@@ -1,8 +1,11 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 import { PersonService } from '../../services/person.service';
+import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Person } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -10,20 +13,32 @@ import { DataTableComponent, TableColumn, TableAction } from '../../../../shared
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PersonFormComponent } from '../person-form/person-form.component';
+import { PersonImportDialogComponent } from '../person-import-dialog/person-import-dialog.component';
 
 @Component({
   selector: 'app-person-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataTableComponent, PageHeaderComponent],
+  imports: [DataTableComponent, PageHeaderComponent, MatButtonModule, MatIconModule],
   template: `
     <div class="page-container">
       <app-page-header
-        title="Persons"
+        title="People"
         subtitle="People and contacts in the system"
         actionLabel="Add Person"
         actionIcon="person_add"
-        (action)="openForm()" />
+        (action)="openForm()">
+        <ng-container extraActions>
+          <button mat-stroked-button (click)="downloadTemplate()">
+            <mat-icon>download</mat-icon>
+            Download Template
+          </button>
+          <button mat-stroked-button (click)="openImportDialog()">
+            <mat-icon>upload</mat-icon>
+            Import People
+          </button>
+        </ng-container>
+      </app-page-header>
 
       <app-data-table
         [columns]="columns"
@@ -38,9 +53,11 @@ import { PersonFormComponent } from '../person-form/person-form.component';
 })
 export class PersonListComponent implements OnInit {
   private personService = inject(PersonService);
+  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
+  private orgId: string | null = null;
   page = signal<Page<Person> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -48,7 +65,7 @@ export class PersonListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'firstName', header: 'First Name' },
     { key: 'lastName',  header: 'Last Name' },
-    { key: 'email',     header: 'Email', sortable: true },
+    { key: 'email',     header: 'Email', sortable: true, type: 'email' },
     { key: 'phone',     header: 'Phone' },
     { key: 'city',      header: 'City' },
   ];
@@ -60,6 +77,7 @@ export class PersonListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPage();
+    this.orgContext.ensureOrgId().subscribe(orgId => { this.orgId = orgId; });
   }
 
   onPageChange(event: PageEvent): void {
@@ -90,6 +108,34 @@ export class PersonListComponent implements OnInit {
       })
       .afterClosed()
       .subscribe(confirmed => { if (confirmed) this.deletePerson(person); });
+  }
+
+  downloadTemplate(): void {
+    if (!this.orgId) {
+      this.notifications.error('No organization found — create one first, under Organizations.');
+      return;
+    }
+    this.personService.downloadImportTemplate(this.orgId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'people-import-template.csv';
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+    });
+  }
+
+  openImportDialog(): void {
+    if (!this.orgId) {
+      this.notifications.error('No organization found — create one first, under Organizations.');
+      return;
+    }
+    this.dialog
+      .open(PersonImportDialogComponent, { width: '600px', data: { orgId: this.orgId } })
+      .afterClosed()
+      .subscribe(imported => { if (imported) this.loadPage(); });
   }
 
   private loadPage(): void {

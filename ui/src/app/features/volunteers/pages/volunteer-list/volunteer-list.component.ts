@@ -82,8 +82,8 @@ export class VolunteerListComponent implements OnInit {
     },
     { key: 'contact', header: 'Contact', cell: (v: Volunteer) => v.contactPerson ? `${v.contactPerson.firstName} ${v.contactPerson.lastName}` : '—' },
     { key: 'areas', header: 'Areas', cell: (v: Volunteer) => (v.areas ?? []).map(a => a.name).join(', ') || '—' },
-    { key: 'onboardDate', header: 'Onboarded', sortable: true },
-    { key: 'isActive', header: 'Active', cell: (v: Volunteer) => v.isActive ? 'Yes' : 'No' },
+    { key: 'onboardDate', header: 'Onboarded', sortable: true, type: 'date' },
+    { key: 'isActive', header: 'Active', cell: (v: Volunteer) => v.isActive ? 'Yes' : 'No', type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

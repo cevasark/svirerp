@@ -49,10 +49,10 @@ export class MembershipTypeListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'name', header: 'Name' },
-    { key: 'annualFee', header: 'Annual Fee', cell: t => `$${Number(t.annualFee ?? 0).toFixed(2)}` },
-    { key: 'durationMonths', header: 'Duration (months)' },
-    { key: 'isActive', header: 'Active', cell: t => (t.isActive ? 'Yes' : 'No') },
-    { key: 'canVote', header: 'Can Vote', cell: t => (t.canVote ? 'Yes' : 'No') },
+    { key: 'annualFee', header: 'Annual Fee', cell: t => `$${Number(t.annualFee ?? 0).toFixed(2)}`, type: 'number' },
+    { key: 'durationMonths', header: 'Duration (months)', type: 'number' },
+    { key: 'isActive', header: 'Active', cell: t => (t.isActive ? 'Yes' : 'No'), type: 'boolean' },
+    { key: 'canVote', header: 'Can Vote', cell: t => (t.canVote ? 'Yes' : 'No'), type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

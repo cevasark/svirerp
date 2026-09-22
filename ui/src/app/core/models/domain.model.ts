@@ -156,6 +156,75 @@ export interface ActionItem {
   updatedAt?: string;
 }
 
+// ─── Governance: Projects ───────────────────────────────────────────────────
+// Task-tracking projects under Governance — distinct from Finance's Fund/"project"
+// restricted-fund-accounting concept (see the Fund interface below).
+
+export interface Project {
+  id: string;
+  org: Organization;
+  name: string;
+  description?: string;
+  status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  dueDate?: string;
+  assignee?: Person;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  project: Project;
+  name: string;
+  description?: string;
+  status: 'todo' | 'in_progress' | 'blocked' | 'done';
+  assignee?: Person;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** authorName is always stamped server-side from the logged-in session — see
+ *  GovernanceController#resolveAuthorName on the backend; never settable from the client. */
+export interface ProjectComment {
+  id: string;
+  project: Project;
+  comment: string;
+  authorName: string;
+  createdAt?: string;
+}
+
+export interface ProjectTaskComment {
+  id: string;
+  projectTask: ProjectTask;
+  comment: string;
+  authorName: string;
+  createdAt?: string;
+}
+
+/** A checklist attached to a Project — a sibling of ProjectTask, not nested under one. A project
+ *  can hold multiple independent checklists (see ProjectChecklist.java's class doc). */
+export interface ProjectChecklist {
+  id: string;
+  project: Project;
+  title: string;
+  completionDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Deliberately 3-state, not a boolean checkbox — see ProjectChecklistItem.java's class doc.
+ *  `detail` is an optional one-line note captured when marking Done/Skipped; Re-open always
+ *  clears it (enforced server-side, not just in the UI). */
+export interface ProjectChecklistItem {
+  id: string;
+  checklist: ProjectChecklist;
+  text: string;
+  detail?: string;
+  status: 'new' | 'done' | 'skipped';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;
@@ -509,6 +578,9 @@ export interface ZeffyCampaignMapping {
   org: Organization;
   campaignTitle: string;
   fund: Fund;
+  /** Overrides the Ticket-category-skips-membership default — Zeffy implements fixed-price
+   *  membership registration as a Ticket-type product, not Donation. */
+  isMembershipPayment: boolean;
   createdAt?: string;
 }
 
@@ -522,27 +594,25 @@ export interface ZeffyImportBatch {
   committedAt?: string;
 }
 
-/** One row per line of an uploaded Zeffy CSV — the preview/commit staging area and audit trail. */
+/** One row per line of an uploaded Zeffy Transactions export — the preview/commit staging area
+ *  and audit trail. */
 export interface ZeffyImportRow {
   id: string;
   batch: ZeffyImportBatch;
   org: Organization;
   rowNumber: number;
-  paymentDate?: string;
-  paymentTime?: string;
+  transactionId?: string;
   amount?: number;
-  paymentStatus?: string;
-  payoutDate?: string;
+  /** "Donation" earns membership tier credit; "Ticket" is a plain income posting only. */
+  category?: 'Donation' | 'Ticket';
+  /** The tax-deductible portion — informational only, blank for non-donation rows. */
+  eligibleAmount?: number;
+  transactionDate?: string;
+  /** When Zeffy pays this out to the bank — informational only. */
+  availableDate?: string;
   firstName?: string;
   lastName?: string;
   email?: string;
-  address?: string;
-  city?: string;
-  postalCode?: string;
-  state?: string;
-  country?: string;
-  taxReceiptNumber?: string;
-  taxReceiptUrl?: string;
   campaignTitle?: string;
   dedupeKey?: string;
   outcome: 'pending_preview' | 'ready' | 'duplicate' | 'skipped_status' | 'unmapped_campaign' | 'error' | 'committed';

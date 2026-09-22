@@ -12,10 +12,26 @@ body {
 
 /* Standard page wrapper: centred, padded */
 .page-container {
-  padding: 24px;
+  padding: 24px 12px;
   max-width: 1280px;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+/* app-data-table: belt-and-suspenders left alignment. Material's own defaults already resolve
+   to left/start for both <th mat-header-cell> and <td mat-cell> (native <table> variant, since
+   V47's mat-header-cell/mat-cell → th/td conversion — see that commit for why the old flex-based
+   mat-table could NOT be fixed with CSS alone: it laid out each row as an independent flex
+   container, so a column's width could differ between the header row and a body row whenever
+   their content differed, no matter what text-align/justify-content said). Kept explicit here as
+   a safety net against a future Material upgrade changing those defaults. */
+.data-table th.mat-mdc-header-cell:not(.actions-cell),
+.data-table td.mat-mdc-cell:not(.actions-cell) {
+  text-align: left;
+}
+.data-table .mat-sort-header-container,
+.data-table .mat-sort-header-content {
+  justify-content: flex-start;
 }
 
 /* Snackbar colour overrides */

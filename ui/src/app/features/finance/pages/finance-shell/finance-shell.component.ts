@@ -9,17 +9,13 @@ import { MatTabsModule } from '@angular/material/tabs';
   imports: [RouterLink, RouterLinkActive, RouterOutlet, MatTabsModule],
   template: `
     <nav mat-tab-nav-bar [tabPanel]="tabPanel" class="finance-tabs">
+      <a mat-tab-link routerLink="reports" routerLinkActive #reportsActive="routerLinkActive"
+         [active]="reportsActive.isActive">
+        Reports
+      </a>
       <a mat-tab-link routerLink="transactions" routerLinkActive #transactionsActive="routerLinkActive"
          [active]="transactionsActive.isActive">
         Transactions
-      </a>
-      <a mat-tab-link routerLink="master" routerLinkActive #masterActive="routerLinkActive"
-         [active]="masterActive.isActive">
-        Master
-      </a>
-      <a mat-tab-link routerLink="vendors" routerLinkActive #vendorsActive="routerLinkActive"
-         [active]="vendorsActive.isActive">
-        Vendors
       </a>
       <a mat-tab-link routerLink="service-requests" routerLinkActive #serviceRequestsActive="routerLinkActive"
          [active]="serviceRequestsActive.isActive">
@@ -33,9 +29,13 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="stripeActive.isActive">
         Stripe
       </a>
-      <a mat-tab-link routerLink="reports" routerLinkActive #reportsActive="routerLinkActive"
-         [active]="reportsActive.isActive">
-        Reports
+      <a mat-tab-link routerLink="master" routerLinkActive #masterActive="routerLinkActive"
+         [active]="masterActive.isActive">
+        Master
+      </a>
+      <a mat-tab-link routerLink="vendors" routerLinkActive #vendorsActive="routerLinkActive"
+         [active]="vendorsActive.isActive">
+        Vendors
       </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>

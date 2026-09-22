@@ -51,10 +51,10 @@ export class AccountListComponent implements OnInit {
   pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, size: 50 });
 
   readonly columns: TableColumn[] = [
-    { key: 'accountNumber', header: '#' },
+    { key: 'accountNumber', header: '#', type: 'number' },
     { key: 'accountName', header: 'Name' },
     { key: 'accountType', header: 'Type', cell: a => a.accountType },
-    { key: 'isActive', header: 'Active', cell: a => (a.isActive ? 'Yes' : 'No') },
+    { key: 'isActive', header: 'Active', cell: a => (a.isActive ? 'Yes' : 'No'), type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

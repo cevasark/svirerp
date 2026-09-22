@@ -43,4 +43,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     @EntityGraph(attributePaths = {"person", "org", "membershipType"})
     Optional<Member> findByPersonIdAndOrgId(UUID personId, UUID orgId);
+
+    long countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(UUID orgId, String status, String membershipTypeName);
+
+    long countByOrgIdAndMembershipType_NameIgnoreCase(UUID orgId, String membershipTypeName);
+
+    long countByOrgId(UUID orgId);
 }

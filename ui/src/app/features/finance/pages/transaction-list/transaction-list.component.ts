@@ -119,7 +119,7 @@ export class TransactionListComponent implements OnInit {
   readonly paymentMethodOptions = PAYMENT_METHOD_OPTIONS;
 
   readonly columns: TableColumn[] = [
-    { key: 'entryDate', header: 'Date', sortable: true },
+    { key: 'entryDate', header: 'Date', sortable: true, type: 'date' },
     { key: 'description', header: 'Description', cell: e => e.description || '—' },
     { key: 'categoryAccount', header: 'Category', cell: e => e.categoryAccount?.accountName ?? '—' },
     { key: 'fund', header: 'Project / Fund', cell: e => e.fund?.fundName ?? '—' },
@@ -129,8 +129,9 @@ export class TransactionListComponent implements OnInit {
       key: 'totalDebit',
       header: 'Amount',
       cell: e => `${e.categoryAccount?.accountType === 'expense' ? '-' : '+'}${e.totalDebit.toFixed(2)}`,
+      type: 'number',
     },
-    { key: 'status', header: 'Status' },
+    { key: 'status', header: 'Status', type: 'status' },
   ];
 
   readonly actions: TableAction[] = [

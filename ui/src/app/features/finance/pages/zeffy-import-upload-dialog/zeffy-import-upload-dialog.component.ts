@@ -19,13 +19,14 @@ interface ZeffyImportUploadDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule],
   template: `
-    <h2 mat-dialog-title>Import Zeffy Payments</h2>
+    <h2 mat-dialog-title>Import Zeffy Transactions</h2>
 
     <mat-dialog-content class="import-dialog">
       <p>
-        Upload a Zeffy payment export (.xlsx or .csv). You'll get a preview of every row — new
-        people/members, duplicates, skipped/refunded payments, and any campaigns that still need a
-        fund assigned — before anything is actually recorded.
+        Upload a Zeffy <strong>Transactions</strong> export (.xlsx or .csv — not the older Payments
+        export, which is no longer accepted). You'll get a preview of every row — new
+        people/members, duplicates, and any campaigns that still need a fund assigned — before
+        anything is actually recorded.
       </p>
 
       <input type="file" accept=".xlsx,.xls,.csv" (change)="onFileSelected($event)" />

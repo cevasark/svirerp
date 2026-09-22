@@ -54,12 +54,12 @@ export class StripeEventsListComponent implements OnInit {
   pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, sort: 'receivedAt,desc' });
 
   readonly columns: TableColumn[] = [
-    { key: 'receivedAt', header: 'Received', cell: (e: StripeWebhookEvent) => e.receivedAt ? new Date(e.receivedAt).toLocaleString() : '—' },
+    { key: 'receivedAt', header: 'Received', cell: (e: StripeWebhookEvent) => e.receivedAt ? new Date(e.receivedAt).toLocaleString() : '—', type: 'date' },
     { key: 'eventType', header: 'Event', cell: (e: StripeWebhookEvent) => e.eventType },
     { key: 'payer', header: 'Payer', cell: (e: StripeWebhookEvent) => e.person ? `${e.person.firstName} ${e.person.lastName}` : (e.email || '—') },
-    { key: 'amount', header: 'Amount', cell: (e: StripeWebhookEvent) => e.amount != null ? e.amount.toFixed(2) : '—' },
-    { key: 'fee', header: 'Fee', cell: (e: StripeWebhookEvent) => e.fee != null ? e.fee.toFixed(2) : '—' },
-    { key: 'status', header: 'Status', cell: (e: StripeWebhookEvent) => STATUS_LABELS[e.status] ?? e.status },
+    { key: 'amount', header: 'Amount', cell: (e: StripeWebhookEvent) => e.amount != null ? e.amount.toFixed(2) : '—', type: 'number' },
+    { key: 'fee', header: 'Fee', cell: (e: StripeWebhookEvent) => e.fee != null ? e.fee.toFixed(2) : '—', type: 'number' },
+    { key: 'status', header: 'Status', cell: (e: StripeWebhookEvent) => STATUS_LABELS[e.status] ?? e.status, type: 'status' },
     { key: 'detail', header: 'Detail', cell: (e: StripeWebhookEvent) => this.detailFor(e) },
   ];
 

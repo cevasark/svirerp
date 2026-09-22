@@ -40,7 +40,7 @@ import { NavCollapseService } from '../../core/services/nav-collapse.service';
 
         <div class="brand-header">
           @if (!navCollapsed()) {
-            <mat-icon class="brand-icon">church</mat-icon>
+            <img class="brand-icon" src="assets/logo.png" alt="SvirERP logo">
             <span class="brand-name">SvirERP</span>
             <span class="brand-header-spacer"></span>
           }
@@ -90,7 +90,7 @@ import { NavCollapseService } from '../../core/services/nav-collapse.service';
       border-bottom: 1px solid rgba(0,0,0,.08);
     }
     .shell-sidenav.collapsed .brand-header { padding: 8px; justify-content: center; }
-    .brand-icon { color: #3f51b5; font-size: 28px; flex-shrink: 0; }
+    .brand-icon { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
     .brand-name { font-size: 20px; font-weight: 500; white-space: nowrap; }
     .brand-header-spacer { flex: 1 1 auto; }
     .shell-toolbar { position: sticky; top: 0; z-index: 10; }

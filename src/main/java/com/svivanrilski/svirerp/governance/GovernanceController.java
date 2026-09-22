@@ -1,12 +1,15 @@
 package com.svivanrilski.svirerp.governance;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -244,5 +247,187 @@ public class GovernanceController {
     public ResponseEntity<Void> deleteActionItem(@PathVariable UUID id) {
         service.deleteActionItem(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Project ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/projects")
+    public Page<Project> listProjects(@PathVariable UUID orgId,
+            @RequestParam(required = false) String status, Pageable pageable) {
+        return service.findProjectsByOrg(orgId, status, pageable);
+    }
+
+    @GetMapping("/api/projects/{id}")
+    public Project getProject(@PathVariable UUID id) {
+        return service.findProjectById(id);
+    }
+
+    @PostMapping("/api/projects")
+    public ResponseEntity<Project> createProject(@Valid @RequestBody Project project) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createProject(project));
+    }
+
+    @PutMapping("/api/projects/{id}")
+    public Project updateProject(@PathVariable UUID id, @Valid @RequestBody Project project) {
+        return service.updateProject(id, project);
+    }
+
+    @DeleteMapping("/api/projects/{id}")
+    public ResponseEntity<Void> deleteProject(@PathVariable UUID id) {
+        service.deleteProject(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── ProjectTask ──────────────────────────────────────────────────────────
+
+    @GetMapping("/api/projects/{projectId}/tasks")
+    public List<ProjectTask> listProjectTasks(@PathVariable UUID projectId) {
+        return service.findTasksByProject(projectId);
+    }
+
+    @PostMapping("/api/project-tasks")
+    public ResponseEntity<ProjectTask> createProjectTask(@Valid @RequestBody ProjectTask task) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createProjectTask(task));
+    }
+
+    @PutMapping("/api/project-tasks/{id}")
+    public ProjectTask updateProjectTask(@PathVariable UUID id, @Valid @RequestBody ProjectTask task) {
+        return service.updateProjectTask(id, task);
+    }
+
+    @DeleteMapping("/api/project-tasks/{id}")
+    public ResponseEntity<Void> deleteProjectTask(@PathVariable UUID id) {
+        service.deleteProjectTask(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── ProjectChecklist / ProjectChecklistItem ─────────────────────────────
+    // A sibling of ProjectTask under Project, not nested under one — see GovernanceService's
+    // ProjectChecklist section for why (V50).
+
+    @GetMapping("/api/projects/{projectId}/checklists")
+    public List<ProjectChecklist> listChecklists(@PathVariable UUID projectId) {
+        return service.findChecklistsByProject(projectId);
+    }
+
+    // A dedicated request record rather than @Valid ProjectChecklist itself — the entity's own
+    // project field is @NotNull (correct for the entity), but the client must never supply it here
+    // since it's already resolved from the projectId path variable; reusing the entity for the
+    // request body would force the client to redundantly echo it back, same reasoning as
+    // CommentRequest below.
+    public record ChecklistRequest(@NotBlank String title, LocalDate completionDate) {
+    }
+
+    @PostMapping("/api/projects/{projectId}/checklists")
+    public ResponseEntity<ProjectChecklist> createChecklist(@PathVariable UUID projectId,
+            @Valid @RequestBody ChecklistRequest request) {
+        ProjectChecklist created = service.createChecklist(projectId, request.title(), request.completionDate());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/api/project-checklists/{id}")
+    public ProjectChecklist updateChecklist(@PathVariable UUID id, @Valid @RequestBody ChecklistRequest request) {
+        return service.updateChecklist(id, request.title(), request.completionDate());
+    }
+
+    @DeleteMapping("/api/project-checklists/{id}")
+    public ResponseEntity<Void> deleteChecklist(@PathVariable UUID id) {
+        service.deleteChecklist(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    public record ChecklistItemRequest(@NotBlank String text) {
+    }
+
+    @GetMapping("/api/project-checklists/{checklistId}/items")
+    public List<ProjectChecklistItem> listChecklistItems(@PathVariable UUID checklistId) {
+        return service.findChecklistItems(checklistId);
+    }
+
+    @PostMapping("/api/project-checklists/{checklistId}/items")
+    public ResponseEntity<ProjectChecklistItem> addChecklistItem(@PathVariable UUID checklistId,
+            @Valid @RequestBody ChecklistItemRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addChecklistItem(checklistId, request.text()));
+    }
+
+    @DeleteMapping("/api/project-checklist-items/{id}")
+    public ResponseEntity<Void> deleteChecklistItem(@PathVariable UUID id) {
+        service.deleteChecklistItem(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // detail is optional (no @NotBlank) — Done/Skip both work with no note at all.
+    public record ChecklistItemActionRequest(String detail) {
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/done")
+    public ProjectChecklistItem markChecklistItemDone(@PathVariable UUID id,
+            @RequestBody(required = false) ChecklistItemActionRequest request) {
+        return service.markChecklistItemDone(id, request != null ? request.detail() : null);
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/skip")
+    public ProjectChecklistItem markChecklistItemSkipped(@PathVariable UUID id,
+            @RequestBody(required = false) ChecklistItemActionRequest request) {
+        return service.markChecklistItemSkipped(id, request != null ? request.detail() : null);
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/reopen")
+    public ProjectChecklistItem reopenChecklistItem(@PathVariable UUID id) {
+        return service.reopenChecklistItem(id);
+    }
+
+    // ── ProjectComment / ProjectTaskComment ─────────────────────────────────
+    // POST bodies only ever carry the comment text — authorName is always resolved server-side
+    // from the caller's own session (see resolveAuthorName), never trusted from the client.
+
+    public record CommentRequest(@NotBlank String comment) {
+    }
+
+    @GetMapping("/api/projects/{projectId}/comments")
+    public List<ProjectComment> listProjectComments(@PathVariable UUID projectId) {
+        return service.findCommentsByProject(projectId);
+    }
+
+    @PostMapping("/api/projects/{projectId}/comments")
+    public ResponseEntity<ProjectComment> createProjectComment(@PathVariable UUID projectId,
+            @Valid @RequestBody CommentRequest request, Authentication authentication) {
+        ProjectComment created = service.createProjectComment(
+                projectId, request.comment(), resolveAuthorName(authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @DeleteMapping("/api/project-comments/{id}")
+    public ResponseEntity<Void> deleteProjectComment(@PathVariable UUID id) {
+        service.deleteProjectComment(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/project-tasks/{taskId}/comments")
+    public List<ProjectTaskComment> listProjectTaskComments(@PathVariable UUID taskId) {
+        return service.findCommentsByTask(taskId);
+    }
+
+    @PostMapping("/api/project-tasks/{taskId}/comments")
+    public ResponseEntity<ProjectTaskComment> createProjectTaskComment(@PathVariable UUID taskId,
+            @Valid @RequestBody CommentRequest request, Authentication authentication) {
+        ProjectTaskComment created = service.createProjectTaskComment(
+                taskId, request.comment(), resolveAuthorName(authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @DeleteMapping("/api/project-task-comments/{id}")
+    public ResponseEntity<Void> deleteProjectTaskComment(@PathVariable UUID id) {
+        service.deleteProjectTaskComment(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Same logic as AuthController#me — Google's display name, or the local-admin username —
+     *  since a comment's author is always "whoever is logged in right now," never client-supplied. */
+    private String resolveAuthorName(Authentication authentication) {
+        if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+            return oidcUser.getFullName();
+        }
+        return authentication.getName();
     }
 }

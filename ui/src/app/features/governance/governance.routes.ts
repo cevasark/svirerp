@@ -8,7 +8,7 @@ export const governanceRoutes: Routes = [
         m => m.GovernanceShellComponent,
       ),
     children: [
-      { path: '', redirectTo: 'meeting-minutes', pathMatch: 'full' },
+      { path: '', redirectTo: 'projects', pathMatch: 'full' },
       {
         path: 'trustees',
         loadComponent: () =>
@@ -28,6 +28,20 @@ export const governanceRoutes: Routes = [
         loadComponent: () =>
           import('./pages/meeting-minutes-detail/meeting-minutes-detail.component').then(
             m => m.MeetingMinutesDetailComponent,
+          ),
+      },
+      {
+        path: 'projects',
+        loadComponent: () =>
+          import('./pages/project-list/project-list.component').then(
+            m => m.ProjectListComponent,
+          ),
+      },
+      {
+        path: 'projects/:id',
+        loadComponent: () =>
+          import('./pages/project-detail/project-detail.component').then(
+            m => m.ProjectDetailComponent,
           ),
       },
     ],

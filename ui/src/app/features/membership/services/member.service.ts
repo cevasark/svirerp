@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { ResourceService } from '../../../core/services/resource.service';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
 import { Member } from '../../../core/models/domain.model';
-import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTiersResult } from '../../../core/models/api.model';
+import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTiersResult, MemberSummary } from '../../../core/models/api.model';
 
 @Injectable({ providedIn: 'root' })
 export class MemberService extends ResourceService<Member> {
@@ -34,6 +34,12 @@ export class MemberService extends ResourceService<Member> {
     return this.http.get<Page<Member>>(
       `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/members`,
       { params: p },
+    );
+  }
+
+  getSummary(orgId: string): Observable<MemberSummary> {
+    return this.http.get<MemberSummary>(
+      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/members/summary`,
     );
   }
 

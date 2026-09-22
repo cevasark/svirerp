@@ -66,9 +66,9 @@ export class MemberPaymentListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'name', header: 'Member Name', cell: (p: MemberPayment) => `${p.member.person.firstName} ${p.member.person.lastName}` },
-    { key: 'email', header: 'Member Email', cell: (p: MemberPayment) => p.member.person.email, sortable: true, sortKey: 'member.person.email' },
-    { key: 'amount', header: 'Amount', cell: (p: MemberPayment) => `$${Number(p.amount).toFixed(2)}` },
-    { key: 'paymentDate', header: 'Date', sortable: true },
+    { key: 'email', header: 'Member Email', cell: (p: MemberPayment) => p.member.person.email, sortable: true, sortKey: 'member.person.email', type: 'email' },
+    { key: 'amount', header: 'Amount', cell: (p: MemberPayment) => `$${Number(p.amount).toFixed(2)}`, type: 'number' },
+    { key: 'paymentDate', header: 'Date', sortable: true, type: 'date' },
   ];
 
   readonly actions: TableAction[] = [

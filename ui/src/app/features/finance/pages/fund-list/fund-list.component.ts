@@ -50,9 +50,9 @@ export class FundListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'fundName', header: 'Name' },
-    { key: 'fundCode', header: 'Code' },
+    { key: 'fundCode', header: 'Code', type: 'number' },
     { key: 'fundType', header: 'Type', cell: f => f.fundType.replace(/_/g, ' ') },
-    { key: 'isActive', header: 'Active', cell: f => (f.isActive ? 'Yes' : 'No') },
+    { key: 'isActive', header: 'Active', cell: f => (f.isActive ? 'Yes' : 'No'), type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

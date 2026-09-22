@@ -63,10 +63,10 @@ export class TrusteeListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: t => `${t.person.firstName} ${t.person.lastName}` },
     { key: 'title', header: 'Title', cell: t => t.title || t.role },
-    { key: 'termStart', header: 'Term Start', sortable: true },
-    { key: 'termEnd', header: 'Term End', cell: t => t.termEnd || '—', sortable: true },
-    { key: 'status', header: 'Status', cell: t => trusteeStatus(t) },
-    { key: 'isOfficer', header: 'Officer', cell: t => (t.isOfficer ? 'Yes' : 'No') },
+    { key: 'termStart', header: 'Term Start', sortable: true, type: 'date' },
+    { key: 'termEnd', header: 'Term End', cell: t => t.termEnd || '—', sortable: true, type: 'date' },
+    { key: 'status', header: 'Status', cell: t => trusteeStatus(t), type: 'status' },
+    { key: 'isOfficer', header: 'Officer', cell: t => (t.isOfficer ? 'Yes' : 'No'), type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

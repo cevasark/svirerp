@@ -33,7 +33,41 @@ export interface TableColumn {
   /** Backend sort property, if it differs from `key` (e.g. a nested path like "person.email", or
    *  because `key` is a computed/display-only column such as a joined name). Defaults to `key`. */
   sortKey?: string;
+  /** Sizing hint for the desktop table layout. 'date'/'number'/'status'/'boolean' values are
+   *  naturally short and are pinned to a narrow fixed width instead of eating space that's better
+   *  spent elsewhere; 'email' gets a larger share since it's often the longest value in the row.
+   *  Defaults to 'text' (a normal flexible share of the remaining width). No effect on the mobile
+   *  card layout, which stacks every field at full width regardless. */
+  type?: 'text' | 'date' | 'number' | 'status' | 'boolean' | 'email';
 }
+
+/** Column width hint per type, for the native <table>'s browser-computed column-grid layout.
+ *  'date'/'number'/'status'/'boolean' get a fixed width so they never claim more than they need;
+ *  'text'/'email' get a min-width floor and are free to grow into whatever space is left — 'email'
+ *  starts from a taller floor since it's typically the longest value in the row. Unlike the old
+ *  flex-based sizing, a real <table> guarantees these resolve to the SAME pixel width in the
+ *  header row and every body row — a flex mat-table lays out each row as an independent flex
+ *  container, so header/body column widths could silently drift apart when row content differed
+ *  (e.g. a short "Email" header next to a long real address) even with identical flex values. */
+const COLUMN_WIDTH: Record<NonNullable<TableColumn['type']>, string> = {
+  date: '130px',
+  number: '100px',
+  status: '120px',
+  boolean: '90px',
+  email: '220px',
+  text: '140px',
+};
+/** Fixed-width types must not wrap — a wrapped header inside Angular Material's mat-sort-header
+ *  renders its second line centered instead of left-aligned (a known Material quirk), and with
+ *  only 90-130px to work with, a long enough locale/value could otherwise trigger it. */
+const COLUMN_NOWRAP: Record<NonNullable<TableColumn['type']>, boolean> = {
+  date: true,
+  number: true,
+  status: true,
+  boolean: true,
+  email: false,
+  text: false,
+};
 
 export interface TableAction {
   icon: string;
@@ -138,30 +172,33 @@ export interface TableAction {
           }
         </div>
       } @else {
-        <mat-table [dataSource]="rows()" matSort matSortDisableClear
-                   [matSortActive]="activeSortKey()"
-                   [matSortDirection]="activeSortDirection()"
-                   (matSortChange)="onSortChange($event)"
-                   class="data-table mat-elevation-z1">
+        <table mat-table [dataSource]="rows()" matSort matSortDisableClear
+               [matSortActive]="activeSortKey()"
+               [matSortDirection]="activeSortDirection()"
+               (matSortChange)="onSortChange($event)"
+               class="data-table mat-elevation-z1">
 
           @for (col of columns(); track col.key) {
             <ng-container [matColumnDef]="col.key">
-              <mat-header-cell *matHeaderCellDef [mat-sort-header]="col.sortKey ?? col.key" [disabled]="!col.sortable">
+              <th mat-header-cell *matHeaderCellDef [style.width]="columnWidth(col.type)"
+                  [style.white-space]="columnNoWrap(col.type)"
+                  [mat-sort-header]="col.sortKey ?? col.key" [disabled]="!col.sortable">
                 {{ col.header }}
-              </mat-header-cell>
-              <mat-cell *matCellDef="let row">
+              </th>
+              <td mat-cell *matCellDef="let row" [style.width]="columnWidth(col.type)"
+                  [style.white-space]="columnNoWrap(col.type)">
                 @if (col.link) {
                   <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
                 } @else {
                   {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
                 }
-              </mat-cell>
+              </td>
             </ng-container>
           }
 
           <ng-container matColumnDef="_actions">
-            <mat-header-cell *matHeaderCellDef class="actions-cell">Actions</mat-header-cell>
-            <mat-cell *matCellDef="let row" class="actions-cell">
+            <th mat-header-cell *matHeaderCellDef class="actions-cell">Actions</th>
+            <td mat-cell *matCellDef="let row" class="actions-cell">
               @for (act of actions(); track act.icon) {
                 <button mat-icon-button
                         [matTooltip]="act.label"
@@ -170,18 +207,18 @@ export interface TableAction {
                   <mat-icon>{{ act.icon }}</mat-icon>
                 </button>
               }
-            </mat-cell>
+            </td>
           </ng-container>
 
-          <mat-header-row *matHeaderRowDef="displayedColumns()" />
-          <mat-row *matRowDef="let row; columns: displayedColumns()" />
+          <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
 
           <tr class="mat-row no-data-row" *matNoDataRow>
             <td [attr.colspan]="displayedColumns().length" class="no-data-cell">
               {{ emptyMessage() }}
             </td>
           </tr>
-        </mat-table>
+        </table>
       }
 
       <mat-paginator
@@ -197,7 +234,7 @@ export interface TableAction {
     .table-wrapper { position: relative; }
     .loading-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; }
     .data-table { width: 100%; margin-top: 4px; }
-    .actions-cell { justify-content: flex-end; min-width: 100px; }
+    .actions-cell { text-align: right; white-space: nowrap; width: 1%; min-width: 100px; }
     .no-data-row { display: block; }
     .no-data-cell { text-align: center; padding: 32px; color: rgba(0,0,0,.54); display: block; margin: 0; }
     .cell-link { color: #3f51b5; cursor: pointer; text-decoration: none; }
@@ -250,6 +287,14 @@ export class DataTableComponent {
     '_actions',
   ]);
   sortableColumns = computed(() => this.columns().filter(c => c.sortable));
+
+  columnWidth(type: TableColumn['type']): string {
+    return COLUMN_WIDTH[type ?? 'text'];
+  }
+
+  columnNoWrap(type: TableColumn['type']): string {
+    return COLUMN_NOWRAP[type ?? 'text'] ? 'nowrap' : 'normal';
+  }
 
   activeSortKey = computed(() => this.pageParams().sort?.split(',')[0] ?? '');
   activeSortDirection = computed<SortDirection>(() => (this.pageParams().sort?.split(',')[1] as SortDirection) ?? '');

@@ -21,8 +21,8 @@ import { ZeffyImportUploadDialogComponent } from '../zeffy-import-upload-dialog/
     <div class="page-container">
       <app-page-header
         title="Zeffy Import"
-        subtitle="Import a Zeffy payment export — preview, resolve any campaign fund mapping, then commit"
-        actionLabel="Import Zeffy CSV"
+        subtitle="Import a Zeffy Transactions export — preview, resolve any campaign fund mapping, then commit"
+        actionLabel="Import Zeffy Transactions"
         actionIcon="upload_file"
         (action)="openUpload()" />
 
@@ -51,9 +51,9 @@ export class ZeffyImportListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'fileName', header: 'File', link: (b: ZeffyImportBatch) => this.openDetail(b) },
-    { key: 'uploadedAt', header: 'Uploaded', cell: (b: ZeffyImportBatch) => new Date(b.uploadedAt!).toLocaleString(), sortable: true },
-    { key: 'status', header: 'Status', cell: (b: ZeffyImportBatch) => (b.status === 'committed' ? 'Committed' : 'Preview only') },
-    { key: 'rowCount', header: 'Rows' },
+    { key: 'uploadedAt', header: 'Uploaded', cell: (b: ZeffyImportBatch) => new Date(b.uploadedAt!).toLocaleString(), sortable: true, type: 'date' },
+    { key: 'status', header: 'Status', cell: (b: ZeffyImportBatch) => (b.status === 'committed' ? 'Committed' : 'Preview only'), type: 'status' },
+    { key: 'rowCount', header: 'Rows', type: 'number' },
   ];
 
   ngOnInit(): void {

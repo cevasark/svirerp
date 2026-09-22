@@ -82,9 +82,9 @@ export class EventListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'title', header: 'Title' },
     { key: 'eventType', header: 'Type', cell: (e: CalendarEvent) => e.eventType || '—' },
-    { key: 'startDatetime', header: 'Start', sortable: true },
+    { key: 'startDatetime', header: 'Start', sortable: true, type: 'date' },
     { key: 'location', header: 'Location', cell: (e: CalendarEvent) => e.location || '—' },
-    { key: 'status', header: 'Status' },
+    { key: 'status', header: 'Status', type: 'status' },
     { key: 'calendarSync', header: 'Calendar Sync', cell: (e: CalendarEvent) => calendarSyncSummary(e) },
   ];
 

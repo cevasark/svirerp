@@ -77,7 +77,7 @@ export class MeetingMinutesListComponent implements OnInit {
   openActionItemsOnlyFilter = false;
 
   readonly columns: TableColumn[] = [
-    { key: 'meetingDate', header: 'Date', sortable: true },
+    { key: 'meetingDate', header: 'Date', sortable: true, type: 'date' },
     { key: 'title', header: 'Title' },
     { key: 'summary', header: 'Summary', cell: m => excerpt(m.summary) },
   ];

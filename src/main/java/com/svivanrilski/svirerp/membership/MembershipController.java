@@ -62,6 +62,11 @@ public class MembershipController {
         return service.findAllMembers(orgId, status, membershipTypeId, pageable);
     }
 
+    @GetMapping("/api/organizations/{orgId}/members/summary")
+    public MembershipService.MemberSummary getMemberSummary(@PathVariable UUID orgId) {
+        return service.getMemberSummary(orgId);
+    }
+
     @GetMapping("/api/organizations/{orgId}/members/import-template")
     public ResponseEntity<byte[]> importTemplate(@PathVariable UUID orgId) {
         byte[] csv = importService.buildImportTemplateCsv();

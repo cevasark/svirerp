@@ -5,7 +5,8 @@
       "Bash(git -C \"H:/workspaces/svirerp\" update-index --chmod=+x mvnw)",
       "Bash(git -C \"H:/workspaces/svirerp\" status --short)",
       "Bash(git *)",
-      "Bash(wsl.exe *)"
+      "Bash(wsl.exe *)",
+      "Bash(grep -iv \"\\\\.class$\")"
     ]
   }
 }

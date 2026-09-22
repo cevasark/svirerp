@@ -10,6 +10,7 @@ import {
   ZeffyImportSummary,
   ZeffyImportCommitResult,
   ZeffyCampaignMappingRequest,
+  ReprocessMembershipResult,
 } from '../../../core/models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -75,5 +76,14 @@ export class ZeffyImportService {
 
   deleteMapping(id: string): Observable<void> {
     return this.http.delete<void>(`${this.env.apiUrl}/zeffy-campaign-mappings/${id}`);
+  }
+
+  /** One-time backfill for already-committed Ticket rows whose campaign has since been flagged
+   *  as a membership payment — safe to call more than once (idempotent on the backend). */
+  reprocessMembershipRows(orgId: string): Observable<ReprocessMembershipResult> {
+    return this.http.post<ReprocessMembershipResult>(
+      `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports/reprocess-membership-rows`,
+      {},
+    );
   }
 }

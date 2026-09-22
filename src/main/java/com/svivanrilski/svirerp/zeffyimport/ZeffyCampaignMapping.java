@@ -46,6 +46,13 @@ public class ZeffyCampaignMapping {
     @JoinColumn(name = "fund_id", nullable = false)
     private Fund fund;
 
+    /** Overrides the Ticket-category-skips-membership default (see ZeffyImportRowApplier#applyRow)
+     *  — Zeffy implements fixed-price membership registration as a Ticket-type product, not
+     *  Donation, so a campaign that's actually collecting dues needs this explicitly set. */
+    @Column(name = "is_membership_payment", nullable = false)
+    @Builder.Default
+    private Boolean isMembershipPayment = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

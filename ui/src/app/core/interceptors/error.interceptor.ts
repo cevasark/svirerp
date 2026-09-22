@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { NotificationService } from '../services/notification.service';
+import { ReturnUrlService } from '../services/return-url.service';
 import { ApiError } from '../models/api.model';
 
 /**
@@ -15,6 +16,7 @@ import { ApiError } from '../models/api.model';
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const notifications = inject(NotificationService);
   const router = inject(Router);
+  const returnUrl = inject(ReturnUrlService);
 
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
@@ -34,6 +36,10 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         notifications.error('Cannot reach the server. Check your connection.');
       } else if (err.status === 401) {
         if (!isAuthEndpoint) {
+          // Session expired mid-visit (not the initial page-load gate — authGuard already
+          // handles that case) — save where we were so login lands back here, same as a shared
+          // link. See ReturnUrlService's class doc for why this is sessionStorage, not a query param.
+          returnUrl.save(router.url);
           router.navigate(['/login']);
         }
       } else if (err.status >= 500) {

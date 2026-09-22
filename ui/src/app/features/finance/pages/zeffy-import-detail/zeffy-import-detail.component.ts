@@ -4,13 +4,20 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectChange, MatSelectModule } from '@angular/material/select';
+import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { ZeffyImportService } from '../../services/zeffy-import.service';
 import { FundService } from '../../services/fund.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ZeffyImportBatch, ZeffyImportRow, Fund } from '../../../../core/models/domain.model';
-import { ZeffyImportSummary, ZeffyImportCommitResult } from '../../../../core/models/api.model';
+import { ZeffyImportSummary, ZeffyImportCommitResult, ZeffyCampaignMappingRequest } from '../../../../core/models/api.model';
+
+interface MappingSelection {
+  fundId: string | null;
+  isMembershipPayment: boolean;
+}
 
 const OUTCOME_LABELS: Record<ZeffyImportRow['outcome'], string> = {
   pending_preview: 'Pending',
@@ -32,6 +39,8 @@ const OUTCOME_LABELS: Record<ZeffyImportRow['outcome'], string> = {
     MatIconModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatCheckboxModule,
+    MatTooltipModule,
     MatProgressSpinnerModule,
   ],
   template: `
@@ -73,13 +82,20 @@ const OUTCOME_LABELS: Record<ZeffyImportRow['outcome'], string> = {
                 <span class="campaign-title">{{ title }}</span>
                 <mat-form-field appearance="outline" class="fund-select">
                   <mat-label>Fund</mat-label>
-                  <mat-select [value]="mappingSelections()[title] ?? null"
+                  <mat-select [value]="mappingSelections()[title]?.fundId ?? null"
                               (selectionChange)="onMappingSelect(title, $event)">
                     @for (f of funds(); track f.id) {
                       <mat-option [value]="f.id">{{ f.fundName }}</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>
+                <mat-checkbox [checked]="mappingSelections()[title]?.isMembershipPayment ?? false"
+                              (change)="onMembershipToggle(title, $event)"
+                              matTooltip="Zeffy sometimes implements membership registration as a Ticket-type
+                                          product instead of a Donation — check this if that's what this
+                                          campaign actually is, so it still counts toward membership.">
+                  Membership payment
+                </mat-checkbox>
               </div>
             }
             <button mat-stroked-button color="primary" [disabled]="!allMappingsSelected() || savingMappings()"
@@ -119,7 +135,7 @@ const OUTCOME_LABELS: Record<ZeffyImportRow['outcome'], string> = {
       <table class="rows-table">
         <thead>
           <tr>
-            <th>#</th><th>Name</th><th>Email</th><th>Amount</th><th>Campaign</th><th>Outcome</th><th>Detail</th>
+            <th>#</th><th>Name</th><th>Email</th><th>Amount</th><th>Category</th><th>Campaign</th><th>Outcome</th><th>Detail</th>
           </tr>
         </thead>
         <tbody>
@@ -129,6 +145,7 @@ const OUTCOME_LABELS: Record<ZeffyImportRow['outcome'], string> = {
               <td>{{ row.firstName }} {{ row.lastName }}</td>
               <td>{{ row.email }}</td>
               <td>{{ row.amount != null ? formatCurrency(row.amount) : '—' }}</td>
+              <td>{{ row.category || '—' }}</td>
               <td>{{ row.campaignTitle || '—' }}</td>
               <td>{{ outcomeLabel(row) }}</td>
               <td>{{ row.outcomeDetail || '—' }}</td>
@@ -179,13 +196,13 @@ export class ZeffyImportDetailComponent implements OnInit {
   // A plain mutation of this object would never be seen by the `computed()`s below — computed()
   // only re-evaluates when a *signal* it read changes, so this has to be a signal itself, updated
   // immutably via .update(), not a plain object driven by [(ngModel)].
-  mappingSelections = signal<Record<string, string | null>>({});
+  mappingSelections = signal<Record<string, MappingSelection>>({});
 
   allMappingsSelected = computed(() => {
     const s = this.summary();
     if (!s) return false;
     const selections = this.mappingSelections();
-    return s.unmappedCampaignTitles.every(title => !!selections[title]);
+    return s.unmappedCampaignTitles.every(title => !!selections[title]?.fundId);
   });
 
   // unmappedCampaignCount reflects each row's outcome as stored on the backend, which only
@@ -217,7 +234,21 @@ export class ZeffyImportDetailComponent implements OnInit {
   }
 
   onMappingSelect(title: string, event: MatSelectChange): void {
-    this.mappingSelections.update(current => ({ ...current, [title]: event.value }));
+    this.mappingSelections.update(current => ({
+      ...current,
+      [title]: { ...this.selectionFor(current, title), fundId: event.value },
+    }));
+  }
+
+  onMembershipToggle(title: string, event: MatCheckboxChange): void {
+    this.mappingSelections.update(current => ({
+      ...current,
+      [title]: { ...this.selectionFor(current, title), isMembershipPayment: event.checked },
+    }));
+  }
+
+  private selectionFor(current: Record<string, MappingSelection>, title: string): MappingSelection {
+    return current[title] ?? { fundId: null, isMembershipPayment: false };
   }
 
   saveMappings(): void {
@@ -277,10 +308,14 @@ export class ZeffyImportDetailComponent implements OnInit {
     });
   }
 
-  private pendingMappingRequests(): { campaignTitle: string; fundId: string }[] {
+  private pendingMappingRequests(): ZeffyCampaignMappingRequest[] {
     return Object.entries(this.mappingSelections())
-      .filter((entry): entry is [string, string] => !!entry[1])
-      .map(([campaignTitle, fundId]) => ({ campaignTitle, fundId }));
+      .filter((entry): entry is [string, MappingSelection] => !!entry[1]?.fundId)
+      .map(([campaignTitle, sel]) => ({
+        campaignTitle,
+        fundId: sel.fundId!,
+        isMembershipPayment: sel.isMembershipPayment,
+      }));
   }
 
   private load(): void {

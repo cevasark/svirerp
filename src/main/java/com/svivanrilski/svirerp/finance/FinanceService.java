@@ -833,6 +833,44 @@ public class FinanceService {
         return postEntry(entry.getId(), null);
     }
 
+    /**
+     * Moves already-recognized revenue from one category account to another — e.g. correcting a
+     * Zeffy Ticket-category transaction that turned out to actually be a membership payment, after
+     * it already posted to the wrong revenue account. Doesn't touch any asset/clearing account, so
+     * cash-in-hand figures are unaffected; this is purely a categorization fix.
+     */
+    @Transactional
+    public JournalEntry reclassifyIncome(UUID orgId, LocalDate entryDate, BigDecimal amount, String description,
+            UUID fromCategoryAccountId, UUID toCategoryAccountId) {
+        Organization org = orgService.findById(orgId);
+        Account from = findAccountById(fromCategoryAccountId);
+        requireAccountType(from, "revenue", "Source account");
+        Account to = findAccountById(toCategoryAccountId);
+        requireAccountType(to, "revenue", "Destination account");
+
+        JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
+                .org(org)
+                .entryDate(entryDate)
+                .description(description)
+                .entryType("general")
+                .status("draft")
+                .totalDebit(amount)
+                .totalCredit(amount)
+                .build());
+
+        // Revenue is credit-normal — debiting `from` reduces its balance, crediting `to` increases it.
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(from)
+                .debitAmount(amount).creditAmount(BigDecimal.ZERO)
+                .memo(description).build());
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(to)
+                .debitAmount(BigDecimal.ZERO).creditAmount(amount)
+                .memo(description).build());
+
+        return postEntry(entry.getId(), null);
+    }
+
     private void requireAccountType(Account account, String expectedType, String label) {
         if (!expectedType.equals(account.getAccountType())) {
             throw new IllegalArgumentException(label + " must be a '" + expectedType

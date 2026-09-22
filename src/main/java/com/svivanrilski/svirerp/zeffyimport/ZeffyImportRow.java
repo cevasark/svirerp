@@ -47,24 +47,40 @@ public class ZeffyImportRow {
     @Column(name = "csv_row_number", nullable = false)
     private Integer rowNumber;
 
-    // --- Raw/parsed Zeffy CSV columns ---
+    // --- Raw/parsed Zeffy Transactions-export columns ---
 
-    @Column(name = "payment_date")
-    private LocalDate paymentDate;
-
-    /** Raw "Payment Time (America/Chicago)" text — kept unparsed, only used for the dedupe key. */
-    @Column(name = "payment_time", length = 20)
-    private String paymentTime;
+    /** Zeffy's own transaction Id (e.g. "txn_..."), from the "Id" column — always present, and
+     *  the dedupe key (see ZeffyImportService#computeOutcome). */
+    @Column(name = "transaction_id", length = 100)
+    private String transactionId;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal amount;
 
-    /** Raw "Payment Status" text from the export (e.g. "Succeeded", "Refunded"). */
-    @Column(name = "payment_status", length = 50)
-    private String paymentStatus;
+    /** Usually "Donation" or "Ticket", from the "Category" column — drives purpose routing in
+     *  ZeffyImportRowApplier (Donation earns membership tier credit, Ticket doesn't). Zeffy can also
+     *  send other values here (e.g. "Dispute pending" for a chargeback, with a negative Amount) —
+     *  ZeffyImportService#computeOutcome flags anything outside {Donation, Ticket} as outcome='error'
+     *  for manual review rather than guessing how to post it. Deliberately not DB-CHECK-constrained
+     *  (see V46) so an unexpected value can still be saved and made visible on the error row. */
+    @Column(length = 30)
+    private String category;
 
-    @Column(name = "payout_date")
-    private LocalDate payoutDate;
+    /** "Eligible amount" — the tax-deductible portion; blank for non-donation rows (e.g. Ticket).
+     *  Informational only, not read by any downstream logic. */
+    @Column(name = "eligible_amount", precision = 10, scale = 2)
+    private BigDecimal eligibleAmount;
+
+    /** From "Creation Date (America/Chicago)" — the date the transaction happened. */
+    @Column(name = "transaction_date")
+    private LocalDate transactionDate;
+
+    /** From "Available on (America/Chicago)" — purely informational, when Zeffy pays this out to
+     *  the bank; never read by any membership/tier/finance logic. Parsed leniently (see
+     *  ZeffyImportService#parseDateLenient) since it can plausibly show a placeholder for a
+     *  transaction that hasn't been paid out yet. */
+    @Column(name = "available_date")
+    private LocalDate availableDate;
 
     @Column(name = "first_name", length = 100)
     private String firstName;
@@ -75,33 +91,12 @@ public class ZeffyImportRow {
     @Column(length = 255)
     private String email;
 
-    @Column(length = 255)
-    private String address;
-
-    @Column(length = 100)
-    private String city;
-
-    @Column(name = "postal_code", length = 20)
-    private String postalCode;
-
-    @Column(length = 50)
-    private String state;
-
-    @Column(length = 100)
-    private String country;
-
-    @Column(name = "tax_receipt_number", length = 50)
-    private String taxReceiptNumber;
-
-    @Column(name = "tax_receipt_url", length = 500)
-    private String taxReceiptUrl;
-
     @Column(name = "campaign_title", length = 255)
     private String campaignTitle;
 
     // --- Computed during preview ---
 
-    /** Tax Receipt # when present, else "email|paymentDate|paymentTime|amount". */
+    /** Zeffy's transaction Id — always present, so no composite fallback key is needed. */
     @Column(name = "dedupe_key", length = 500)
     private String dedupeKey;
 

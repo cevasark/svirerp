@@ -52,6 +52,13 @@ public class ZeffyImportController {
         return service.commitImport(orgId, batchId);
     }
 
+    /** One-time backfill for already-committed Ticket rows whose campaign has since been flagged
+     *  as a membership payment — see ZeffyImportService#reprocessMembershipRows. Idempotent. */
+    @PostMapping("/api/organizations/{orgId}/zeffy-imports/reprocess-membership-rows")
+    public ZeffyImportService.ReprocessMembershipResult reprocessMembershipRows(@PathVariable UUID orgId) {
+        return service.reprocessMembershipRows(orgId);
+    }
+
     // ── Campaign mappings ────────────────────────────────────────────────────
 
     @GetMapping("/api/organizations/{orgId}/zeffy-campaign-mappings")

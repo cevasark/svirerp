@@ -2,6 +2,8 @@
 
 Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backed by MySQL 8 with Flyway schema migrations.
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a design/architecture overview (backend + frontend structure, auth model, third-party dependencies), or [SETUP.md](SETUP.md) for step-by-step install instructions starting from a blank machine — this file covers configuration and the full API/migration reference.
+
 ---
 
 ## Table of Contents
@@ -49,14 +51,14 @@ svirerp/
 │       │   ├── event/
 │       │   ├── volunteer/
 │       │   ├── finance/
-│       │   ├── zeffyimport/    # Zeffy payment import (.xlsx/.csv) — spans membership + finance
+│       │   ├── zeffyimport/    # Zeffy transaction import (.xlsx/.csv) — spans membership + finance
 │       │   ├── stripeintegration/  # Stripe webhook receiver — spans membership + finance
 │       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
 │       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V44 SQL scripts
+│           └── db/migration/                       # Flyway V1–V45 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -157,6 +159,7 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar \
 | `app.auth.google.allowed-domain` | `svivanrilski.com` | Google Workspace hosted domain allowed to sign in; override via `SVIRERP_GOOGLE_ALLOWED_DOMAIN` |
 | `app.auth.admin.username` / `app.auth.admin.password-hash` | *(empty — disabled)* | Break-glass local admin login; blank disables it. Set via `SVIRERP_ADMIN_USERNAME` / `SVIRERP_ADMIN_PASSWORD_HASH` |
 | `app.settings.encryption-key` / `app.settings.encryption-salt` | *(empty — required for SECRET settings)* | Encrypts `SECRET`-type rows in the `app_setting` table (e.g. the Google OAuth client secret). Salt must be hex-encoded. Set via `SVIRERP_SETTINGS_ENCRYPTION_KEY` / `SVIRERP_SETTINGS_ENCRYPTION_SALT` — see [Admin Settings](#admin-settings) |
+| `server.servlet.session.timeout` / `server.servlet.session.cookie.max-age` | `7d` / `7d` | How long a login lasts — both the server-side session and the browser's session cookie survive a browser restart for 7 days, rather than Spring Boot's defaults (30-minute inactivity timeout, and a cookie that's wiped the instant the browser closes) |
 
 > **Note:** The Google OAuth 2.0 client ID/secret are **not** properties — they're configured at runtime via the admin-only Settings page and stored (secret encrypted) in the `app_setting` table, so they can be rotated with no restart. See [Admin Settings](#admin-settings).
 
@@ -189,6 +192,10 @@ A single admin account, for when Google sign-in is unavailable. Disabled by defa
 3. Sign in at `/portal-access` — this route is intentionally not linked from the login page or any navigation; it's meant to be known only to whoever holds the admin credentials.
 
 Failed attempts are rate-limited (5 failures per IP within 15 minutes triggers a 15-minute lockout) and every attempt — success, failure, or lockout — is audit-logged under the `AUDIT.local-admin-login` logger name.
+
+### Session duration
+
+A login persists for 7 days (`server.servlet.session.timeout` / `server.servlet.session.cookie.max-age`, see [Key properties](#key-properties)) — the session cookie survives closing the browser instead of dying immediately, the original Spring Boot/Tomcat default. Sessions are in-memory only (no Redis/JDBC session store), so restarting the app still forces a fresh login regardless of this setting.
 
 ---
 
@@ -412,6 +419,8 @@ npm run build        # production build → ui/dist/svirerp-ui/browser/
 
 Visiting the app while logged out redirects to `/login` (Google sign-in). The break-glass local admin form lives at `/portal-access` — see [Authentication](#authentication).
 
+**Shareable links** (e.g. a Project or Meeting Minutes detail page) work even when the recipient isn't logged in yet: `authGuard` (`ui/src/app/core/guards/auth.guard.ts`) saves the originally-requested URL to `sessionStorage` before redirecting to `/login`, then restores and navigates to it as soon as the user is authenticated — regardless of which login method they use. This is `sessionStorage`-backed rather than a `?returnUrl=` query param or in-memory router state, specifically because Google sign-in is a full-page redirect away to accounts.google.com and back; `sessionStorage` (scoped to the tab + origin) is what actually survives that round trip. The error interceptor (`error.interceptor.ts`) does the same thing on a mid-session 401 (session expired while already on a page), via the shared `ReturnUrlService`.
+
 ---
 
 ## API Overview
@@ -431,6 +440,11 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Committees | `GET/POST /api/committees` | |
 | Meeting minutes | `GET /api/organizations/{id}/meeting-minutes` | `POST/PUT /api/meeting-minutes[/{id}]`, `DELETE` (cascades to its action items); org-level board/trustee meetings, not tied to a committee |
 | Action items | `GET /api/meeting-minutes/{id}/action-items` | `POST/PUT /api/action-items[/{id}]`, `DELETE`; unpaginated list, optional trustee assignee |
+| Projects (Governance) | `GET /api/organizations/{id}/projects` | `?status=` filter; `POST/PUT /api/projects[/{id}]`, `DELETE` (cascades to its tasks/comments); optional `Person` assignee. Distinct from Finance's Fund/"project" restricted-fund-accounting concept above |
+| Project tasks | `GET /api/projects/{id}/tasks` | `POST/PUT /api/project-tasks[/{id}]`, `DELETE` (cascades to its comments); unpaginated list, optional `Person` assignee |
+| Project / task comments | `GET /api/projects/{id}/comments`, `GET /api/project-tasks/{id}/comments` | `POST` on either (body is just `{comment}` — `authorName` is always resolved server-side from the logged-in session, never client input); `DELETE /api/project-comments/{id}`, `DELETE /api/project-task-comments/{id}` |
+| Project checklists | `GET /api/projects/{id}/checklists` | Unpaginated; a sibling of Tasks under Project (not nested under one — reworked in V50 after "create a task first" proved one step too many), a project can hold multiple. `POST` same URL to create (body `{title, completionDate}`); `PUT/DELETE /api/project-checklists/{id}` |
+| Checklist items | `GET /api/project-checklists/{id}/items` | Unpaginated. `POST` same URL to add (body `{text}`, starts `new`); `DELETE /api/project-checklist-items/{id}`; 3-state, not a checkbox — `POST .../{id}/done`, `.../skip` (either is terminal, body `{detail}` — an optional one-line note, e.g. why it was skipped), `.../reopen` (no body — always back to `new` and always clears `detail` server-side, the only transition out of `done`/`skipped`) |
 | Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter; `PUT/DELETE /api/events/{id}` (delete cascades to church details/registrations/resources) |
 | Church service details | `GET /api/events/{id}/church-details` | 1:1 with an event, 404 if not recorded; `POST/PUT/DELETE /api/church-events[/{id}]` |
 | Event registrations | `GET /api/events/{id}/registrations` | `POST/PUT/DELETE /api/event-registrations[/{id}]`; at most one registration per (event, person) |
@@ -450,7 +464,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
 | Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
 | Google Calendar (admin) | `GET /api/settings/calendar/authorize-url` | `GET .../callback`, `POST .../test-connection`; `ROLE_ADMIN` only. One-way push only (ERP → Calendar, never the reverse) — see `CalendarEvent.publishToOfficial`/`publishToInternal` and their `google*SyncError` fields |
-| Zeffy payment import | `POST /api/organizations/{id}/zeffy-imports/preview` | Multipart `.xlsx`/`.xls`/`.csv` — Zeffy's real export is an Excel spreadsheet, parsed via Apache POI (`.csv` also accepted); persists one row per line with a computed `outcome` (`ready`/`duplicate`/`skipped_status`/`unmapped_campaign`/`error`), no writes to `Person`/`Member`/`MemberPayment`/`JournalEntry` yet. `GET .../zeffy-imports`, `GET /api/zeffy-imports/{batchId}[/summary\|/rows]`, `POST /api/organizations/{id}/zeffy-imports/{batchId}/commit` — applies every still-eligible row, one DB transaction per row (`ZeffyImportRowApplier`) |
+| Zeffy transaction import | `POST /api/organizations/{id}/zeffy-imports/preview` | Multipart `.xlsx`/`.xls`/`.csv` — Zeffy's **Transactions** export (not the older Payments export, which is rejected with a clear error), parsed via Apache POI (`.csv` also accepted); persists one row per line with a computed `outcome` (`ready`/`duplicate`/`unmapped_campaign`/`error`; `skipped_status` is a legacy value no longer produced), no writes to `Person`/`Member`/`MemberPayment`/`JournalEntry` yet. Each row's `category` (`Donation`/`Ticket`) drives purpose routing at commit — Donation earns membership tier credit and posts to Donation Income (4010), Ticket skips the membership pipeline and posts to Service Fees Income (4030). `GET .../zeffy-imports`, `GET /api/zeffy-imports/{batchId}[/summary\|/rows]`, `POST /api/organizations/{id}/zeffy-imports/{batchId}/commit` — applies every still-eligible row, one DB transaction per row (`ZeffyImportRowApplier`) |
 | Zeffy campaign mappings | `GET /api/organizations/{id}/zeffy-campaign-mappings` | `POST .../zeffy-campaign-mappings/bulk`, `DELETE /api/zeffy-campaign-mappings/{id}` — persists which `Fund` a Zeffy "Campaign Title" posts income to, so recurring campaigns don't need remapping every import |
 | Recompute member tiers | `POST /api/organizations/{id}/members/recompute-tiers` | Re-runs Follower/Member/Benefactor tier computation for every member in the org — tier can go stale purely from elapsed time, not just new payments |
 | Stripe webhook (unauthenticated) | `POST /api/webhooks/stripe` | Checkout happens on WordPress, a Stripe Invoice, or a mobile card-reader app, never in svirerp — this is purely a receiver for `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded`, authenticated by the `Stripe-Signature` header instead of a session. Always `200`s a validly-signed event (even on a business-rule failure — see [Admin Settings](#admin-settings)); `400` on a bad signature, `503` if the secrets aren't configured yet |
@@ -509,3 +523,8 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V42 | `stripe_product_mapping` (org-scoped Stripe Price → purpose/`fund`/`account` routing), `stripe_webhook_event` (one row per webhook delivery, keyed by Stripe's event id for idempotency — the audit trail and "needs mapping"/"error"/reprocess staging area); widens `member_payment.payment_method` and `journal_entry.payment_method`'s CHECKs to accept `'stripe'`; seeds `stripe.secret-key`/`stripe.webhook-signing-secret` `app_setting` rows (reuses V28's `app_setting`) |
 | V43 | `stripe_webhook_event.fee` — Stripe's processing fee, resolved from the underlying charge's `BalanceTransaction`, stored for audit visibility alongside the existing `amount` column |
 | V44 | Widens `journal_entry.payment_method`'s CHECK to accept `'zelle'`/`'facebook'`. No table for the three new "Undeposited Funds" clearing accounts (Zeffy/Stripe/Facebook) — they're lazily seeded like the rest of the default chart of accounts (see `FinanceService#DEFAULT_ACCOUNTS`/`#findOrCreateAccountByNumber`) |
+| V45 | Migrates `zeffy_import_row` from Zeffy's Payments export shape to its Transactions export shape — drops the Payments-only columns (address/city/state/zip, tax receipt #/URL, payment status, payment time), renames `payment_date`→`transaction_date`/`payout_date`→`available_date`, adds `transaction_id` (the new dedupe key, replacing tax receipt #), `category` (`Donation`/`Ticket`), `eligible_amount`. Payments-format support was dropped entirely, not kept alongside — a one-time by-hand cleanup of all prior Zeffy-derived data preceded this migration (not itself a migration, deliberately: a destructive one-time DELETE must never be able to run against a real database by accident) |
+| V48 | `project` (Governance task-tracking, nullable FK `assignee_person_id`→`person`), `project_task` (FK `project_id` `ON DELETE CASCADE`, nullable `assignee_person_id`→`person`), `project_comment` + `project_task_comment` (FK to `project`/`project_task` `ON DELETE CASCADE`; `author_name` is a plain string stamped from the logged-in session, not a FK — this app has no separate `User` table) |
+| V49 | `task_checklist` (1 per `project_task`, enforced by `UNIQUE project_task_id`, FK `ON DELETE CASCADE`; `title` + user-set `completion_date`, alongside — not replacing — the task's own `description`), `task_checklist_item` (FK `checklist_id` `ON DELETE CASCADE`; `status` CHECK `new`/`done`/`skipped` — 3-state, not a boolean checkbox; `done`/`skipped` are both terminal, either reachable back to `new` via a single "Re-open" action). **Superseded by V50** — kept here for history, not the current shape |
+| V50 | Reworks the checklist tables from V49's 1-per-task shape into a project-scoped sibling of `project_task` — data-preserving (backfills `project_id` from each checklist's former task, since real checklist data already existed by the time this was requested), then renames `task_checklist`→`project_checklist` (drops the `UNIQUE project_task_id` FK/column, adds a plain FK `project_id`→`project` `ON DELETE CASCADE` — a project can now hold multiple independent checklists) and `task_checklist_item`→`project_checklist_item` (FK re-pointed at the renamed parent table, same CHECK/columns otherwise unchanged) |
+| V51 | `project_checklist_item.detail` — nullable `VARCHAR(500)`, an optional one-line note captured when an item is marked Done/Skipped (e.g. why it was skipped); always cleared server-side on Re-open (`GovernanceService#reopenChecklistItem`), not just a frontend-side clear |

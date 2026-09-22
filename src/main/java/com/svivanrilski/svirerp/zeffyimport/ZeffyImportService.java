@@ -65,22 +65,22 @@ public class ZeffyImportService {
 
     private static final int OUTCOME_DETAIL_MAX_LENGTH = 500;
 
-    private static final String COL_PAYMENT_DATE = "Payment Date (America/Chicago)";
-    private static final String COL_PAYMENT_TIME = "Payment Time (America/Chicago)";
-    private static final String COL_AMOUNT = "Total Amount";
-    private static final String COL_PAYMENT_STATUS = "Payment Status";
-    private static final String COL_PAYOUT_DATE = "Payout Date";
+    private static final String COL_TRANSACTION_ID = "Id";
+    private static final String COL_AMOUNT = "Amount";
+    private static final String COL_CATEGORY = "Category";
     private static final String COL_FIRST_NAME = "First Name";
     private static final String COL_LAST_NAME = "Last Name";
     private static final String COL_EMAIL = "Email";
-    private static final String COL_ADDRESS = "Address";
-    private static final String COL_CITY = "City";
-    private static final String COL_POSTAL_CODE = "Postal Code";
-    private static final String COL_STATE = "State";
-    private static final String COL_COUNTRY = "Country";
-    private static final String COL_TAX_RECEIPT_NUMBER = "Tax Receipt #";
-    private static final String COL_TAX_RECEIPT_URL = "Tax Receipt URL";
-    private static final String COL_CAMPAIGN_TITLE = "Campaign Title";
+    private static final String COL_TRANSACTION_DATE = "Creation Date (America/Chicago)";
+    private static final String COL_AVAILABLE_DATE = "Available on (America/Chicago)";
+    private static final String COL_ELIGIBLE_AMOUNT = "Eligible amount";
+    private static final String COL_CAMPAIGN_TITLE = "Campaign";
+
+    /** Columns that must be present for a file to be recognized as a Zeffy Transactions export —
+     *  Payments-format uploads (which have "Payment Status" instead of "Id"/"Category") are
+     *  rejected with a clear error rather than silently mis-parsed. */
+    private static final Set<String> REQUIRED_COLUMNS =
+            Set.of(COL_TRANSACTION_ID, COL_CATEGORY, COL_TRANSACTION_DATE, COL_EMAIL);
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
@@ -88,10 +88,10 @@ public class ZeffyImportService {
             DateTimeFormatter.ofPattern("M/d/yy"));
 
     /** Columns that are real dates in an .xlsx export — extracted as an actual date value rather
-     *  than trusting the cell's display format (see {@link #cellToText}). Deliberately does NOT
-     *  include Payment Time: Excel also flags time-only cells as "date formatted" (a time is a
-     *  fractional day internally), but that column is only ever used as opaque dedupe-key text. */
-    private static final Set<String> DATE_COLUMNS = Set.of(COL_PAYMENT_DATE, COL_PAYOUT_DATE);
+     *  than trusting the cell's display format (see {@link #cellToText}). */
+    private static final Set<String> DATE_COLUMNS = Set.of(COL_TRANSACTION_DATE, COL_AVAILABLE_DATE);
+
+    private static final Set<String> VALID_CATEGORIES = Set.of("Donation", "Ticket");
 
     private final ZeffyImportBatchRepository batchRepo;
     private final ZeffyImportRowRepository rowRepo;
@@ -102,7 +102,7 @@ public class ZeffyImportService {
     private final MembershipService membershipService;
     private final FinanceService financeService;
 
-    public record CampaignMappingRequest(String campaignTitle, UUID fundId) {
+    public record CampaignMappingRequest(String campaignTitle, UUID fundId, Boolean isMembershipPayment) {
     }
 
     public record ZeffyImportSummary(
@@ -121,6 +121,9 @@ public class ZeffyImportService {
     }
 
     public record ZeffyImportCommitResult(UUID batchId, int committed, int failed, int stillUnmappedCampaign) {
+    }
+
+    public record ReprocessMembershipResult(int rowsProcessed, int membersCreated) {
     }
 
     // ── Batches ──────────────────────────────────────────────────────────────
@@ -211,6 +214,7 @@ public class ZeffyImportService {
                 .setIgnoreEmptyLines(true)
                 .build()
                 .parse(reader);
+        validateHeaders(parser.getHeaderNames());
         for (CSVRecord record : parser) {
             Map<String, String> raw = new LinkedHashMap<>();
             for (String header : parser.getHeaderNames()) {
@@ -239,6 +243,7 @@ public class ZeffyImportService {
                 Cell cell = headerRow.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                 headers.add(cell != null ? formatter.formatCellValue(cell).trim() : "");
             }
+            validateHeaders(headers);
 
             while (rowIterator.hasNext()) {
                 Row excelRow = rowIterator.next();
@@ -260,7 +265,21 @@ public class ZeffyImportService {
         return rows;
     }
 
-    /** Payment Date / Payout Date are real Excel date cells — extracted as an actual LocalDate
+    /** Fails fast on a file that isn't a Zeffy Transactions export (e.g. a Payments-format upload —
+     *  recognizable by having "Payment Status" instead of "Id"/"Category") rather than silently
+     *  mis-parsing it into a batch full of garbage/error rows. */
+    private void validateHeaders(List<String> presentHeaders) {
+        Set<String> present = new HashSet<>(presentHeaders);
+        if (!present.containsAll(REQUIRED_COLUMNS)) {
+            throw new IllegalArgumentException(
+                    "This doesn't look like a Zeffy Transactions export — expected columns including "
+                            + String.join(", ", REQUIRED_COLUMNS) + ". If you exported a Zeffy Payments "
+                            + "report instead, that format is no longer supported — please generate a "
+                            + "Transactions export instead.");
+        }
+    }
+
+    /** Transaction Date / Available On are real Excel date cells — extracted as an actual LocalDate
      *  (ISO-formatted) rather than trusting the cell's display format, which varies. Every other
      *  column is rendered as its displayed text via DataFormatter (mirrors what a human sees, and
      *  handles currency-formatted amount cells like "$1,200.00" — parseAmount strips the symbols). */
@@ -277,25 +296,22 @@ public class ZeffyImportService {
     }
 
     private void populateRawFields(ZeffyImportRow row, Map<String, String> raw) {
-        row.setPaymentDate(parseDate(raw.get(COL_PAYMENT_DATE)));
-        row.setPaymentTime(raw.get(COL_PAYMENT_TIME));
+        row.setTransactionId(raw.get(COL_TRANSACTION_ID));
+        row.setTransactionDate(parseDate(raw.get(COL_TRANSACTION_DATE)));
         row.setAmount(parseAmount(raw.get(COL_AMOUNT)));
-        row.setPaymentStatus(raw.get(COL_PAYMENT_STATUS));
-        // Payout Date is purely informational — stored for reference but never read by any
-        // membership/tier/finance logic, which uses Payment Date exclusively (see
+        row.setCategory(raw.get(COL_CATEGORY));
+        // Eligible amount is purely informational (the tax-deductible portion — blank for
+        // non-donation rows like Ticket) and never read by any downstream logic.
+        row.setEligibleAmount(raw.get(COL_ELIGIBLE_AMOUNT) != null ? parseAmount(raw.get(COL_ELIGIBLE_AMOUNT)) : null);
+        // Available On is purely informational — stored for reference but never read by any
+        // membership/tier/finance logic, which uses Transaction Date exclusively (see
         // ZeffyImportRowApplier). Parsed leniently so a placeholder value Zeffy uses for a payout
-        // that hasn't happened yet (e.g. "Unknown") doesn't fail the whole row.
-        row.setPayoutDate(parseDateLenient(raw.get(COL_PAYOUT_DATE)));
+        // that hasn't happened yet doesn't fail the whole row (same leniency the old Payout Date
+        // column needed).
+        row.setAvailableDate(parseDateLenient(raw.get(COL_AVAILABLE_DATE)));
         row.setFirstName(raw.get(COL_FIRST_NAME));
         row.setLastName(raw.get(COL_LAST_NAME));
         row.setEmail(raw.get(COL_EMAIL));
-        row.setAddress(raw.get(COL_ADDRESS));
-        row.setCity(raw.get(COL_CITY));
-        row.setPostalCode(raw.get(COL_POSTAL_CODE));
-        row.setState(raw.get(COL_STATE));
-        row.setCountry(raw.get(COL_COUNTRY));
-        row.setTaxReceiptNumber(raw.get(COL_TAX_RECEIPT_NUMBER));
-        row.setTaxReceiptUrl(raw.get(COL_TAX_RECEIPT_URL));
         row.setCampaignTitle(raw.get(COL_CAMPAIGN_TITLE));
     }
 
@@ -310,15 +326,20 @@ public class ZeffyImportService {
             row.setOutcomeDetail("Missing email");
             return;
         }
+        if (row.getTransactionId() == null || row.getTransactionId().isBlank()) {
+            row.setOutcome("error");
+            row.setOutcomeDetail("Missing transaction Id");
+            return;
+        }
 
         Optional<Person> existingPerson = personService.findByEmailIfExists(row.getEmail());
         row.setIsNewPerson(existingPerson.isEmpty());
         row.setIsNewMember(existingPerson.isEmpty()
                 || !membershipService.hasMembership(existingPerson.get().getId(), orgId));
 
-        String dedupeKey = (row.getTaxReceiptNumber() != null && !row.getTaxReceiptNumber().isBlank())
-                ? row.getTaxReceiptNumber()
-                : row.getEmail() + "|" + row.getPaymentDate() + "|" + row.getPaymentTime() + "|" + row.getAmount();
+        // Zeffy's transaction Id is always present, unlike the old Payments export's Tax Receipt #
+        // (blank for non-tax-deductible rows) — no composite-key fallback needed anymore.
+        String dedupeKey = row.getTransactionId();
         row.setDedupeKey(dedupeKey);
 
         if (seenDedupeKeysInBatch.contains(dedupeKey)
@@ -328,9 +349,15 @@ public class ZeffyImportService {
         }
         seenDedupeKeysInBatch.add(dedupeKey);
 
-        if (!"succeeded".equalsIgnoreCase(row.getPaymentStatus())) {
-            row.setOutcome("skipped_status");
-            row.setOutcomeDetail(row.getPaymentStatus());
+        if (!VALID_CATEGORIES.contains(row.getCategory())) {
+            row.setOutcome("error");
+            row.setOutcomeDetail("Unrecognized category: " + row.getCategory());
+            return;
+        }
+
+        if (row.getAmount() != null && row.getAmount().signum() < 0) {
+            row.setOutcome("error");
+            row.setOutcomeDetail("Negative amount — needs manual review");
             return;
         }
 
@@ -405,6 +432,7 @@ public class ZeffyImportService {
                             .campaignTitle(req.campaignTitle())
                             .build());
             mapping.setFund(fund);
+            mapping.setIsMembershipPayment(Boolean.TRUE.equals(req.isMembershipPayment()));
             saved.add(mappingRepo.save(mapping));
         }
         return saved;
@@ -439,7 +467,11 @@ public class ZeffyImportService {
 
         membershipService.ensureZeffyTierTypesSeeded(orgId);
         financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
-        Account categoryAccount = financeService.findAccountByNumber(orgId, "4010");
+        // Donation rows earn membership tier credit and post to Donation Income; Ticket rows (event/
+        // service ticket purchases, not membership contributions) post to Service Fees Income instead
+        // and skip the Member/MemberPayment/tier pipeline entirely — see ZeffyImportRowApplier.
+        Account donationAccount = financeService.findAccountByNumber(orgId, "4010");
+        Account ticketAccount = financeService.findAccountByNumber(orgId, "4030");
         // Zeffy holds donations and pays out to the real bank in periodic lump sums — post to its
         // clearing account rather than Checking directly, so Checking only grows when the actual
         // payout lands (see FinanceService#recordTransfer / DEFAULT_ACCOUNTS). findOrCreateAccountByNumber
@@ -454,7 +486,7 @@ public class ZeffyImportService {
         for (ZeffyImportRow row : rows) {
             if (!"ready".equals(row.getOutcome()) && !"unmapped_campaign".equals(row.getOutcome())) continue;
             try {
-                rowApplier.applyRow(row.getId(), depositAccount.getId(), categoryAccount.getId());
+                rowApplier.applyRow(row.getId(), depositAccount.getId(), donationAccount.getId(), ticketAccount.getId());
                 String outcomeAfter = rowRepo.findById(row.getId())
                         .map(ZeffyImportRow::getOutcome)
                         .orElse("error");
@@ -476,9 +508,38 @@ public class ZeffyImportService {
         return new ZeffyImportCommitResult(batchId, committed, failed, stillUnmapped);
     }
 
+    /**
+     * One-time backfill: finds every already-committed Ticket-category row whose campaign has
+     * since been flagged {@code isMembershipPayment=true} (a campaign mapping change doesn't
+     * retroactively touch already-committed rows on its own) and applies the missing Member/
+     * MemberPayment/tier + income-reclassification via {@link ZeffyImportRowApplier#reprocessAsMembership}.
+     * Idempotent — safe to call again after a partial failure, or if run a second time with no new
+     * rows to process. Same NOT_SUPPORTED reasoning as {@link #commitImport} — each row gets its
+     * own transaction so one bad row can't poison the rest.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ReprocessMembershipResult reprocessMembershipRows(UUID orgId) {
+        financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
+        Account donationAccount = financeService.findAccountByNumber(orgId, "4010");
+        Account ticketAccount = financeService.findAccountByNumber(orgId, "4030");
+
+        List<ZeffyImportRow> rows = rowRepo.findCommittedTicketRowsNeedingMembershipReprocess(orgId);
+        int rowsProcessed = 0;
+        int membersCreated = 0;
+        for (ZeffyImportRow row : rows) {
+            boolean hadMembershipBefore = row.getPerson() != null
+                    && membershipService.hasMembership(row.getPerson().getId(), orgId);
+            rowApplier.reprocessAsMembership(row.getId(), donationAccount.getId(), ticketAccount.getId());
+            rowsProcessed++;
+            if (!hadMembershipBefore) membersCreated++;
+        }
+
+        return new ReprocessMembershipResult(rowsProcessed, membersCreated);
+    }
+
     // ── Parsing helpers ──────────────────────────────────────────────────────
 
-    /** A blank Total Amount is treated the same as an explicit 0 — both import as Follower with
+    /** A blank Amount is treated the same as an explicit 0 — both import as Follower with
      *  no Finance posting (see ZeffyImportRowApplier), rather than failing the row at commit time. */
     private BigDecimal parseAmount(String raw) {
         if (raw == null) return BigDecimal.ZERO;
@@ -487,7 +548,7 @@ public class ZeffyImportService {
         try {
             return new BigDecimal(cleaned);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Total Amount must be a number, got: " + raw);
+            throw new IllegalArgumentException("Amount must be a number, got: " + raw);
         }
     }
 

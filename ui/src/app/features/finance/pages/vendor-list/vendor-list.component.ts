@@ -53,7 +53,7 @@ export class VendorListComponent implements OnInit {
     { key: 'category', header: 'Category', cell: v => v.category || '—' },
     { key: 'contactName', header: 'Contact', cell: v => v.contactName || '—' },
     { key: 'phone', header: 'Phone', cell: v => v.phone || '—' },
-    { key: 'isActive', header: 'Active', cell: v => (v.isActive ? 'Yes' : 'No') },
+    { key: 'isActive', header: 'Active', cell: v => (v.isActive ? 'Yes' : 'No'), type: 'boolean' },
   ];
 
   readonly actions: TableAction[] = [

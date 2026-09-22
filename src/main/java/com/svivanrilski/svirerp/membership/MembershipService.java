@@ -100,6 +100,27 @@ public class MembershipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Member", id));
     }
 
+    public record MemberSummary(
+            long activeMembers, long inactiveMembers,
+            long activeBenefactors, long inactiveBenefactors,
+            long followers, long totalMembers) {
+    }
+
+    /** Counts by tier/status for the Members list header — tier is TierCalculator.MEMBER/
+     *  BENEFACTOR/FOLLOWER stored as the member's membershipType name (see TierCalculator's class
+     *  doc for why "Member" here means the $150+ tier, not the generic "has a Member row" sense).
+     *  Followers have no active/inactive distinction (always active — see TierCalculator), so just
+     *  one count. totalMembers is every Member row for the org, regardless of tier/status. */
+    public MemberSummary getMemberSummary(UUID orgId) {
+        return new MemberSummary(
+                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.MEMBER),
+                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.MEMBER),
+                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.BENEFACTOR),
+                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.BENEFACTOR),
+                memberRepo.countByOrgIdAndMembershipType_NameIgnoreCase(orgId, TierCalculator.FOLLOWER),
+                memberRepo.countByOrgId(orgId));
+    }
+
     /** Returns all members whose expiry date is before today (candidates for renewal notices). */
     public List<Member> findExpiredMembers() {
         return memberRepo.findByExpiryDateBefore(LocalDate.now());
@@ -281,15 +302,12 @@ public class MembershipService {
     }
 
     /**
-     * Recomputes a member's tier (MembershipType) and status from their full completed-payment
-     * history. Status is "active" whenever any tier applies — which is always, once any completed
-     * payment exists, since Follower never expires. "inactive" is reserved for a Member with zero
-     * completed-payment history at all; unreachable via Zeffy import (a Member is only created
-     * because a payment triggered it) but possible for a manually-created Member with no payments.
-     * expiryDate reflects the member's last-ever $150+ payment plus one year — see
-     * TierCalculator's class doc — so it stays populated (often in the past) even after a member's
-     * current tier has lapsed back to Follower; it does not drive status. Null only for a member
-     * who was never a $150+ payer at all.
+     * Recomputes a member's tier (MembershipType), expiryDate, and status from their full
+     * completed-payment history — see TierCalculator's class doc for the chaining rule. "inactive"
+     * now covers two distinct cases: (a) zero completed-payment history at all (unreachable via
+     * Zeffy import, but possible for a manually-created Member with no payments) — tier is left
+     * untouched in that case; (b) the member's last $150+ membership period has expired — tier is
+     * still updated to whatever that last period was (not reverted to Follower), only status flips.
      */
     @Transactional
     public Member recomputeTier(UUID memberId) {
@@ -310,7 +328,7 @@ public class MembershipService {
         MembershipType tierType = typeRepo.findByOrgIdAndNameIgnoreCase(member.getOrg().getId(), result.tierName())
                 .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + result.tierName()));
         member.setMembershipType(tierType);
-        member.setStatus("active");
+        member.setStatus(result.status());
         member.setExpiryDate(result.expiryDate());
         return memberRepo.save(member);
     }
@@ -319,25 +337,66 @@ public class MembershipService {
         return memberRepo.existsByPersonIdAndOrgId(personId, orgId);
     }
 
-    /** Find-or-create a Member starting at the Follower tier — used by ZeffyImportRowApplier for a
-     *  brand-new payer. Kept here (rather than reaching into MemberRepository from another package)
-     *  so all Member/MembershipType access stays inside this domain's service, per this repo's
-     *  one-shared-service-per-domain-area convention. */
+    /**
+     * Find-or-create a Member starting at the Follower tier — used by ZeffyImportRowApplier for a
+     * brand-new payer. Kept here (rather than reaching into MemberRepository from another package)
+     * so all Member/MembershipType access stays inside this domain's service, per this repo's
+     * one-shared-service-per-domain-area convention.
+     *
+     * <p>{@code transactionDate} also self-heals an existing member's {@code joinDate} backward
+     * when an earlier transaction shows up — a bulk historical import processes files/rows in
+     * whatever order they're uploaded, not necessarily chronological, so the transaction that
+     * happens to be committed *first* for a person isn't necessarily their chronologically
+     * earliest. Without this, joinDate would permanently lock onto whichever transaction was
+     * committed first, which can be wrong by however far out of order the import was.
+     */
     @Transactional
-    public Member findOrCreateFollowerMember(UUID personId, UUID orgId, LocalDate joinDate) {
-        return memberRepo.findByPersonIdAndOrgId(personId, orgId).orElseGet(() -> {
-            ensureZeffyTierTypesSeeded(orgId);
-            MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
-                    .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
-            return memberRepo.save(Member.builder()
-                    .person(personService.findById(personId))
-                    .org(orgService.findById(orgId))
-                    .membershipType(follower)
-                    .joinDate(joinDate)
-                    .status("active")
-                    .emailOptIn(true)
-                    .build());
-        });
+    public Member findOrCreateFollowerMember(UUID personId, UUID orgId, LocalDate transactionDate) {
+        return memberRepo.findByPersonIdAndOrgId(personId, orgId)
+                .map(existing -> {
+                    if (transactionDate != null && existing.getJoinDate() != null
+                            && transactionDate.isBefore(existing.getJoinDate())) {
+                        existing.setJoinDate(transactionDate);
+                        return memberRepo.save(existing);
+                    }
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    ensureZeffyTierTypesSeeded(orgId);
+                    MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+                            .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
+                    return memberRepo.save(Member.builder()
+                            .person(personService.findById(personId))
+                            .org(orgService.findById(orgId))
+                            .membershipType(follower)
+                            .joinDate(transactionDate)
+                            .status("active")
+                            .emailOptIn(true)
+                            .build());
+                });
+    }
+
+    /**
+     * Unconditionally creates a new Follower Member for a person who is guaranteed not to have one
+     * yet in this org (used by the People import, which only ever calls this for a Person it just
+     * created — unlike {@link #findOrCreateFollowerMember}, which also handles the "may already
+     * exist" case for the Zeffy-transactions path). joinDate is the import date, since a Zeffy
+     * contacts export carries no date of its own. {@code active} drives both status and
+     * emailOptIn together — a person Zeffy reports as unsubscribed is neither.
+     */
+    @Transactional
+    public Member createFollowerMember(UUID personId, UUID orgId, boolean active) {
+        ensureZeffyTierTypesSeeded(orgId);
+        MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+                .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
+        return memberRepo.save(Member.builder()
+                .person(personService.findById(personId))
+                .org(orgService.findById(orgId))
+                .membershipType(follower)
+                .joinDate(LocalDate.now())
+                .status(active ? "active" : "inactive")
+                .emailOptIn(active)
+                .build());
     }
 
     /** Backs the manual "Recompute Tiers" action — tier can go stale purely from time passing. */

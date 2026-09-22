@@ -13,7 +13,7 @@ import { MembershipTypeService } from '../../services/membership-type.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Member, MembershipType } from '../../../../core/models/domain.model';
-import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
+import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberSummary } from '../../../../core/models/api.model';
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -49,6 +49,35 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
         </ng-container>
       </app-page-header>
 
+      @if (summary(); as s) {
+        <div class="stats-bar">
+          <div class="stat">
+            <span class="stat-value">{{ s.activeMembers }}</span>
+            <a class="stat-label" (click)="applyStatFilter('active', 'Member')">Active Members</a>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ s.inactiveMembers }}</span>
+            <a class="stat-label" (click)="applyStatFilter('inactive', 'Member')">Inactive Members</a>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ s.activeBenefactors }}</span>
+            <a class="stat-label" (click)="applyStatFilter('active', 'Benefactor')">Active Benefactors</a>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ s.inactiveBenefactors }}</span>
+            <a class="stat-label" (click)="applyStatFilter('inactive', 'Benefactor')">Inactive Benefactors</a>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ s.followers }}</span>
+            <a class="stat-label" (click)="applyStatFilter(null, 'Follower')">Followers</a>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ s.totalMembers }}</span>
+            <a class="stat-label" (click)="applyStatFilter(null, null)">Total Members</a>
+          </div>
+        </div>
+      }
+
       <div class="filter-bar">
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Status</mat-label>
@@ -82,6 +111,20 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
     </div>
   `,
   styles: [`
+    .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px 16px;
+      min-width: 140px;
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 4px;
+      background: rgba(0,0,0,.02);
+    }
+    .stat-value { font-size: 1.5em; font-weight: 500; line-height: 1.2; }
+    .stat-label { font-size: .8em; color: #3f51b5; cursor: pointer; text-decoration: none; }
+    .stat-label:hover { text-decoration: underline; }
     .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; }
     .filter-field { width: 220px; }
   `],
@@ -100,6 +143,7 @@ export class MemberListComponent implements OnInit {
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
   recomputingTiers = signal(false);
   membershipTypes = signal<MembershipType[]>([]);
+  summary = signal<MemberSummary | null>(null);
 
   readonly statuses = ['active', 'inactive', 'suspended', 'expired', 'pending'];
   statusFilter: string | null = null;
@@ -107,11 +151,11 @@ export class MemberListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: m => `${m.person.firstName} ${m.person.lastName}` },
+    { key: 'email', header: 'Email', cell: m => m.person.email, type: 'email' },
     { key: 'membershipType', header: 'Membership Type', cell: m => m.membershipType.name },
-    { key: 'status', header: 'Status' },
-    { key: 'joinDate', header: 'Join Date', sortable: true },
-    { key: 'expiryDate', header: 'Expiry Date', sortable: true },
-    { key: 'memberNumber', header: 'Member #' },
+    { key: 'status', header: 'Status', type: 'status' },
+    { key: 'joinDate', header: 'Join Date', sortable: true, type: 'date' },
+    { key: 'expiryDate', header: 'Expiry Date', sortable: true, type: 'date' },
   ];
 
   readonly actions: TableAction[] = [
@@ -122,6 +166,7 @@ export class MemberListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPage();
+    this.loadSummary();
     this.orgContext.ensureOrgId().subscribe(orgId => {
       this.membershipTypeService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
         this.membershipTypes.set(page.content);
@@ -137,6 +182,19 @@ export class MemberListComponent implements OnInit {
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
+  }
+
+  /** Drives the Status/Membership Type filters from a stats-bar link click, so the number shown
+   *  can be clicked through to the actual member records behind it. typeName is matched against
+   *  the org's configured membership types by name (e.g. "Member", "Benefactor", "Follower" — see
+   *  TierCalculator); null resets that filter (used by "Total Members" for both, and by
+   *  "Followers" for status, since followers have no active/inactive distinction). */
+  applyStatFilter(status: string | null, typeName: string | null): void {
+    this.statusFilter = status;
+    this.membershipTypeFilter = typeName
+      ? (this.membershipTypes().find(t => t.name === typeName)?.id ?? null)
+      : null;
+    this.onFilterChange();
   }
 
   onSortChange(sort: string | null): void {
@@ -159,7 +217,7 @@ export class MemberListComponent implements OnInit {
         data: { orgId: this.orgId, member: member ?? null },
       })
       .afterClosed()
-      .subscribe(saved => { if (saved) this.loadPage(); });
+      .subscribe(saved => { if (saved) { this.loadPage(); this.loadSummary(); } });
   }
 
   downloadTemplate(): void {
@@ -187,7 +245,7 @@ export class MemberListComponent implements OnInit {
     this.dialog
       .open(MemberImportDialogComponent, { width: '600px', data: { orgId: this.orgId } })
       .afterClosed()
-      .subscribe(imported => { if (imported) this.loadPage(); });
+      .subscribe(imported => { if (imported) { this.loadPage(); this.loadSummary(); } });
   }
 
   recomputeTiers(): void {
@@ -201,6 +259,7 @@ export class MemberListComponent implements OnInit {
         this.recomputingTiers.set(false);
         this.notifications.success(`Recomputed tiers for ${result.membersProcessed} member(s).`);
         this.loadPage();
+        this.loadSummary();
       },
       error: () => {
         this.recomputingTiers.set(false);
@@ -244,7 +303,14 @@ export class MemberListComponent implements OnInit {
       next: () => {
         this.notifications.success('Member deleted.');
         this.loadPage();
+        this.loadSummary();
       },
+    });
+  }
+
+  private loadSummary(): void {
+    this.orgContext.ensureOrgId().subscribe(orgId => {
+      this.memberService.getSummary(orgId).subscribe(summary => this.summary.set(summary));
     });
   }
 }
