@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class MemberPaymentService extends ResourceService<MemberPayment> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('member-payments');
@@ -24,7 +24,7 @@ export class MemberPaymentService extends ResourceService<MemberPayment> {
       p = p.set('fromDate', fromDate);
     }
     return this.http.get<Page<MemberPayment>>(
-      `${this.orgScopedEnv.apiUrl}/member-payments`,
+      `${this.env.apiUrl}/member-payments`,
       { params: p },
     );
   }
@@ -36,7 +36,7 @@ export class MemberPaymentService extends ResourceService<MemberPayment> {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<MemberPayment>>(
-      `${this.orgScopedEnv.apiUrl}/members/${memberId}/payments`,
+      `${this.env.apiUrl}/members/${memberId}/payments`,
       { params: p },
     );
   }

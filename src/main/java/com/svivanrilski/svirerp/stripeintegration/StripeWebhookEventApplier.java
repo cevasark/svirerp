@@ -230,7 +230,7 @@ public class StripeWebhookEventApplier {
         return financeService.findAccountByNumber(fallbackNumber);
     }
 
-    /** Lazily creates "Payment Processing Fees" (5320) for this org if it doesn't exist yet — this
+    /** Lazily creates "Payment Processing Fees" (5320) if it doesn't exist yet — this
      *  org may already have an established chart of accounts predating this account being added, so
      *  the normal DEFAULT_ACCOUNTS seed (which only runs once, on an org's very first accounts
      *  request) wouldn't otherwise pick it up. */

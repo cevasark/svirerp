@@ -8,13 +8,13 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class EventService extends ResourceService<CalendarEvent> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('events');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
+  /** List all events in this installation. */
   override getPage(params: PageParams = DEFAULT_PAGE_PARAMS, from?: string | null, to?: string | null): Observable<Page<CalendarEvent>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
@@ -27,7 +27,7 @@ export class EventService extends ResourceService<CalendarEvent> {
       p = p.set('to', to);
     }
     return this.http.get<Page<CalendarEvent>>(
-      `${this.orgScopedEnv.apiUrl}/events`,
+      `${this.env.apiUrl}/events`,
       { params: p },
     );
   }

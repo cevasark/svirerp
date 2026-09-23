@@ -8,13 +8,13 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService extends ResourceService<Project> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('projects');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
+  /** List all projects in this installation. */
   override getPage(params: PageParams = DEFAULT_PAGE_PARAMS, status?: string | null): Observable<Page<Project>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
@@ -24,7 +24,7 @@ export class ProjectService extends ResourceService<Project> {
       p = p.set('status', status);
     }
     return this.http.get<Page<Project>>(
-      `${this.orgScopedEnv.apiUrl}/projects`,
+      `${this.env.apiUrl}/projects`,
       { params: p },
     );
   }
@@ -41,6 +41,6 @@ export class ProjectService extends ResourceService<Project> {
   }
 
   removeComment(commentId: string): Observable<void> {
-    return this.http.delete<void>(`${this.orgScopedEnv.apiUrl}/project-comments/${commentId}`);
+    return this.http.delete<void>(`${this.env.apiUrl}/project-comments/${commentId}`);
   }
 }

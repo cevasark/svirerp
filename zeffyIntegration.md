@@ -221,13 +221,14 @@ Only the local admin can view or change this page. Operational payment/mapping p
 
 Exact names can be adjusted to repository conventions, but the following data responsibilities and constraints are required.
 
+All integration records implicitly belong to the installation's single organization. They do not store an organization foreign key, and internal endpoints do not accept an organization ID.
+
 ### 7.1 Zeffy campaign
 
 Stores the most recent API snapshot of a campaign:
 
 - local UUID
-- organization FK
-- unique Zeffy campaign ID within the organization
+- globally unique Zeffy campaign ID within the installation
 - title
 - campaign type and category
 - status, archived/deleted indicators
@@ -256,7 +257,7 @@ The Zeffy campaign ID is authoritative. Title is not a key because titles can ch
 
 Stores one row per Zeffy event ID:
 
-- local UUID and organization FK
+- local UUID
 - unique Zeffy event ID
 - event type and schema version
 - dispatched timestamp
@@ -275,7 +276,7 @@ Raw payload contains personal information. It must not be included in routine li
 
 Stores one row per unique Zeffy payment ID, independent of webhook event IDs:
 
-- unique `(org_id, zeffy_payment_id)` constraint
+- unique `zeffy_payment_id` constraint
 - latest Zeffy status, refund status, dispute status, amount, eligible amount, currency, and created timestamp
 - payment type, campaign ID/title snapshot, contact ID, buyer email/name snapshot
 - latest payload snapshot or controlled raw JSON
@@ -290,7 +291,7 @@ This is the business idempotency boundary. A new event may update the record, bu
 
 Stores:
 
-- run ID and organization
+- run ID
 - requested created-from/created-through range
 - start/end timestamps
 - status: `RUNNING`, `COMPLETED`, `PARTIAL`, or `FAILED`
@@ -300,7 +301,7 @@ Stores:
 
 ### 7.6 Contact link (Phase 5)
 
-Maps unique `(org_id, zeffy_contact_id)` to Person. Email remains a matching aid but is not the durable external identity because an email can change.
+Maps unique `zeffy_contact_id` to Person. Email remains a matching aid but is not the durable external identity because an email can change.
 
 ## 8. Cross-cutting business rules
 
@@ -419,8 +420,8 @@ Proposed internal endpoints:
 - `GET /api/settings/zeffy/status`
 - `POST /api/settings/zeffy/test-connection`
 - `POST /api/settings/zeffy/sync-campaigns`
-- `GET /api/organizations/{orgId}/zeffy-campaigns`
-- `PUT /api/organizations/{orgId}/zeffy-campaigns/{campaignId}/mapping`
+- `GET /api/zeffy-campaigns`
+- `PUT /api/zeffy-campaigns/{campaignId}/mapping`
 
 Settings endpoints are admin-only. Existing generic secret-setting APIs may be reused internally, but dedicated DTOs should prevent accidental exposure and make validation clear.
 
@@ -781,7 +782,7 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 
 ### Confirmed for the existing application
 
-- The installation represents one church organization.
+- The installation represents exactly one church organization. Domain and integration records belong to it implicitly; they do not carry organization foreign keys and APIs do not accept organization IDs.
 - All authenticated operational users currently share access; Settings is local-admin-only.
 - Free Followers remain active until explicitly changed.
 - Manual membership contributions, accounting records, and membership recalculation are deliberately maintained separately by staff.
@@ -832,4 +833,3 @@ The overall integration is complete when:
 - Operators can understand and resolve mapping/review/error states from the UI.
 - Security, database concurrency, contract fixtures, and core Angular flows have automated coverage.
 - Production reconciliation demonstrates that Zeffy totals and SVIR ERP postings agree for the approved scope.
-

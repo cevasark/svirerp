@@ -84,6 +84,6 @@ The following decisions would make subsequent implementation safer and more prec
 5. Should existing contacts be updated/enrolled by Contacts import? How should shared/missing email and blank CSV update cells be handled?
 6. Should every Donation and every membership-enabled Ticket grant membership credit, including repeated qualifying donations, or only specific purposes/campaigns? The renewal chaining algorithm itself is already documented as intentional.
 7. Can Stripe payments contain multiple different products, and are refunds, disputes, delayed payments, or automatic attendee registration required?
-8. Should the documented shared operational access remain, including organization edits and project deletion, and what audit/retention expectations apply?
+8. Should the documented shared operational access remain for actions such as project deletion, and what audit/retention expectations apply? Organization profile edits are admin-only.
 
 The existing architecture, single-organization deployment, same-origin session authentication, domain layering, Flyway ownership, explicit campaign overrides, documented renewal chaining, and the three user-confirmed requirements provide the working conventions for future changes. Other business-rule questions remain open; this report does not assume their answers or authorize changing production data.

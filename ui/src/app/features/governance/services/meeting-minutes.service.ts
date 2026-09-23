@@ -8,13 +8,13 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('meeting-minutes');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
+  /** List all meeting minutes in this installation. */
   override getPage(
     params: PageParams = DEFAULT_PAGE_PARAMS,
     fromDate?: string | null,
@@ -31,7 +31,7 @@ export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
       p = p.set('openActionItemsOnly', 'true');
     }
     return this.http.get<Page<MeetingMinutes>>(
-      `${this.orgScopedEnv.apiUrl}/meeting-minutes`,
+      `${this.env.apiUrl}/meeting-minutes`,
       { params: p },
     );
   }

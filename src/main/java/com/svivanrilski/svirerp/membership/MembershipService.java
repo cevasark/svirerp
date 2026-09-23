@@ -104,7 +104,7 @@ public class MembershipService {
      *  BENEFACTOR/FOLLOWER stored as the member's membershipType name (see TierCalculator's class
      *  doc for why "Member" here means the $150+ tier, not the generic "has a Member row" sense).
      *  Followers have no active/inactive distinction (always active — see TierCalculator), so just
-     *  one count. totalMembers is every Member row for the org, regardless of tier/status. */
+     *  one count. totalMembers is every Member row in the installation, regardless of tier/status. */
     public MemberSummary getMemberSummary() {
         return new MemberSummary(
                 memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.MEMBER),

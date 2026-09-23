@@ -6,7 +6,7 @@ import { ActionItem } from '../../../core/models/domain.model';
 
 @Injectable({ providedIn: 'root' })
 export class ActionItemService extends ResourceService<ActionItem> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('action-items');
@@ -17,6 +17,6 @@ export class ActionItemService extends ResourceService<ActionItem> {
    * as a whole live list while trustees are discussing, not paged through.
    */
   getForMeeting(meetingMinutesId: string): Observable<ActionItem[]> {
-    return this.http.get<ActionItem[]>(`${this.orgScopedEnv.apiUrl}/meeting-minutes/${meetingMinutesId}/action-items`);
+    return this.http.get<ActionItem[]>(`${this.env.apiUrl}/meeting-minutes/${meetingMinutesId}/action-items`);
   }
 }

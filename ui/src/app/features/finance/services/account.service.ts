@@ -8,21 +8,21 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class AccountService extends ResourceService<Account> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('accounts');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). Lazily seeds a default
-   *  chart of accounts on the org's first request — see FinanceService#seedDefaultChartOfAccounts. */
+  /** Lists all accounts and lazily seeds a default
+   *  chart of accounts on the installation's first request — see FinanceService#seedDefaultChartOfAccounts. */
   override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Account>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Account>>(
-      `${this.orgScopedEnv.apiUrl}/accounts`,
+      `${this.env.apiUrl}/accounts`,
       { params: p },
     );
   }

@@ -8,13 +8,13 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTie
 
 @Injectable({ providedIn: 'root' })
 export class MemberService extends ResourceService<Member> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly env = inject(ENVIRONMENT);
 
   constructor() {
     super('members');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
+  /** List all members in this installation. */
   override getPage(
     params: PageParams = DEFAULT_PAGE_PARAMS,
     status?: string | null,
@@ -31,20 +31,20 @@ export class MemberService extends ResourceService<Member> {
       p = p.set('membershipTypeId', membershipTypeId);
     }
     return this.http.get<Page<Member>>(
-      `${this.orgScopedEnv.apiUrl}/members`,
+      `${this.env.apiUrl}/members`,
       { params: p },
     );
   }
 
   getSummary(): Observable<MemberSummary> {
     return this.http.get<MemberSummary>(
-      `${this.orgScopedEnv.apiUrl}/members/summary`,
+      `${this.env.apiUrl}/members/summary`,
     );
   }
 
   downloadImportTemplate(): Observable<Blob> {
     return this.http.get(
-      `${this.orgScopedEnv.apiUrl}/members/import-template`,
+      `${this.env.apiUrl}/members/import-template`,
       { responseType: 'blob' },
     );
   }
@@ -53,7 +53,7 @@ export class MemberService extends ResourceService<Member> {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<MemberImportResult>(
-      `${this.orgScopedEnv.apiUrl}/members/import`,
+      `${this.env.apiUrl}/members/import`,
       formData,
     );
   }
@@ -62,7 +62,7 @@ export class MemberService extends ResourceService<Member> {
    *  (a qualifying payment ages past its window with no new payment event). */
   recomputeTiers(): Observable<RecomputeTiersResult> {
     return this.http.post<RecomputeTiersResult>(
-      `${this.orgScopedEnv.apiUrl}/members/recompute-tiers`,
+      `${this.env.apiUrl}/members/recompute-tiers`,
       {},
     );
   }
