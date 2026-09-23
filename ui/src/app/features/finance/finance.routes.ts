@@ -45,13 +45,6 @@ export const financeRoutes: Routes = [
           ),
       },
       {
-        path: 'zeffy-import',
-        loadComponent: () =>
-          import('./pages/zeffy-import-list/zeffy-import-list.component').then(
-            m => m.ZeffyImportListComponent,
-          ),
-      },
-      {
         path: 'stripe',
         loadComponent: () =>
           import('./pages/stripe-shell/stripe-shell.component').then(m => m.StripeShellComponent),
@@ -72,6 +65,13 @@ export const financeRoutes: Routes = [
               ),
           },
         ],
+      },
+      {
+        path: 'zeffy',
+        loadComponent: () =>
+          import('./pages/zeffy-campaign-list/zeffy-campaign-list.component').then(
+            m => m.ZeffyCampaignListComponent,
+          ),
       },
       {
         path: 'reports',
@@ -103,12 +103,5 @@ export const financeRoutes: Routes = [
         ],
       },
     ],
-  },
-  {
-    path: 'zeffy-import/:batchId',
-    loadComponent: () =>
-      import('./pages/zeffy-import-detail/zeffy-import-detail.component').then(
-        m => m.ZeffyImportDetailComponent,
-      ),
   },
 ];

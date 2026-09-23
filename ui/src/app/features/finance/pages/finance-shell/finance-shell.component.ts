@@ -21,13 +21,13 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="serviceRequestsActive.isActive">
         Service Requests
       </a>
-      <a mat-tab-link routerLink="zeffy-import" routerLinkActive #zeffyImportActive="routerLinkActive"
-         [active]="zeffyImportActive.isActive">
-        Zeffy Import
-      </a>
       <a mat-tab-link routerLink="stripe" routerLinkActive #stripeActive="routerLinkActive"
          [active]="stripeActive.isActive">
         Stripe
+      </a>
+      <a mat-tab-link routerLink="zeffy" routerLinkActive #zeffyActive="routerLinkActive"
+         [active]="zeffyActive.isActive">
+        Zeffy
       </a>
       <a mat-tab-link routerLink="master" routerLinkActive #masterActive="routerLinkActive"
          [active]="masterActive.isActive">

@@ -14,8 +14,7 @@ import java.util.UUID;
  * Routes a Stripe Price to what a completed payment against it means — membership dues, a paid
  * church service, an event ticket, or general income — plus where it posts (Fund/Account). One row
  * per (org, stripePriceId), persisted so a recurring WordPress/mobile-app product doesn't need
- * remapping on every payment. Same role as ZeffyCampaignMapping, generalized to four purposes
- * instead of one campaign-to-fund link.
+ * remapping on every payment.
  */
 @Entity
 @Table(

@@ -16,7 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
   ignored: 'Ignored',
 };
 
-/** Audit log of every Stripe webhook delivery — mirrors the Zeffy import's row-level audit trail.
+/** Audit log of every Stripe webhook delivery.
  *  'Needs Mapping' rows appear the first time a new Stripe Price is paid for before an admin has
  *  mapped it; 'Reprocess' re-runs the same apply path once the mapping (or whatever else failed)
  *  has been fixed. */

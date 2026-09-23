@@ -51,6 +51,13 @@ export const settingsRoutes: Routes = [
             m => m.StripeSettingsComponent,
           ),
       },
+      {
+        path: 'zeffy',
+        loadComponent: () =>
+          import('./pages/zeffy-settings/zeffy-settings.component').then(
+            m => m.ZeffySettingsComponent,
+          ),
+      },
     ],
   },
 ];

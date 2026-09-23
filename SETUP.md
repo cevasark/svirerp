@@ -186,7 +186,20 @@ Full details, including the separate production client and the org's Workspace-d
 
 ---
 
-## Step 12 (optional) — Build a single production-style jar
+## Step 12 (optional) — Connect Zeffy
+
+Phase 1 can synchronize the campaign catalog before webhook/payment processing is enabled:
+
+1. Generate an API key in Zeffy under **Settings → Integrations**.
+2. In SVIR ERP, open **Settings → Zeffy**, enter the API key, and leave validation enabled when saving.
+3. Use **Test Connection**, then **Sync Campaigns**. Every outbound request is paced at one request per second, and each synchronization attempt is retained in the history table.
+4. Open **Finance → Zeffy** and confirm an APPLY or IGNORE policy for each campaign. APPLY requires a Fund and revenue Account.
+
+The event-processing mode remains `DISABLED` in Phase 1. Do not configure the displayed webhook URL in Zeffy until Phase 2 enables the receiver.
+
+---
+
+## Step 13 (optional) — Build a single production-style jar
 
 To run the app the way production does — one jar serving both the API and the built UI from a single origin:
 

@@ -4,13 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +16,6 @@ import java.util.UUID;
 public class PersonController {
 
     private final PersonService service;
-    private final PersonImportService importService;
 
     @GetMapping("/api/persons")
     public Page<Person> list(Pageable pageable) {
@@ -54,22 +49,4 @@ public class PersonController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Import (Zeffy contacts export — see PersonImportService) ──────────────
-
-    @GetMapping("/api/persons/import-template")
-    public ResponseEntity<byte[]> importTemplate() {
-        byte[] csv = importService.buildImportTemplate();
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename("people-import-template.csv")
-                        .build()
-                        .toString())
-                .body(csv);
-    }
-
-    @PostMapping("/api/persons/import")
-    public PersonImportService.PersonImportResult importPeople(@RequestParam("file") MultipartFile file) {
-        return importService.importPeople(file);
-    }
 }

@@ -128,7 +128,10 @@ export class SettingsPageComponent implements OnInit {
 
   private load(): void {
     this.settingsService.list().subscribe(settings => {
-      this.rows.set(settings.filter(setting => !setting.key.startsWith('gmail.') && !setting.key.startsWith('calendar.') && !setting.key.startsWith('email.')).map(setting => ({
+      this.rows.set(settings.filter(setting => !setting.key.startsWith('gmail.')
+        && !setting.key.startsWith('calendar.')
+        && !setting.key.startsWith('email.')
+        && !setting.key.startsWith('zeffy.')).map(setting => ({
         setting,
         draftValue: setting.valueType === 'SECRET' ? '' : (setting.value ?? ''),
         saving: false,

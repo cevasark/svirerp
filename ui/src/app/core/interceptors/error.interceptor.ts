@@ -42,6 +42,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           returnUrl.save(router.url);
           router.navigate(['/login']);
         }
+      } else if (err.status === 429 || err.status === 502) {
+        notifications.error(message);
       } else if (err.status >= 500) {
         notifications.error('Server error — please try again later.');
       } else if (err.status === 409) {

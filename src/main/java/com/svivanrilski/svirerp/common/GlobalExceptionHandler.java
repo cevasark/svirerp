@@ -1,5 +1,6 @@
 package com.svivanrilski.svirerp.common;
 
+import com.svivanrilski.svirerp.zeffyintegration.ZeffyApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -52,6 +53,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArg(IllegalArgumentException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(ZeffyApiException.class)
+    public ResponseEntity<Map<String, Object>> handleZeffyApi(ZeffyApiException ex) {
+        if (ex.getStatus() == 401) {
+            // Keep an upstream credential rejection distinct from the user's application session;
+            // returning 401 here would make the Angular interceptor redirect to login.
+            return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+        if (ex.getStatus() == 429) {
+            return error(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        }
+        return error(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

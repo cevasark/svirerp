@@ -556,55 +556,35 @@ export interface ReconciliationItem {
   notes?: string;
 }
 
-// ─── Zeffy Import ────────────────────────────────────────────────────────────
-export interface ZeffyCampaignMapping {
+// ─── Zeffy API Integration ───────────────────────────────────────────────────
+export interface ZeffyReference {
   id: string;
-  campaignTitle: string;
-  fund: Fund;
-  /** Overrides the Ticket-category-skips-membership default — Zeffy implements fixed-price
-   *  membership registration as a Ticket-type product, not Donation. */
-  isMembershipPayment: boolean;
-  createdAt?: string;
+  code: string;
+  name: string;
 }
 
-export interface ZeffyImportBatch {
+export interface ZeffyCampaign {
   id: string;
-  fileName: string;
-  uploadedAt?: string;
-  status: 'previewed' | 'committed';
-  rowCount: number;
-  committedAt?: string;
-}
-
-/** One row per line of an uploaded Zeffy Transactions export — the preview/commit staging area
- *  and audit trail. */
-export interface ZeffyImportRow {
-  id: string;
-  batch: ZeffyImportBatch;
-  rowNumber: number;
-  transactionId?: string;
-  amount?: number;
-  /** "Donation" earns membership tier credit; "Ticket" is a plain income posting only. */
-  category?: 'Donation' | 'Ticket';
-  /** The tax-deductible portion — informational only, blank for non-donation rows. */
-  eligibleAmount?: number;
-  transactionDate?: string;
-  /** When Zeffy pays this out to the bank — informational only. */
-  availableDate?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  campaignTitle?: string;
-  dedupeKey?: string;
-  outcome: 'pending_preview' | 'ready' | 'duplicate' | 'skipped_status' | 'unmapped_campaign' | 'error' | 'committed';
-  outcomeDetail?: string;
-  isNewPerson: boolean;
-  isNewMember: boolean;
-  person?: Person;
-  member?: Member;
-  memberPayment?: MemberPayment;
-  journalEntry?: JournalEntry;
-  fund?: Fund;
+  zeffyCampaignId: string;
+  title: string;
+  campaignType: string;
+  category?: string;
+  status?: string;
+  currency?: string;
+  archived: boolean;
+  publicUrl?: string;
+  zeffyCreatedAt?: string;
+  zeffyUpdatedAt?: string;
+  zeffyDeletedAt?: string;
+  lastSyncedAt: string;
+  mappingConfirmed: boolean;
+  processingAction?: 'APPLY' | 'IGNORE';
+  fund?: ZeffyReference;
+  categoryAccount?: ZeffyReference;
+  grantsMembershipCredit: boolean;
+  mappingNote?: string;
+  suggestedAction: 'APPLY' | 'IGNORE';
+  suggestedMembershipCredit: boolean;
 }
 
 // ─── Stripe Integration ──────────────────────────────────────────────────────

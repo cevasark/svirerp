@@ -96,7 +96,7 @@ public class MembershipController {
 
     /** Manual re-run of tier computation for every member in the org — tier can go stale purely
      *  from time passing (a qualifying payment ages past its 1-year window with no new payment
-     *  event), so this doesn't require a new Zeffy import to catch up. */
+     *  event), so this does not depend on a new external payment event to catch up. */
     @PostMapping("/api/members/recompute-tiers")
     public RecomputeTiersResult recomputeTiers() {
         return new RecomputeTiersResult(service.recomputeAllTiers());

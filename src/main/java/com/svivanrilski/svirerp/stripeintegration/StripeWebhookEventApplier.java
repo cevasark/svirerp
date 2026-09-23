@@ -27,8 +27,8 @@ import java.util.UUID;
 /**
  * Applies a single {@link StripeWebhookEvent} — called by {@link StripeWebhookService}, a
  * different bean, so {@link #applyEvent} always gets its own fresh transaction whether it succeeds
- * or throws. Same idiom as ZeffyImportRowApplier: on failure the caller catches the exception and
- * calls {@link #markEventError}, itself a separate transaction, so the event's terminal status is
+ * or throws. On failure the caller catches the exception and calls {@link #markEventError},
+ * itself a separate transaction, so the event's terminal status is
  * always durably recorded even though the failed attempt's domain writes rolled back.
  */
 @Service

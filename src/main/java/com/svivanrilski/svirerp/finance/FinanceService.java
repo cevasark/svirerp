@@ -56,7 +56,7 @@ public class FinanceService {
         // Pass-through payment platforms hold donations and pay out to Checking in periodic lump
         // sums, net of their own fees — these clearing accounts let a platform's transactions post
         // the moment they happen without overstating Checking until the real payout lands. See
-        // StripeWebhookEventApplier#resolveDepositAccount / ZeffyImportService#commitImport.
+        // StripeWebhookEventApplier#resolveDepositAccount and future Zeffy API payment processing.
         {"1020", "Undeposited Funds – Zeffy", "asset"},
         {"1021", "Undeposited Funds – Stripe", "asset"},
         {"1022", "Undeposited Funds – Facebook", "asset"},
@@ -801,42 +801,6 @@ public class FinanceService {
                 .journalEntry(entry).account(from)
                 .debitAmount(BigDecimal.ZERO).creditAmount(req.amount())
                 .memo(req.description()).build());
-
-        return postEntry(entry.getId(), null);
-    }
-
-    /**
-     * Moves already-recognized revenue from one category account to another — e.g. correcting a
-     * Zeffy Ticket-category transaction that turned out to actually be a membership payment, after
-     * it already posted to the wrong revenue account. Doesn't touch any asset/clearing account, so
-     * cash-in-hand figures are unaffected; this is purely a categorization fix.
-     */
-    @Transactional
-    public JournalEntry reclassifyIncome(LocalDate entryDate, BigDecimal amount, String description,
-            UUID fromCategoryAccountId, UUID toCategoryAccountId) {
-        Account from = findAccountById(fromCategoryAccountId);
-        requireAccountType(from, "revenue", "Source account");
-        Account to = findAccountById(toCategoryAccountId);
-        requireAccountType(to, "revenue", "Destination account");
-
-        JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
-                .entryDate(entryDate)
-                .description(description)
-                .entryType("general")
-                .status("draft")
-                .totalDebit(amount)
-                .totalCredit(amount)
-                .build());
-
-        // Revenue is credit-normal — debiting `from` reduces its balance, crediting `to` increases it.
-        journalLineRepo.save(JournalLine.builder()
-                .journalEntry(entry).account(from)
-                .debitAmount(amount).creditAmount(BigDecimal.ZERO)
-                .memo(description).build());
-        journalLineRepo.save(JournalLine.builder()
-                .journalEntry(entry).account(to)
-                .debitAmount(BigDecimal.ZERO).creditAmount(amount)
-                .memo(description).build());
 
         return postEntry(entry.getId(), null);
     }

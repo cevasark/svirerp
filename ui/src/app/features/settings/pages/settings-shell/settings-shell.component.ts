@@ -33,6 +33,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="stripeActive.isActive">
         Stripe
       </a>
+      <a mat-tab-link routerLink="zeffy" routerLinkActive #zeffyActive="routerLinkActive"
+         [active]="zeffyActive.isActive">
+        Zeffy
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />

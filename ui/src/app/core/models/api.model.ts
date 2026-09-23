@@ -40,21 +40,6 @@ export interface MemberImportRowError {
   message: string;
 }
 
-/** Response shape of POST /api/persons/import — imports a Zeffy contacts
- * export, enrolling anyone not already in the system as an active/inactive Follower. Rows whose
- * email already matches an existing Person are skipped, not updated. */
-export interface PersonImportResult {
-  created: number;
-  skippedExisting: number;
-  failed: PersonImportRowError[];
-}
-
-export interface PersonImportRowError {
-  rowNumber: number;
-  email: string | null;
-  message: string;
-}
-
 /** Response shape of GET/PUT /api/settings — admin-only runtime config. `value`
  * is always null for SECRET settings; `hasValue` tells the UI whether one is
  * configured without ever exposing it. */
@@ -66,44 +51,56 @@ export interface AppSetting {
   hasValue: boolean;
 }
 
-/** Response shape of GET /api/zeffy-imports/{batchId}/summary — a synthesized preview
- * projection, not a persisted entity. */
-export interface ZeffyImportSummary {
-  batchId: string;
-  totalRows: number;
-  readyCount: number;
-  duplicateCount: number;
-  skippedStatusCount: number;
-  unmappedCampaignCount: number;
-  errorCount: number;
-  committedCount: number;
-  newPersonCount: number;
-  newMemberCount: number;
-  totalAmountReady: number;
-  unmappedCampaignTitles: string[];
+export interface ZeffySyncRun {
+  id: string;
+  syncType: 'CAMPAIGNS' | 'PAYMENTS' | 'CONTACTS';
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  triggerType: 'MANUAL' | 'SCHEDULED';
+  initiatedBy?: string;
+  startedAt: string;
+  completedAt?: string;
+  requestedFrom?: string;
+  requestedTo?: string;
+  startingCursor?: string;
+  endingCursor?: string;
+  fetchedCount: number;
+  insertedCount: number;
+  updatedCount: number;
+  ignoredCount: number;
+  failedCount: number;
+  errorSummary?: string;
 }
 
-/** Response shape of POST /api/zeffy-imports/{batchId}/commit. */
-export interface ZeffyImportCommitResult {
-  batchId: string;
-  committed: number;
-  failed: number;
-  stillUnmappedCampaign: number;
+export interface ZeffyIntegrationStatus {
+  apiKeyConfigured: boolean;
+  webhookSecretConfigured: boolean;
+  integrationMode: 'DISABLED' | 'RECORD_ONLY' | 'LIVE';
+  campaignCount: number;
+  confirmedMappingCount: number;
+  latestCampaignSync?: ZeffySyncRun;
 }
 
-/** Request body for POST /api/zeffy-campaign-mappings/bulk. */
+export interface ZeffyConfigurationRequest {
+  apiKey?: string;
+  webhookSigningSecret?: string;
+  validateApiKey: boolean;
+}
+
+export interface ZeffyConnectionTestResult {
+  connected: boolean;
+  testedAt: string;
+}
+
+export interface ZeffyCampaignSyncResult {
+  run: ZeffySyncRun;
+}
+
 export interface ZeffyCampaignMappingRequest {
-  campaignTitle: string;
-  fundId: string;
-  isMembershipPayment: boolean;
-}
-
-/** Response shape of POST /api/zeffy-imports/reprocess-membership-rows —
- *  the one-time backfill for Ticket rows whose campaign was flagged as a membership payment
- *  after they'd already committed. */
-export interface ReprocessMembershipResult {
-  rowsProcessed: number;
-  membersCreated: number;
+  action: 'APPLY' | 'IGNORE';
+  fundId?: string;
+  categoryAccountId?: string;
+  grantsMembershipCredit: boolean;
+  note?: string;
 }
 
 /** Response shape of POST /api/members/recompute-tiers. */

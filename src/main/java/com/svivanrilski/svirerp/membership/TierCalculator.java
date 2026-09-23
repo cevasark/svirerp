@@ -8,9 +8,7 @@ import java.util.List;
 
 /**
  * Derives a member's tier/expiry/status from their completed-payment history. Stateless — shared
- * by the real tier recompute ({@link MembershipService#recomputeTier}) and the Zeffy import
- * preview, which simulates the tier a new/updated payment would produce before anything is
- * committed.
+ * by the real tier recompute ({@link MembershipService#recomputeTier}) and payment integrations.
  *
  * <p>Tiers, low to high: Follower (any payment, including $0) &lt; Member ($150+ — VOTING_THRESHOLD,
  * grants voting rights) &lt; Benefactor ($1000+). "Member" is this org's pre-existing name for the
@@ -30,8 +28,7 @@ import java.util.List;
  *
  * <p>A payment history containing no $150+ payment (for example, small one-off donations) produces
  * an active, non-expiring Follower. No payment history produces no result; the caller preserves an
- * existing Follower's staff/import-assigned status. Zeffy's Transactions export doesn't carry
- * sub-$150 "Follower" signups as of this writing, so modeling Follower expiry remains separate.
+ * existing Follower's staff/API-assigned status. Modeling Follower expiry remains separate.
  */
 public final class TierCalculator {
 
@@ -42,8 +39,7 @@ public final class TierCalculator {
     public static final BigDecimal BENEFACTOR_THRESHOLD = new BigDecimal("1000.00");
     public static final BigDecimal VOTING_THRESHOLD = new BigDecimal("150.00");
 
-    /** Dates on Zeffy's export are already Chicago-local calendar dates; "today" for the
-     *  active-vs-lapsed check uses the same zone. */
+    /** "Today" for the active-vs-lapsed check uses the church's local zone. */
     private static final ZoneId WINDOW_ZONE = ZoneId.of("America/Chicago");
 
     private TierCalculator() {

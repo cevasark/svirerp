@@ -1,13 +1,13 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Planning specification  
-**Date:** September 22, 2026  
-**Target application:** SVIR ERP, branch `zeffy-import-refactor`  
+**Status:** Living specification; Phase 1 implemented
+**Date:** September 22, 2026
+**Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
 
 ## 1. Purpose
 
-SVIR ERP currently receives Zeffy information through manually uploaded Contacts and Transactions spreadsheets. This integration will add direct Zeffy API access and signed webhook delivery while retaining the existing file imports as a controlled fallback.
+SVIR ERP will receive Zeffy information directly through authenticated API reads and signed webhook delivery. The former Zeffy Contacts and Transactions spreadsheet imports are removed as part of Phase 1; the unrelated application-owned Member CSV import remains available.
 
 The work is divided into five independently releasable phases:
 
@@ -19,7 +19,7 @@ The work is divided into five independently releasable phases:
 
 Each phase requires a separate implementation plan and explicit approval before application code is changed. Later phases depend on the acceptance criteria of the earlier phases.
 
-The integration must not create an independent set of church business rules. API, webhook, and spreadsheet inputs must eventually feed shared payment-processing logic so that equivalent Zeffy payments produce equivalent Person, membership, contribution, fund, account, and journal results.
+The integration must not create an independent set of church business rules. API synchronization and webhook events must feed shared payment-processing logic so that equivalent Zeffy payments produce equivalent Person, membership, contribution, fund, account, and journal results.
 
 ## 2. Goals
 
@@ -28,7 +28,7 @@ The integration will:
 - Receive new completed Zeffy payments without waiting for a spreadsheet export.
 - Authenticate inbound webhooks using Zeffy's documented signature scheme.
 - Keep a durable audit trail of every received event and every Zeffy payment considered by SVIR ERP.
-- Prevent duplicate accounting or membership effects across webhook retries, API synchronization, concurrent processing, and spreadsheet imports.
+- Prevent duplicate accounting or membership effects across webhook retries, API synchronization, concurrent processing, and reprocessing.
 - Synchronize Zeffy campaigns and identify them by immutable Zeffy IDs rather than mutable titles.
 - Require an explicit local mapping before a campaign can affect accounting or membership.
 - Use the original Zeffy payment date for accounting and membership.
@@ -48,7 +48,7 @@ Unless a later approved feature expands the scope, the integration will not:
 - Delete local Persons, Members, journal entries, or other historical records because Zeffy deleted a resource.
 - Modify manually entered membership contributions or journal entries. Staff deliberately maintain manual contributions, accounting, and membership separately.
 - Make Zeffy the master of all Person fields without an explicitly approved field-ownership policy.
-- Remove the existing CSV/XLSX imports during initial rollout.
+- Provide a second Zeffy spreadsheet-ingestion path alongside the API.
 - Introduce multi-organization behavior. The application remains one organization per installation.
 - Introduce new user roles. Existing authentication remains in effect: operational pages are available to authenticated users and integration credentials/settings are admin-only.
 
@@ -74,6 +74,7 @@ Unless a later approved feature expands the scope, the integration will not:
   - 20 requests per second
 - A `429` response includes `Retry-After`. The client must honor it and use bounded retry behavior.
 - Authenticated responses may include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+- SVIR ERP deliberately applies a stricter global pace of one outbound Zeffy request per second. The same shared pacer applies to connection tests, all synchronization types, retries, and future API reads.
 
 ### 4.2 Webhooks
 
@@ -147,8 +148,6 @@ flowchart LR
     AC --> CS[Campaign/contact/payment sync]
     WI --> PP[Shared Zeffy payment processor]
     CS --> PP
-    FI[Spreadsheet fallback] --> IA[Import adapter]
-    IA --> PP
     PP --> CM[Campaign mapping]
     PP --> P[Person]
     PP --> M[Membership contribution and tier]
@@ -179,9 +178,9 @@ The existing `app_setting` and `SettingEncryptor` mechanism will store:
 |---|---|---|
 | `zeffy.api-key` | `SECRET` | Bearer key used for Zeffy API requests |
 | `zeffy.webhook-signing-secret` | `SECRET` | `whsec_...` key used for webhook verification |
-| `zeffy.integration-mode` | `STRING` | `DISABLED`, `RECORD_ONLY`, or `LIVE` |
-| `zeffy.last-campaign-sync-at` | `STRING` | Read-only operational timestamp maintained by the application |
-| `zeffy.last-payment-sync-at` | `STRING` | Read-only operational timestamp maintained by the application after successful historical synchronization |
+| `zeffy.integration-mode` | `STRING` | `DISABLED`, `RECORD_ONLY`, or `LIVE` event-processing mode |
+
+Synchronization timestamps, counts, checkpoints, outcomes, and errors are operational history. They must be stored in `zeffy_sync_run`, never in `app_setting`.
 
 The Zeffy API base URL is a server-side constant, not an editable production setting. Tests may inject a mock base URL.
 
@@ -195,7 +194,7 @@ Secret values must:
 
 ### 6.2 Integration modes
 
-- **DISABLED:** no API synchronization and no event processing. The webhook URL must not be configured in Zeffy while the endpoint is deliberately disabled, because non-2xx responses create retries.
+- **DISABLED:** no webhook event processing. Admin-initiated connection tests and API synchronization remain available so a new installation can be configured and populated before event processing is enabled. The webhook URL must not be configured in Zeffy while the endpoint is deliberately disabled, because non-2xx responses create retries.
 - **RECORD_ONLY:** signed webhooks are recorded and displayed but do not create domain records. This is the required initial production mode for Phase 2.
 - **LIVE:** supported events are recorded and eligible completed payments are applied automatically.
 
@@ -209,9 +208,10 @@ Settings → Zeffy will show:
 - Webhook secret configured/not configured
 - Integration mode
 - Webhook URL: `{origin}/api/webhooks/zeffy`
-- Latest successful API connection test
-- Latest campaign synchronization and result counts
-- Latest historical payment synchronization and result counts
+- Result of the current-session API connection test; connection tests are not persisted as settings
+- Latest campaign synchronization and result counts, derived from `zeffy_sync_run`
+- Paginated synchronization history, including failures
+- Latest historical payment synchronization and result counts when Phase 4 is implemented
 - Buttons for Test Connection and Sync Campaigns
 - Clear warnings before secret replacement or mode change
 
@@ -241,19 +241,33 @@ Campaign synchronization updates descriptive fields but never silently changes l
 
 ### 7.2 Campaign mapping
 
-The existing `zeffy_campaign_mapping` will evolve from title identity to Zeffy campaign-ID identity. It retains a title snapshot for display and migration compatibility.
+Campaign policy is stored with the synchronized `zeffy_campaign` record. The immutable Zeffy campaign ID is authoritative; title is descriptive and may change.
 
 Required local policy:
 
 - local Fund
-- income category Account or an approved default derived from purpose
+- required income category Account when action is `APPLY`
 - membership-credit flag
 - processing action: `APPLY` or `IGNORE`
 - optional explanatory note
 
-The Zeffy campaign ID is authoritative. Title is not a key because titles can change. Existing title-based mappings must be matched to synchronized campaigns and confirmed by an operator before automatic processing. Ambiguous or unmatched legacy mappings remain visible and do not apply automatically.
+Every policy must be explicitly confirmed by an operator before automatic processing. Suggestions derived from Zeffy type/category have no effect until confirmed. A rename updates descriptive fields without changing confirmed local policy.
 
-### 7.3 Webhook event
+### 7.3 Synchronization run
+
+`zeffy_sync_run` stores every manual or scheduled synchronization attempt:
+
+- run ID and synchronization type: `CAMPAIGNS`, `PAYMENTS`, or `CONTACTS`
+- status: `RUNNING`, `COMPLETED`, `PARTIAL`, or `FAILED`
+- trigger type and initiating user when available
+- start and completion timestamps
+- requested time range and starting/ending cursor where applicable
+- fetched, inserted, updated, ignored, and failed counts
+- sanitized/truncated error summary
+
+A run is inserted and committed before the first remote request. Completion or failure is committed independently so a remote or processing exception does not erase the audit record. Settings/status views derive the latest result from this history.
+
+### 7.4 Webhook event
 
 Stores one row per Zeffy event ID:
 
@@ -272,7 +286,7 @@ Stores one row per Zeffy event ID:
 
 Raw payload contains personal information. It must not be included in routine list responses or logs. A sanitized/detail endpoint may expose it only to the admin if operationally necessary.
 
-### 7.4 Zeffy payment record
+### 7.5 Zeffy payment record
 
 Stores one row per unique Zeffy payment ID, independent of webhook event IDs:
 
@@ -281,23 +295,11 @@ Stores one row per unique Zeffy payment ID, independent of webhook event IDs:
 - payment type, campaign ID/title snapshot, contact ID, buyer email/name snapshot
 - latest payload snapshot or controlled raw JSON
 - processing status and error/review reason
-- first-seen source: `WEBHOOK`, `API_SYNC`, or `FILE_IMPORT`
+- first-seen source: `WEBHOOK` or `API_SYNC`
 - first/last event and synchronization timestamps
 - links to Person, Member, MemberPayment, JournalEntry, and any later reversal/correction entries
 
 This is the business idempotency boundary. A new event may update the record, but only one initial application may create the original domain effects.
-
-### 7.5 Historical sync run
-
-Stores:
-
-- run ID
-- requested created-from/created-through range
-- start/end timestamps
-- status: `RUNNING`, `COMPLETED`, `PARTIAL`, or `FAILED`
-- current cursor/checkpoint
-- fetched, duplicate, applied, needs-mapping, needs-review, and failed counts
-- last safe error message
 
 ### 7.6 Contact link (Phase 5)
 
@@ -324,7 +326,7 @@ Maps unique `zeffy_contact_id` to Person. Email remains a matching aid but is no
 - A payment with no active mapping is recorded as `NEEDS_MAPPING` and creates no Person, MemberPayment, or JournalEntry.
 - Mapping changes affect unprocessed/reprocessed records. They do not silently rewrite already-posted accounting.
 - Correcting an applied payment requires an explicit correction/reversal operation and an audit link.
-- Existing mapping behavior must be preserved during migration until the operator confirms the Zeffy campaign-ID match.
+- Campaign type/category suggestions remain advisory until the operator confirms policy.
 
 ### 8.3 Payment eligibility
 
@@ -361,7 +363,7 @@ One Payment can contain multiple line items. The initial rule is:
 ### 8.6 Membership
 
 - Campaign mapping decides whether a payment grants membership credit.
-- The current spreadsheet behavior should seed mapping suggestions: donation/membership campaigns may suggest membership credit; event/ticket/shop/auction/raffle campaigns should default to no membership credit. The operator must confirm the mapping before LIVE processing.
+- A `donation_form` campaign may suggest membership credit; ticketing campaigns default to no membership credit. The operator must confirm every policy before LIVE processing.
 - A membership-credit payment finds or creates the Person and Follower Member, creates a completed `MemberPayment`, and recomputes the tier.
 - Non-membership payments do not create Member or MemberPayment records.
 - MemberPayment amount and date use the Zeffy payment amount and original date.
@@ -408,22 +410,24 @@ An admin can:
 - Save the encrypted webhook signing secret in preparation for Phase 2.
 - Test the API connection using a minimal authenticated read.
 - Synchronize all campaigns using `limit=100` and cursor pagination.
-- See last synchronization time and counts: fetched, inserted, updated, archived/deleted, and failed.
+- See every synchronization attempt and its status, timestamps, initiating user, and fetched/inserted/updated/ignored/failed counts.
 - Review campaigns and configure Fund, income Account, membership-credit flag, and APPLY/IGNORE action.
-- See suggested mappings derived from Zeffy campaign category, clearly marked as suggestions until saved.
-- See legacy title-based mappings and associate them with synchronized campaign IDs.
+- See suggested mappings derived from Zeffy campaign type, clearly marked as suggestions until saved.
+- Use the immutable Zeffy campaign ID as policy identity; campaign title changes do not affect policy.
 
 ### 9.2 API behavior
 
-Proposed internal endpoints:
+Phase 1 internal endpoints:
 
 - `GET /api/settings/zeffy/status`
+- `PUT /api/settings/zeffy/configuration`
 - `POST /api/settings/zeffy/test-connection`
 - `POST /api/settings/zeffy/sync-campaigns`
+- `GET /api/settings/zeffy/sync-runs`
 - `GET /api/zeffy-campaigns`
 - `PUT /api/zeffy-campaigns/{campaignId}/mapping`
 
-Settings endpoints are admin-only. Existing generic secret-setting APIs may be reused internally, but dedicated DTOs should prevent accidental exposure and make validation clear.
+Settings endpoints are admin-only. Dedicated request/response DTOs prevent secret exposure and keep validation explicit.
 
 ### 9.3 Failure handling
 
@@ -431,6 +435,7 @@ Settings endpoints are admin-only. Existing generic secret-setting APIs may be r
 - `429`: honor `Retry-After`; show a retryable error without busy-looping.
 - Network/5xx: bounded retry for idempotent GET requests, then show failure.
 - A failed synchronization does not delete or invalidate previously synced campaigns/mappings.
+- Every attempted synchronization reaches a durable `COMPLETED`, `PARTIAL`, or `FAILED` run status unless the database itself is unavailable.
 - A campaign absent from one sync is not immediately deleted locally. Use Zeffy's archived/deleted fields when available and preserve mapping history.
 
 ### 9.4 Acceptance criteria
@@ -440,7 +445,8 @@ Settings endpoints are admin-only. Existing generic secret-setting APIs may be r
 - More than 100 campaigns synchronize across pages without duplicates.
 - Repeated synchronization is idempotent.
 - Campaign rename updates display text without losing the local mapping.
-- Existing title mappings remain intact until explicitly associated.
+- Campaign synchronization history includes successful, partial, and failed runs and is not stored in `app_setting`.
+- The former Zeffy Contacts and Transactions spreadsheet-import code and tables are removed.
 - No Person, MemberPayment, or JournalEntry is created in Phase 1.
 
 ## 10. Phase 2 — Secure webhook inbox
@@ -552,14 +558,11 @@ Before application, the first production historical run should support a preview
 
 Execution can then apply eligible records. A partial failure records the cursor and per-payment outcomes. Re-running the same date range is safe because payment IDs are unique.
 
-### 12.3 Spreadsheet coexistence
+### 12.3 API-only ingestion
 
-- Spreadsheet import remains available as fallback during rollout.
-- Before historical API application, compare a sample of spreadsheet `transaction_id` values with API Payment IDs.
-- If IDs are identical, migrate/import them into the central Zeffy payment uniqueness table before enabling LIVE mode.
-- If IDs differ, establish an explicit crosswalk or choose a historical cutoff that cannot overlap already imported data.
-- Never assume the two identifier formats match without evidence.
-- The duplicate-at-commit weakness in the current spreadsheet workflow must be corrected before both ingestion paths can safely run concurrently.
+- Historical Zeffy data is loaded through the API; there is no Zeffy spreadsheet fallback.
+- Re-running the same date range is safe because the Zeffy payment ID is the business idempotency key.
+- Operational recovery uses a new or resumed API synchronization run with a durable checkpoint and per-payment outcomes.
 
 ### 12.4 Acceptance criteria
 
@@ -568,7 +571,7 @@ Execution can then apply eligible records. A partial failure records the cursor 
 - Date boundaries and Chicago date conversion are tested.
 - Counts reconcile to stored payment outcomes.
 - A webhook arriving during sync cannot duplicate the same payment.
-- Existing spreadsheet-derived records are not duplicated.
+- A clean installation can be populated without spreadsheet uploads.
 
 ## 13. Phase 5 — Updates, refunds, disputes, and contacts
 
@@ -720,8 +723,8 @@ Use a MySQL/MariaDB-compatible test database for:
 - atomic rollback across Person/MemberPayment/JournalEntry creation
 - status transitions and row locking
 - fund/account report attribution
-- migration of legacy title mappings
 - resume/restart of historical sync
+- durable synchronization-run completion and failure history
 
 ### 17.3 Controller/security tests
 
@@ -764,17 +767,17 @@ DTO parsing should ignore unknown additive fields while validating required fiel
 ## 18. Rollout plan
 
 1. Apply Phase 1 migrations and configure/test API key.
-2. Synchronize campaigns and reconcile all legacy title mappings to IDs.
+2. Synchronize campaigns and confirm each active campaign policy.
 3. Deploy Phase 2 in RECORD_ONLY mode.
 4. Configure the Zeffy webhook URL and signing secret.
 5. Observe real events and build sanitized fixtures; verify amounts, donor tips, IDs, item totals, categories, timestamps, and signature behavior.
-6. Compare live Payment IDs with spreadsheet transaction IDs.
-7. Complete mappings and reconcile any historical overlap.
+6. Validate live Payment IDs, amounts, timestamps, and campaign association against Zeffy.
+7. Complete mappings and review all recorded events.
 8. Enable Phase 3 LIVE mode for completed payments.
 9. Monitor and reconcile against Zeffy daily during an initial observation period.
 10. Run Phase 4 historical preview, approve its range, then execute.
 11. Implement Phase 5 policies only after refund/dispute/contact ownership decisions are approved.
-12. Retain file import fallback until two or more successful accounting reconciliation periods confirm API/webhook completeness.
+12. Continue API/webhook reconciliation until two or more accounting periods confirm completeness.
 
 Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain application without discarding received events. Re-enabling LIVE may process the backlog through explicit operator action after mappings and configuration are verified.
 
@@ -786,7 +789,9 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 - All authenticated operational users currently share access; Settings is local-admin-only.
 - Free Followers remain active until explicitly changed.
 - Manual membership contributions, accounting records, and membership recalculation are deliberately maintained separately by staff.
-- Failed spreadsheet imports are corrected by reuploading rather than reopening a partial file batch.
+- Zeffy Contacts and Transactions spreadsheet imports are removed; the generic Member CSV import remains.
+- Synchronization history belongs in `zeffy_sync_run`, not `app_setting`.
+- All outbound Zeffy API requests are globally paced at one request per second.
 - Existing payment tier thresholds and renewal chaining remain in effect.
 - Posted accounting corrections use new entries rather than editing posted entries.
 
@@ -794,7 +799,6 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 
 - API Payment ID is stable and globally unique within the Zeffy organization.
 - Webhook and API representations of the same payment use the same ID.
-- Spreadsheet transaction ID may equal API Payment ID, but this is explicitly unconfirmed.
 - Payment `amount` is the church's amount and excludes Zeffy's optional donor tip.
 - One campaign mapping can classify the whole payment.
 - API timestamps represent the authoritative transaction time.
@@ -813,7 +817,7 @@ These must be answered before their affected phase is implemented:
 5. Does a partial refund reduce membership credit to the net payment amount? If so, how should later chained renewals be recalculated and presented?
 6. When should a dispute affect accounting: when opened, only when lost, or through a manual treasurer decision?
 7. Which date should refund/reversal journal entries use: refund date, original payment date, or current accounting date?
-8. Should contact-created events automatically enroll every new Zeffy contact as an active Follower, matching the current Contacts file import?
+8. Should contact-created events automatically enroll every new Zeffy contact as an active Follower?
 9. Which Person fields may Zeffy update when local values already exist?
 10. Who may view raw webhook payloads containing donor information?
 11. How long should raw payloads be retained?
@@ -826,7 +830,7 @@ The overall integration is complete when:
 - Credentials and mode can be managed securely.
 - Campaigns synchronize and mappings survive rename/reload.
 - Webhooks are signature-verified, durably recorded, and event-idempotent.
-- Completed payments are payment-idempotent across webhook, API, reprocessing, and files.
+- Completed payments are payment-idempotent across webhook, API synchronization, and reprocessing.
 - Eligible payments produce correct Person, membership, Fund, Account, and balanced journal effects atomically.
 - Historical synchronization is paginated, rate-limit-aware, auditable, and restart-safe.
 - Approved refund/dispute/contact policies are implemented without deleting history.

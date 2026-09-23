@@ -51,14 +51,14 @@ svirerp/
 │       │   ├── event/
 │       │   ├── volunteer/
 │       │   ├── finance/
-│       │   ├── zeffyimport/    # Zeffy transaction import (.xlsx/.csv) — spans membership + finance
+│       │   ├── zeffyintegration/ # Zeffy API campaigns, synchronization history, and future webhooks
 │       │   ├── stripeintegration/  # Stripe webhook receiver — spans membership + finance
 │       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
 │       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V45 SQL scripts
+│           └── db/migration/                       # Flyway V1–V54 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -78,7 +78,7 @@ cp src/main/resources/application-local.properties.example \
    src/main/resources/application-local.properties
 # Edit application-local.properties with your MySQL user/password
 
-# 3. Run Flyway migrations (creates all 31 tables)
+# 3. Run Flyway migrations (creates the application schema)
 ./mvnw flyway:migrate \
   -Dflyway.url="jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
   -Dflyway.user=root \
@@ -205,7 +205,7 @@ An admin-only Settings area (`/settings` in the UI, gated by `ROLE_ADMIN` — on
 
 ### General settings
 
-Generic key/value configuration backed by the `app_setting` table (migration V28) — new settings are a migration row away rather than new plumbing. Each row has a `valueType`; `SECRET`-type values (currently `google.oauth.client-id` and `google.oauth.client-secret`) are encrypted at rest with `app.settings.encryption-key`/`app.settings.encryption-salt` and are **never** sent back to the frontend, even as ciphertext — the API only reports a `hasValue` flag. Changing the Google client id/secret here takes effect on the very next login attempt, with no app restart, since `SecurityConfig` resolves them fresh from the table on every OAuth2 login (see [Authentication](#authentication)).
+Generic key/value configuration backed by the `app_setting` table (migration V28) — new settings are a migration row away rather than new plumbing. Each row has a `valueType`; `SECRET` values are encrypted at rest with `app.settings.encryption-key`/`app.settings.encryption-salt` and are **never** sent back to the frontend, even as ciphertext — the API only reports a `hasValue` flag. Changing a credential takes effect on the next use without restarting the application.
 
 - `GET /api/settings` — list all settings (secrets redacted)
 - `PUT /api/settings/{key}` — update a single setting's value
@@ -239,11 +239,11 @@ The Email tab under Settings (`/settings/email`, migration V39) is a single gate
 - **Live** — sends normally to the real recipient.
 - **Test** — every email is redirected to the configured `email.test-address` instead of its real recipient, content unchanged (no "would have gone to" annotation) — lets you verify email content/formatting before real people receive anything.
 
-No dedicated endpoints — both settings are read/written through the existing generic `GET /api/settings` / `PUT /api/settings/{key}`, same as any other setting; the Email tab is just a purpose-built radio-group UI over those two keys (the generic Settings → General page deliberately excludes `email.*` keys, same as it already does for `gmail.*`/`calendar.*`).
+No dedicated endpoints — both settings are read/written through the existing generic `GET /api/settings` / `PUT /api/settings/{key}`, same as any other setting; the Email tab is just a purpose-built radio-group UI over those two keys (the generic Settings → General page deliberately excludes settings managed by purpose-built tabs, including `email.*`, `gmail.*`, `calendar.*`, and `zeffy.*`).
 
 ### Stripe (payment webhook receiver)
 
-The Stripe tab under Settings (`/settings/stripe`, migration V42) lets svirerp receive completed Stripe payments — membership dues, paid church services (weddings, baptisms, etc.), event tickets, and general income like candles or room rentals — and post them straight into the Finance module. **svirerp never hosts a checkout page itself** — the church's WordPress site, a Stripe Invoice sent directly to a payer, and a mobile card-reader/Tap-to-Pay app for in-person food & drink sales at events all own the actual payment UI; svirerp only listens for Stripe's `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded` webhook events and reacts to them, the same way the Zeffy payment import (see [API Overview](#api-overview)) turns an uploaded spreadsheet into `Person`/`Member`/`MemberPayment`/`JournalEntry` records — just triggered live instead of by a file upload.
+The Stripe tab under Settings (`/settings/stripe`, migration V42) lets svirerp receive completed Stripe payments — membership dues, paid church services (weddings, baptisms, etc.), event tickets, and general income like candles or room rentals — and post them straight into the Finance module. **svirerp never hosts a checkout page itself** — the church's WordPress site, a Stripe Invoice sent directly to a payer, and a mobile card-reader/Tap-to-Pay app for in-person food & drink sales at events all own the actual payment UI; svirerp only listens for Stripe's `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded` webhook events and reacts to them.
 
 **One-time Stripe Dashboard setup:**
 
@@ -256,6 +256,16 @@ The Stripe tab under Settings (`/settings/stripe`, migration V42) lets svirerp r
 An event's data object only deserializes "safely" when its Stripe API version's release train (e.g. `2026-04-22.dahlia`) matches the one the `stripe-java` dependency in `pom.xml` is pinned to — otherwise Stripe's own SDK refuses to risk silently-wrong field mapping and the request 500s. Keep that dependency's version bumped to whatever train the church's Stripe account is on (see the comment on the dependency in `pom.xml`); `StripeWebhookService#deserialize` also falls back to Stripe's `deserializeUnsafe()` for the gap in between an account moving trains and this dependency catching up.
 
 **Processing fees** (migration V43): Stripe deducts its fee before ever depositing to the bank, so the amount recorded as income is more than what actually lands in Checking. `StripeWebhookService` resolves the fee from the underlying charge's `BalanceTransaction` (one extra Stripe API call per payment, keyed off whichever PaymentIntent backs the event — available synchronously, no need to wait for the eventual payout) and stores it on the `stripe_webhook_event` row for audit visibility. `FinanceService#recordIncome` then posts a 3-line entry instead of 2 when a fee is present: the deposit line gets the *net* amount, a new "Payment Processing Fees" account (5320, lazily created per org via `findOrCreateAccountByNumber` since an already-established chart of accounts won't otherwise pick up a newly-added default) gets debited for the fee, and the category account is still credited for the full *gross* amount — so donor giving history and membership tier computation are unaffected, only the Finance-side posting changes. Falls back to the plain 2-line entry if the fee couldn't be resolved, or defensively if the fee is somehow ≥ the gross amount.
+
+### Zeffy (API integration)
+
+The Zeffy tab under Settings (`/settings/zeffy`, migrations V53–V54) configures the encrypted API key and the webhook signing secret reserved for Phase 2. Phase 1 supports connection testing and full campaign-catalog synchronization. The client requests up to 100 campaigns per page and globally limits all outbound Zeffy requests to one per second.
+
+Configuration remains in `app_setting`: `zeffy.api-key`, `zeffy.webhook-signing-secret`, and `zeffy.integration-mode`. Synchronization results are operational history and are stored in `zeffy_sync_run`, including successful, partial, and failed attempts, timestamps, cursors, initiating user, counts, and a sanitized error summary. The latest status is derived from that history; there are no `zeffy.last-*` settings.
+
+Under Finance → Zeffy, each synchronized campaign must be explicitly assigned `APPLY` or `IGNORE`. Applying a campaign requires a Fund and revenue Account and records whether its payments grant membership credit. Zeffy type/category suggestions remain inactive until an operator confirms them. Campaign identity uses the immutable Zeffy campaign ID, so a title change does not lose the local policy.
+
+The older Zeffy Contacts and Transactions spreadsheet imports were removed in V53. The generic Member CSV import remains available.
 
 ---
 
@@ -464,8 +474,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
 | Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
 | Google Calendar (admin) | `GET /api/settings/calendar/authorize-url` | `GET .../callback`, `POST .../test-connection`; `ROLE_ADMIN` only. One-way push only (ERP → Calendar, never the reverse) — see `CalendarEvent.publishToOfficial`/`publishToInternal` and their `google*SyncError` fields |
-| Zeffy transaction import | `POST /api/zeffy-imports/preview` | Multipart `.xlsx`/`.xls`/`.csv` — Zeffy's **Transactions** export (not the older Payments export, which is rejected with a clear error), parsed via Apache POI (`.csv` also accepted); persists one row per line with a computed `outcome` (`ready`/`duplicate`/`unmapped_campaign`/`error`; `skipped_status` is a legacy value no longer produced), no writes to `Person`/`Member`/`MemberPayment`/`JournalEntry` yet. Each row's `category` (`Donation`/`Ticket`) drives purpose routing at commit — Donation earns membership tier credit and posts to Donation Income (4010), Ticket skips the membership pipeline and posts to Service Fees Income (4030). `GET /api/zeffy-imports`, `GET /api/zeffy-imports/{batchId}[/summary\|/rows]`, `POST /api/zeffy-imports/{batchId}/commit` — applies every still-eligible row, one DB transaction per row (`ZeffyImportRowApplier`) |
-| Zeffy campaign mappings | `GET /api/zeffy-campaign-mappings` | `POST /api/zeffy-campaign-mappings/bulk`, `DELETE /api/zeffy-campaign-mappings/{id}` — persists which `Fund` a Zeffy "Campaign Title" posts income to, so recurring campaigns don't need remapping every import |
+| Zeffy settings and synchronization (admin) | `GET /api/settings/zeffy/status` | `PUT .../configuration`, `POST .../test-connection`, `POST .../sync-campaigns`, `GET .../sync-runs`; credentials are redacted, every sync attempt is retained, and all outbound requests are paced at one per second |
+| Zeffy API campaigns | `GET /api/zeffy-campaigns` | Paginated synchronized campaign catalog; `PUT /api/zeffy-campaigns/{campaignId}/mapping` confirms APPLY/IGNORE, Fund, revenue Account, and membership-credit policy by immutable Zeffy ID |
 | Recompute member tiers | `POST /api/members/recompute-tiers` | Re-runs Follower/Member/Benefactor tier computation for every member; a Follower with no qualifying payments keeps the staff/import-assigned active status |
 | Stripe webhook (unauthenticated) | `POST /api/webhooks/stripe` | Checkout happens on WordPress, a Stripe Invoice, or a mobile card-reader app, never in svirerp — this is purely a receiver for `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded`, authenticated by the `Stripe-Signature` header instead of a session. Always `200`s a validly-signed event (even on a business-rule failure — see [Admin Settings](#admin-settings)); `400` on a bad signature, `503` if the secrets aren't configured yet |
 | Stripe product mappings | `GET/POST /api/stripe-product-mappings` | `PUT/DELETE /api/stripe-product-mappings/{id}` — routes a Stripe Price to a purpose (`membership_dues`/`service_request`/`event_ticket`/`general_income`) plus `Fund`/`Account`; `GET /api/stripe-prices` lists active Prices straight from the Stripe API to map without waiting for a live payment |
@@ -519,13 +529,15 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V38 | `journal_entry` transaction tags: `payment_method`, `check_number`, and nullable FKs `payer_id`→`person`, `vendor_id`→`vendor`, `service_request_id`→`service_request`, `category_account_id`/`fund_id`→`account`/`fund` — denormalized so the Finance transaction list doesn't need to join `journal_line` |
 | V39 | `app_setting` rows for the central email switch (`email.mode` defaulting to `DISABLED`, `email.test-address`) — no new table, reuses V28's `app_setting` |
 | V40 | Widens `member_payment.payment_method`'s CHECK to accept `'zeffy'` (via `MODIFY COLUMN` — MariaDB 11.8 embeds this CHECK in the column definition itself, not as a droppable named table constraint) |
-| V41 | `zeffy_campaign_mapping` (initially organization-scoped Campaign Title → `fund` mapping; scope removed by V52), `zeffy_import_batch`, `zeffy_import_row` (preview/commit staging area and permanent audit trail for the Zeffy payment import, one row per spreadsheet line with a computed `outcome`) |
+| V41 | Historical Zeffy spreadsheet-import tables (`zeffy_campaign_mapping`, `zeffy_import_batch`, `zeffy_import_row`); all removed by V53 |
 | V42 | `stripe_product_mapping` (initially organization-scoped Stripe Price → purpose/`fund`/`account` routing; scope removed by V52), `stripe_webhook_event` (one row per webhook delivery, keyed by Stripe's event id for idempotency — the audit trail and "needs mapping"/"error"/reprocess staging area); widens `member_payment.payment_method` and `journal_entry.payment_method`'s CHECKs to accept `'stripe'`; seeds `stripe.secret-key`/`stripe.webhook-signing-secret` `app_setting` rows (reuses V28's `app_setting`) |
 | V43 | `stripe_webhook_event.fee` — Stripe's processing fee, resolved from the underlying charge's `BalanceTransaction`, stored for audit visibility alongside the existing `amount` column |
 | V44 | Widens `journal_entry.payment_method`'s CHECK to accept `'zelle'`/`'facebook'`. No table for the three new "Undeposited Funds" clearing accounts (Zeffy/Stripe/Facebook) — they're lazily seeded like the rest of the default chart of accounts (see `FinanceService#DEFAULT_ACCOUNTS`/`#findOrCreateAccountByNumber`) |
-| V45 | Migrates `zeffy_import_row` from Zeffy's Payments export shape to its Transactions export shape — drops the Payments-only columns (address/city/state/zip, tax receipt #/URL, payment status, payment time), renames `payment_date`→`transaction_date`/`payout_date`→`available_date`, adds `transaction_id` (the new dedupe key, replacing tax receipt #), `category` (`Donation`/`Ticket`), `eligible_amount`. Payments-format support was dropped entirely, not kept alongside — a one-time by-hand cleanup of all prior Zeffy-derived data preceded this migration (not itself a migration, deliberately: a destructive one-time DELETE must never be able to run against a real database by accident) |
+| V45 | Historical Transactions-format update to `zeffy_import_row`; the table is removed by V53 |
 | V48 | `project` (Governance task-tracking, nullable FK `assignee_person_id`→`person`), `project_task` (FK `project_id` `ON DELETE CASCADE`, nullable `assignee_person_id`→`person`), `project_comment` + `project_task_comment` (FK to `project`/`project_task` `ON DELETE CASCADE`; `author_name` is a plain string stamped from the logged-in session, not a FK — this app has no separate `User` table) |
 | V49 | `task_checklist` (1 per `project_task`, enforced by `UNIQUE project_task_id`, FK `ON DELETE CASCADE`; `title` + user-set `completion_date`, alongside — not replacing — the task's own `description`), `task_checklist_item` (FK `checklist_id` `ON DELETE CASCADE`; `status` CHECK `new`/`done`/`skipped` — 3-state, not a boolean checkbox; `done`/`skipped` are both terminal, either reachable back to `new` via a single "Re-open" action). **Superseded by V50** — kept here for history, not the current shape |
 | V50 | Reworks the checklist tables from V49's 1-per-task shape into a project-scoped sibling of `project_task` — data-preserving (backfills `project_id` from each checklist's former task, since real checklist data already existed by the time this was requested), then renames `task_checklist`→`project_checklist` (drops the `UNIQUE project_task_id` FK/column, adds a plain FK `project_id`→`project` `ON DELETE CASCADE` — a project can now hold multiple independent checklists) and `task_checklist_item`→`project_checklist_item` (FK re-pointed at the renamed parent table, same CHECK/columns otherwise unchanged) |
 | V51 | `project_checklist_item.detail` — nullable `VARCHAR(500)`, an optional one-line note captured when an item is marked Done/Skipped (e.g. why it was skipped); always cleared server-side on Re-open (`GovernanceService#reopenChecklistItem`), not just a frontend-side clear |
 | V52 | Enforces one organization profile with a singleton key; removes `org_id` foreign keys/indexes from domain tables and makes formerly organization-scoped business keys installation-wide |
+| V53 | Removes the obsolete Zeffy Contacts/Transactions spreadsheet-import tables: `zeffy_import_row`, `zeffy_import_batch`, and title-based `zeffy_campaign_mapping` |
+| V54 | Zeffy API Phase 1: `zeffy_campaign`, durable `zeffy_sync_run` history, and the three Zeffy configuration rows in `app_setting` |

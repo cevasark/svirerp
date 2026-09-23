@@ -89,13 +89,6 @@
             <version>1.12.0</version>
         </dependency>
 
-        <!-- Reads .xlsx spreadsheets — Zeffy's payment export is a real Excel file, not CSV -->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>5.5.1</version>
-        </dependency>
-
         <!-- Stripe webhook signature verification (Webhook.constructEvent) and Stripe API calls
              (e.g. listing Prices for the product-mapping admin screen). Pinned to the "dahlia"
              release train (matches the church's Stripe account's API version, currently

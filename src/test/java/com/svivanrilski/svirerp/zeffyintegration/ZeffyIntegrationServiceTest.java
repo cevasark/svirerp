@@ -1,0 +1,68 @@
+package com.svivanrilski.svirerp.zeffyintegration;
+
+import com.svivanrilski.svirerp.finance.FinanceService;
+import com.svivanrilski.svirerp.settings.AppSettingService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
+class ZeffyIntegrationServiceTest {
+
+    private AppSettingService settings;
+    private ZeffyApiClient apiClient;
+    private ZeffyCampaignRepository campaigns;
+    private ZeffySyncRunService runs;
+    private ZeffyIntegrationService service;
+
+    @BeforeEach
+    void setUp() {
+        settings = mock(AppSettingService.class);
+        apiClient = mock(ZeffyApiClient.class);
+        campaigns = mock(ZeffyCampaignRepository.class);
+        runs = mock(ZeffySyncRunService.class);
+        service = new ZeffyIntegrationService(settings, apiClient, mock(ZeffyCampaignSyncWriter.class),
+                campaigns, runs, mock(FinanceService.class));
+        when(settings.getDecryptedValue("zeffy.integration-mode"))
+                .thenReturn(java.util.Optional.of("DISABLED"));
+    }
+
+    @Test
+    void rejectedCandidateKeyDoesNotReplaceStoredKey() {
+        doThrow(new ZeffyApiException(401, "Zeffy rejected the API key"))
+                .when(apiClient).testConnection("bad-key");
+
+        assertThatThrownBy(() -> service.saveConfiguration(
+                new ZeffyIntegrationService.ConfigurationRequest("bad-key", null, true)))
+                .isInstanceOf(ZeffyApiException.class);
+
+        verify(settings, never()).updateValue("zeffy.api-key", "bad-key");
+    }
+
+    @Test
+    void validatesCandidateBeforeSavingIt() {
+        service.saveConfiguration(
+                new ZeffyIntegrationService.ConfigurationRequest("new-key", null, true));
+
+        InOrder order = inOrder(apiClient, settings);
+        order.verify(apiClient).testConnection("new-key");
+        order.verify(settings).updateValue("zeffy.api-key", "new-key");
+    }
+
+    @Test
+    void failedCampaignSyncIsRecordedBeforeErrorIsRethrown() {
+        ZeffySyncRun run = ZeffySyncRun.builder().id(UUID.randomUUID()).build();
+        when(runs.start("CAMPAIGNS", "MANUAL", "admin@example.com")).thenReturn(run);
+        doThrow(new ZeffyApiException(502, "Could not reach the Zeffy API"))
+                .when(apiClient).fetchAllCampaigns();
+
+        assertThatThrownBy(() -> service.synchronizeCampaigns("admin@example.com"))
+                .isInstanceOf(ZeffyApiException.class);
+
+        verify(runs).fail(run.getId(), "Could not reach the Zeffy API");
+    }
+}

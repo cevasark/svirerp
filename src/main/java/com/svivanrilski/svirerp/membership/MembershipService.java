@@ -260,8 +260,8 @@ public class MembershipService {
     }
 
     // ── Zeffy tier computation ──────────────────────────────────────────────
-    // See TierCalculator for the algorithm. MembershipType names below are the ones
-    // ZeffyImportService/recomputeTier resolve a computed tier name against.
+    // See TierCalculator for the algorithm. API payment processing and recomputeTier resolve a
+    // computed tier name against these MembershipType rows.
 
     private static final String[] ZEFFY_TIER_TYPES = {
         // name, canVote
@@ -323,22 +323,16 @@ public class MembershipService {
         return memberRepo.save(member);
     }
 
-    public boolean hasMembership(UUID personId) {
-        return memberRepo.existsByPersonId(personId);
-    }
-
     /**
-     * Find-or-create a Member starting at the Follower tier — used by ZeffyImportRowApplier for a
-     * brand-new payer. Kept here (rather than reaching into MemberRepository from another package)
+     * Find-or-create a Member starting at the Follower tier for an externally received payment.
+     * Kept here (rather than reaching into MemberRepository from another package)
      * so all Member/MembershipType access stays inside this domain's service, per this repo's
      * one-shared-service-per-domain-area convention.
      *
      * <p>{@code transactionDate} also self-heals an existing member's {@code joinDate} backward
-     * when an earlier transaction shows up — a bulk historical import processes files/rows in
-     * whatever order they're uploaded, not necessarily chronological, so the transaction that
-     * happens to be committed *first* for a person isn't necessarily their chronologically
-     * earliest. Without this, joinDate would permanently lock onto whichever transaction was
-     * committed first, which can be wrong by however far out of order the import was.
+     * when an earlier transaction shows up — historical API synchronization is not guaranteed to
+     * process payments chronologically, so the first payment processed for a person may not be
+     * their earliest. Without this, joinDate would permanently lock onto processing order.
      */
     @Transactional
     public Member findOrCreateFollowerMember(UUID personId, LocalDate transactionDate) {
@@ -363,28 +357,6 @@ public class MembershipService {
                             .emailOptIn(true)
                             .build());
                 });
-    }
-
-    /**
-     * Unconditionally creates a new Follower Member for a person who is guaranteed not to have one
-     * yet in this org (used by the People import, which only ever calls this for a Person it just
-     * created — unlike {@link #findOrCreateFollowerMember}, which also handles the "may already
-     * exist" case for the Zeffy-transactions path). joinDate is the import date, since a Zeffy
-     * contacts export carries no date of its own. {@code active} drives both status and
-     * emailOptIn together — a person Zeffy reports as unsubscribed is neither.
-     */
-    @Transactional
-    public Member createFollowerMember(UUID personId, boolean active) {
-        ensureZeffyTierTypesSeeded();
-        MembershipType follower = typeRepo.findByNameIgnoreCase(TierCalculator.FOLLOWER)
-                .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
-        return memberRepo.save(Member.builder()
-                .person(personService.findById(personId))
-                .membershipType(follower)
-                .joinDate(LocalDate.now())
-                .status(active ? "active" : "inactive")
-                .emailOptIn(active)
-                .build());
     }
 
     /** Backs the manual "Recompute Tiers" action — tier can go stale purely from time passing. */

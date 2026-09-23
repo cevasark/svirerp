@@ -18,7 +18,7 @@ import java.util.UUID;
  * One row per Stripe webhook delivery, inserted before any dispatch logic runs — the unique
  * constraint on {@link #stripeEventId} is the idempotency guard (Stripe redelivers on any non-2xx
  * response, and can occasionally duplicate a delivery outright). Doubles as the permanent audit
- * trail linking back to whatever it produced, same idea as ZeffyImportRow.
+ * trail linking back to whatever it produced.
  */
 @Entity
 @Table(name = "stripe_webhook_event")

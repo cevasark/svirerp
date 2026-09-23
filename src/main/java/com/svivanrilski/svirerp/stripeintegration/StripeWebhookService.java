@@ -42,8 +42,7 @@ import java.util.stream.Collectors;
  * Orchestrates the Stripe webhook receiver: verifies the signature, parses the event types this
  * endpoint acts on, and delegates the actual DB writes to {@link StripeWebhookEventApplier} — a
  * different bean, so each event gets its own transaction regardless of outcome (see that class's
- * doc comment). Also owns the admin-facing product-mapping CRUD and event listing/reprocess, same
- * "one shared service per domain area" convention as ZeffyImportService.
+ * doc comment). Also owns the admin-facing product-mapping CRUD and event listing/reprocess.
  *
  * <p>Checkout happens entirely outside svirerp (a WordPress page, a Stripe Invoice sent directly to
  * a payer, or a mobile card-reader/Tap-to-Pay app for in-person food/drink sales) — this endpoint
@@ -360,7 +359,7 @@ public class StripeWebhookService {
      * with their own {@code @Transactional} (default REQUIRED propagation); an ambient transaction
      * on this method would make applyEvent's failure join and poison it, so the catch block here
      * would appear to handle it but this method's own commit would then throw
-     * UnexpectedRollbackException anyway. Same idiom as ZeffyImportService#commitImport and
+     * UnexpectedRollbackException anyway. This is the same transaction boundary used by
      * StripeWebhookService#handleWebhook.
      */
     public StripeWebhookEvent reprocessEvent(UUID eventId) {

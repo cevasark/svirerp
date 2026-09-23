@@ -1,5 +1,7 @@
 Review baseline: `zeffy-import-refactor`, commit `6337f15` (`Shareable deep links after login; ARCHITECTURE.md and SETUP.md`). Reviewed September 21, 2026. This report supersedes observations from the earlier branch.
 
+> **Historical review:** This document records the September 21 baseline. The Zeffy Contacts/Transactions spreadsheet-import implementation and the findings tied to it were subsequently removed by V53. Phase 1 now uses the Zeffy API for campaign discovery and mapping; see `zeffyIntegration.md` for the current specification and `README.md` for current endpoints.
+
 The application has a coherent foundation for incremental enhancements. Its most consequential remaining issues involve duplicate import commits, financial validation, and a few shared UI controls. A framework rewrite is not indicated by this review. Business-rule changes should follow clarification of the questions below.
 
 The user confirmed three requirements during this review: **free Followers must keep their active status until explicitly changed; manual membership contributions, accounting, and membership recalculation are deliberately maintained separately by staff; and reuploading is the intended recovery process for failed Zeffy imports.** Accordingly, automatic synchronization and reopening failed batches are not proposed enhancements. The free-Follower recomputation defect has been corrected and covered by a regression test.

@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Covers the membership-period chaining rule confirmed with the user after a bulk historical
- * Zeffy import (~2 years of data in one go) made the previous "qualifying payment within the last
+ * Zeffy data load (~2 years of data in one go) made the previous "qualifying payment within the last
  * 12 months of today" rule produce very wrong-looking tiers — see TierCalculator's class doc for
  * the exact rule. "today" (LocalDate.now(America/Chicago)) is load-bearing for the active/inactive
  * check, so every test below anchors its dates relative to today rather than hardcoding absolute

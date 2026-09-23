@@ -14,7 +14,7 @@ Each installation has exactly one Organization profile. The database enforces th
 
 ### Structure: package-by-domain, not package-by-layer
 
-`src/main/java/com/svivanrilski/svirerp/` has one package per business domain — `auth`, `common`, `email`, `event`, `finance`, `governance`, `membership`, `organization`, `person`, `settings`, `stripeintegration`, `volunteer`, `zeffyimport` — and each domain package holds its **own** Entity/Repository/Service/Controller classes together, rather than the app being sliced into top-level `controllers/`, `services/`, `repositories/` folders. A feature living in one place (e.g. everything Governance-related — Trustees, Committees, Meeting Minutes, Projects — sits in `governance/`) was chosen over grouping by technical layer, since most changes touch one domain end-to-end.
+`src/main/java/com/svivanrilski/svirerp/` has one package per business domain — `auth`, `common`, `email`, `event`, `finance`, `governance`, `membership`, `organization`, `person`, `settings`, `stripeintegration`, `volunteer`, `zeffyintegration` — and each domain package holds its **own** Entity/Repository/Service/Controller classes together, rather than the app being sliced into top-level `controllers/`, `services/`, `repositories/` folders. A feature living in one place (e.g. everything Governance-related — Trustees, Committees, Meeting Minutes, Projects — sits in `governance/`) was chosen over grouping by technical layer, since most changes touch one domain end-to-end.
 
 Within a domain package, the conventional layering still holds:
 
@@ -31,7 +31,7 @@ Entity (@Entity — JPA-mapped, Lombok @Getter/@Setter/@Builder)
 A few patterns repeat across every domain, worth knowing once rather than re-discovering per feature:
 
 - **`spring.jpa.open-in-view=false`** — the Hibernate session closes before the controller layer serializes the response. Every lazy association a response body actually walks must be eagerly fetched by the repository query itself (`@EntityGraph(attributePaths = {...})`, or an explicit `JOIN FETCH` `@Query` when the lazy chain gets too deep for the declarative form to resolve reliably), or serialization throws `LazyInitializationException`. This is the single most common gotcha when adding a new nested response shape.
-- **Flyway owns all DDL; Hibernate never does** (`spring.jpa.hibernate.ddl-auto=validate`) — every schema change is a versioned, checked-in `V<n>__description.sql` file under `src/main/resources/db/migration/` (51 migrations, 44 tables at last count). Migrations are treated as immutable once applied to a real database — a later migration alters/renames rather than editing history in place.
+- **Flyway owns all DDL; Hibernate never does** (`spring.jpa.hibernate.ddl-auto=validate`) — every schema change is a versioned, checked-in `V<n>__description.sql` file under `src/main/resources/db/migration/`. Migrations are treated as immutable once applied to a real database — a later migration alters/renames rather than editing history in place.
 - **DB `CHECK` constraints double as the first line of defense** for enum-like string columns (status, category, payment method, …), with the same allowed-value set re-validated in the Service layer — belt-and-braces, not redundant, since the DB constraint is the backstop against any write path that skips the service.
 - **`GlobalExceptionHandler`** (`@RestControllerAdvice`, in `common/`) centralizes error responses into one JSON envelope (`{timestamp, status, error, message}`) across the whole app, so controllers don't `try`/`catch`.
 
@@ -56,7 +56,6 @@ Once authenticated via either method, a user has the same full API access — au
 | `flyway-core` + `flyway-mysql` | Schema migrations; sole owner of all DDL |
 | `mysql-connector-j` | MySQL/MariaDB JDBC driver (runtime scope) |
 | `commons-csv` (Apache Commons) | RFC 4180 CSV read/write for the Member import/export template |
-| `poi-ooxml` (Apache POI) | Reads `.xlsx` — Zeffy's payment/transaction export is a real Excel file, not CSV |
 | `stripe-java` | Stripe webhook signature verification + API calls (e.g. listing Prices for product-mapping) |
 | `lombok` | Compile-time boilerplate reduction (`@Getter`/`@Setter`/`@Builder`/…) on entities and DTOs; stripped from the runtime jar |
 | `spring-boot-starter-test` + `spring-security-test` | Test scope only |

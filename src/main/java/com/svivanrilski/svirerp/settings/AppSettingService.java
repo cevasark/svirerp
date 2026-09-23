@@ -37,6 +37,14 @@ public class AppSettingService {
         });
     }
 
+    /** Reports whether a setting has a value without decrypting or exposing a secret. */
+    public boolean hasValue(String key) {
+        return repo.findByKey(key)
+                .map(AppSetting::getValue)
+                .filter(value -> !value.isBlank())
+                .isPresent();
+    }
+
     @Transactional
     public AppSetting updateValue(String key, String newValue) {
         AppSetting setting = repo.findByKey(key)
