@@ -7,7 +7,6 @@ import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 
 import { EventService } from '../../services/event.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { CalendarEvent } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -66,12 +65,10 @@ function calendarSyncSummary(e: CalendarEvent): string {
 })
 export class EventListComponent implements OnInit {
   private eventService = inject(EventService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
   private router = inject(Router);
 
-  private orgId: string | null = null;
   page = signal<Page<CalendarEvent> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -95,13 +92,7 @@ export class EventListComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.loadPage();
-      },
-      error: err => this.notifications.error(err.message ?? 'Could not load organization.'),
-    });
+    this.loadPage();
   }
 
   onPageChange(event: PageEvent): void {
@@ -124,9 +115,8 @@ export class EventListComponent implements OnInit {
   }
 
   openForm(entity?: CalendarEvent): void {
-    if (!this.orgId) return;
     this.dialog
-      .open(EventFormComponent, { width: '560px', data: { orgId: this.orgId, entity: entity ?? null } })
+      .open(EventFormComponent, { width: '560px', data: { entity: entity ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
@@ -145,12 +135,11 @@ export class EventListComponent implements OnInit {
   }
 
   private loadPage(): void {
-    if (!this.orgId) return;
     this.loading.set(true);
     // Backend expects `from`/`to` as full ISO datetimes; date inputs give plain dates.
     const from = this.fromFilter ? `${this.fromFilter}T00:00:00Z` : null;
     const to = this.toFilter ? `${this.toFilter}T23:59:59Z` : null;
-    this.eventService.getPageForOrg(this.orgId, this.pageParams(), from, to).subscribe({
+    this.eventService.getPage(this.pageParams(), from, to).subscribe({
       next: data => { this.page.set(data); this.loading.set(false); },
       error: ()   => this.loading.set(false),
     });

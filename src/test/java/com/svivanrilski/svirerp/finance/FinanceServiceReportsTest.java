@@ -8,8 +8,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.svivanrilski.svirerp.event.EventService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
@@ -39,7 +37,6 @@ class FinanceServiceReportsTest {
     @Mock private ReconciliationItemRepository reconItemRepo;
     @Mock private VendorRepository vendorRepo;
     @Mock private ServiceRequestRepository serviceRequestRepo;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
     @Mock private EventService eventService;
     @Mock private EntityManager entityManager;
@@ -47,7 +44,6 @@ class FinanceServiceReportsTest {
     @InjectMocks
     private FinanceService financeService;
 
-    private UUID orgId;
 
     private record AccountAmountRow(UUID accountId, String accountNumber, String accountName, BigDecimal amount)
             implements AccountAmount {
@@ -62,11 +58,6 @@ class FinanceServiceReportsTest {
         @Override public BigDecimal getAmount() { return amount; }
     }
 
-    @BeforeEach
-    void setUp() {
-        orgId = UUID.randomUUID();
-    }
-
     @Test
     void statementOfActivities_convertsRevenueAndExpenseToPositiveDollarsAndComputesNetChange() {
         LocalDate from = LocalDate.of(2026, 8, 1);
@@ -75,15 +66,15 @@ class FinanceServiceReportsTest {
         UUID suppliesAccountId = UUID.randomUUID();
 
         // Revenue is credit-normal: a $500 donation stores as debit-minus-credit = -500.
-        when(journalLineRepo.sumByAccountForOrgAndTypeAndDateRange(orgId, "revenue", from, to, null))
+        when(journalLineRepo.sumByAccountForTypeAndDateRange("revenue", from, to, null))
                 .thenReturn(List.of(new AccountAmountRow(donationAccountId, "4010", "Donation Income",
                         new BigDecimal("-500.00"))));
         // Expense is debit-normal: a $120 supplies purchase stores as debit-minus-credit = +120.
-        when(journalLineRepo.sumByAccountForOrgAndTypeAndDateRange(orgId, "expense", from, to, null))
+        when(journalLineRepo.sumByAccountForTypeAndDateRange("expense", from, to, null))
                 .thenReturn(List.of(new AccountAmountRow(suppliesAccountId, "5020", "Office Supplies Expense",
                         new BigDecimal("120.00"))));
 
-        StatementOfActivities result = financeService.statementOfActivities(orgId, from, to, null);
+        StatementOfActivities result = financeService.statementOfActivities(from, to, null);
 
         assertThat(result.income()).hasSize(1);
         assertThat(result.income().get(0).amount()).isEqualByComparingTo("500.00");
@@ -103,20 +94,20 @@ class FinanceServiceReportsTest {
         // $1000 sat in Checking (asset, debit-normal -> stored positive) funded entirely by a $1000
         // donation (revenue, credit-normal -> stored as -1000) with no expenses and no liabilities,
         // and the static Net Assets equity account still at its seeded $0 — nothing ever closes into it.
-        when(journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "asset", asOf))
+        when(journalLineRepo.sumByAccountForTypeAsOfDate("asset", asOf))
                 .thenReturn(List.of(new AccountAmountRow(checkingId, "1010", "Checking Account",
                         new BigDecimal("1000.00"))));
-        when(journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "liability", asOf))
+        when(journalLineRepo.sumByAccountForTypeAsOfDate("liability", asOf))
                 .thenReturn(List.of());
-        when(journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "equity", asOf))
+        when(journalLineRepo.sumByAccountForTypeAsOfDate("equity", asOf))
                 .thenReturn(List.of(new AccountAmountRow(netAssetsId, "3000", "Net Assets", BigDecimal.ZERO)));
-        when(journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "revenue", asOf))
+        when(journalLineRepo.sumByAccountForTypeAsOfDate("revenue", asOf))
                 .thenReturn(List.of(new AccountAmountRow(UUID.randomUUID(), "4010", "Donation Income",
                         new BigDecimal("-1000.00"))));
-        when(journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "expense", asOf))
+        when(journalLineRepo.sumByAccountForTypeAsOfDate("expense", asOf))
                 .thenReturn(List.of());
 
-        StatementOfFinancialPosition result = financeService.statementOfFinancialPosition(orgId, asOf);
+        StatementOfFinancialPosition result = financeService.statementOfFinancialPosition(asOf);
 
         assertThat(result.totalAssets()).isEqualByComparingTo("1000.00");
         assertThat(result.totalLiabilities()).isEqualByComparingTo("0.00");
@@ -130,18 +121,16 @@ class FinanceServiceReportsTest {
     @Test
     void fundsOverview_computesPerFundBalanceFromOpeningPlusIncomeMinusExpense() {
         UUID fundId = UUID.randomUUID();
-        Organization org = new Organization();
-        org.setId(orgId);
-        Fund fund = Fund.builder().id(fundId).org(org).fundName("Building Campaign")
+        Fund fund = Fund.builder().id(fundId).fundName("Building Campaign")
                 .fundType("temporarily_restricted").openingBalance(new BigDecimal("100.00")).build();
 
-        when(fundRepo.findByOrgIdAndIsActiveOrderByFundName(orgId, true)).thenReturn(List.of(fund));
-        when(journalLineRepo.sumByFundAndAccountType(orgId, "revenue"))
+        when(fundRepo.findByIsActiveOrderByFundName(true)).thenReturn(List.of(fund));
+        when(journalLineRepo.sumByFundAndAccountType("revenue"))
                 .thenReturn(List.of(new FundAmountRow(fundId, new BigDecimal("-300.00"))));
-        when(journalLineRepo.sumByFundAndAccountType(orgId, "expense"))
+        when(journalLineRepo.sumByFundAndAccountType("expense"))
                 .thenReturn(List.of(new FundAmountRow(fundId, new BigDecimal("50.00"))));
 
-        List<FundOverviewRow> result = financeService.fundsOverview(orgId);
+        List<FundOverviewRow> result = financeService.fundsOverview();
 
         assertThat(result).hasSize(1);
         FundOverviewRow row = result.get(0);

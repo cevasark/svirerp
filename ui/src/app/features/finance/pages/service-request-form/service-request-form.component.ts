@@ -16,7 +16,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { ServiceRequest, Person } from '../../../../core/models/domain.model';
 
 interface ServiceRequestDialogData {
-  orgId: string;
   request: ServiceRequest | null;
 }
 
@@ -131,7 +130,6 @@ export class ServiceRequestFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<ServiceRequestDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private request = this.data.request;
   isEdit = !!this.request;
   saving = signal(false);
@@ -186,7 +184,6 @@ export class ServiceRequestFormComponent implements OnInit {
     this.saving.set(true);
     const value = this.form.getRawValue();
     const payload = {
-      org: { id: this.orgId },
       requestorPerson: value.requestorPersonId ? { id: value.requestorPersonId } : null,
       serviceType: value.serviceType,
       status: value.status,

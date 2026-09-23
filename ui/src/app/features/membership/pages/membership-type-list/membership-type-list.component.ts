@@ -3,7 +3,6 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 
 import { MembershipTypeService } from '../../services/membership-type.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { MembershipType } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -38,11 +37,9 @@ import { MembershipTypeFormComponent } from '../membership-type-form/membership-
 })
 export class MembershipTypeListComponent implements OnInit {
   private typeService = inject(MembershipTypeService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<MembershipType> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -70,14 +67,10 @@ export class MembershipTypeListComponent implements OnInit {
   }
 
   openForm(type?: MembershipType): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
       .open(MembershipTypeFormComponent, {
         width: '540px',
-        data: { orgId: this.orgId, type: type ?? null },
+        data: { type: type ?? null },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
@@ -98,18 +91,9 @@ export class MembershipTypeListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.typeService.getPageForOrg(orgId, this.pageParams()).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.typeService.getPage(this.pageParams()).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

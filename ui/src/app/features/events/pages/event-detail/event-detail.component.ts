@@ -199,7 +199,7 @@ export class EventDetailComponent implements OnInit {
     const e = this.event();
     if (!e) return;
     this.dialog
-      .open(EventFormComponent, { width: '560px', data: { orgId: e.org.id, entity: e } })
+      .open(EventFormComponent, { width: '560px', data: { entity: e } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadEvent(); });
   }

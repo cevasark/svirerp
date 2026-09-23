@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import com.svivanrilski.svirerp.finance.Fund;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -17,8 +16,8 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "zeffy_campaign_mapping",
-    uniqueConstraints = @UniqueConstraint(name = "uq_zeffy_campaign_mapping_org_title",
-        columnNames = {"org_id", "campaign_title"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_zeffy_campaign_mapping_title",
+        columnNames = "campaign_title")
 )
 @Getter
 @Setter
@@ -31,11 +30,6 @@ public class ZeffyCampaignMapping {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotBlank
     @Column(name = "campaign_title", nullable = false, length = 255)

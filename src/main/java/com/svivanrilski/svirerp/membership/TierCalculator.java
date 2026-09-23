@@ -28,11 +28,10 @@ import java.util.List;
  * passed, {@code status} becomes "inactive" but the tier itself is <b>not</b> reverted to
  * Follower — an admin needs to see what a lapsed member's last real tier was, not just "Follower."
  *
- * <p>Members with no $150+ payment at all (Follower-only, e.g. small one-off donations) are
- * deliberately left alone by this calculator — always Follower/active/no expiry, matching this
- * app's pre-chaining-rule behavior. Zeffy's Transactions export doesn't carry sub-$150 "Follower"
- * signups at all as of this writing, so properly modeling Follower expiry is a separate,
- * not-yet-solved problem.
+ * <p>A payment history containing no $150+ payment (for example, small one-off donations) produces
+ * an active, non-expiring Follower. No payment history produces no result; the caller preserves an
+ * existing Follower's staff/import-assigned status. Zeffy's Transactions export doesn't carry
+ * sub-$150 "Follower" signups as of this writing, so modeling Follower expiry remains separate.
  */
 public final class TierCalculator {
 

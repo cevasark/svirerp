@@ -3,7 +3,6 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 
 import { AccountService } from '../../services/account.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Account } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -41,11 +40,9 @@ const TYPE_ORDER: Record<string, number> = { revenue: 0, expense: 1, asset: 2, l
 })
 export class AccountListComponent implements OnInit {
   private accountService = inject(AccountService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<Account> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, size: 50 });
@@ -72,12 +69,8 @@ export class AccountListComponent implements OnInit {
   }
 
   openForm(account?: Account): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(AccountFormComponent, { width: '540px', data: { orgId: this.orgId, account: account ?? null } })
+      .open(AccountFormComponent, { width: '540px', data: { account: account ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
@@ -97,24 +90,15 @@ export class AccountListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.accountService.getPageForOrg(orgId, this.pageParams()).subscribe({
-          next: data => {
-            data.content = [...data.content].sort((a, b) =>
-              (TYPE_ORDER[a.accountType] - TYPE_ORDER[b.accountType]) || a.accountNumber.localeCompare(b.accountNumber),
-            );
-            this.page.set(data);
-            this.loading.set(false);
-          },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
+    this.accountService.getPage(this.pageParams()).subscribe({
+      next: data => {
+        data.content = [...data.content].sort((a, b) =>
+          (TYPE_ORDER[a.accountType] - TYPE_ORDER[b.accountType]) || a.accountNumber.localeCompare(b.accountNumber),
+        );
+        this.page.set(data);
         this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
       },
+      error: () => this.loading.set(false),
     });
   }
 

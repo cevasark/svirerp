@@ -13,10 +13,10 @@ public interface ActionItemRepository extends JpaRepository<ActionItem, UUID> {
 
     // Deliberately unpaginated — a meeting's action items are meant to be seen
     // as a whole live list while trustees are discussing, not paged through.
-    @EntityGraph(attributePaths = {"assigneeTrustee", "assigneeTrustee.person", "meetingMinutes", "meetingMinutes.org"})
+    @EntityGraph(attributePaths = {"assigneeTrustee", "assigneeTrustee.person", "meetingMinutes"})
     List<ActionItem> findByMeetingMinutesIdOrderByCreatedAt(UUID meetingMinutesId);
 
-    @EntityGraph(attributePaths = {"assigneeTrustee", "assigneeTrustee.person", "meetingMinutes", "meetingMinutes.org"})
+    @EntityGraph(attributePaths = {"assigneeTrustee", "assigneeTrustee.person", "meetingMinutes"})
     @Override
     Optional<ActionItem> findById(UUID id);
 }

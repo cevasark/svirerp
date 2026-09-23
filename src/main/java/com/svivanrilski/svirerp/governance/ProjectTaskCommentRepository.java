@@ -14,7 +14,7 @@ public interface ProjectTaskCommentRepository extends JpaRepository<ProjectTaskC
     // (the *project's* own assignee) must be listed explicitly too, same gotcha as
     // ProjectTaskRepository. Deliberately unpaginated.
     @EntityGraph(attributePaths = {
-        "projectTask", "projectTask.project", "projectTask.project.org",
+        "projectTask", "projectTask.project",
         "projectTask.project.assignee", "projectTask.assignee",
     })
     List<ProjectTaskComment> findByProjectTaskIdOrderByCreatedAt(UUID projectTaskId);

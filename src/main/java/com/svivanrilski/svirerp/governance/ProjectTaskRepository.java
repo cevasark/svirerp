@@ -17,10 +17,10 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, UUID> 
     // nested Project object whenever that project happens to have an assignee set.
     // Deliberately unpaginated — matches ActionItemRepository#findByMeetingMinutesId: a project's
     // tasks are meant to be seen as one whole list on the project's detail page, not paged through.
-    @EntityGraph(attributePaths = {"project", "project.org", "project.assignee", "assignee"})
+    @EntityGraph(attributePaths = {"project", "project.assignee", "assignee"})
     List<ProjectTask> findByProjectIdOrderByCreatedAt(UUID projectId);
 
-    @EntityGraph(attributePaths = {"project", "project.org", "project.assignee", "assignee"})
+    @EntityGraph(attributePaths = {"project", "project.assignee", "assignee"})
     @Override
     Optional<ProjectTask> findById(UUID id);
 }

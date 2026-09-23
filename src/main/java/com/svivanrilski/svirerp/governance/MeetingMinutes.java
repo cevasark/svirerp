@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -24,11 +23,6 @@ public class MeetingMinutes {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotNull
     @Column(name = "meeting_date", nullable = false)

@@ -18,22 +18,22 @@ export class ZeffyImportService {
   private readonly http = inject(HttpClient);
   private readonly env = inject(ENVIRONMENT);
 
-  getBatchesForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<ZeffyImportBatch>> {
+  getBatches(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<ZeffyImportBatch>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<ZeffyImportBatch>>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports`,
+      `${this.env.apiUrl}/zeffy-imports`,
       { params: p },
     );
   }
 
-  preview(orgId: string, file: File): Observable<ZeffyImportBatch> {
+  preview(file: File): Observable<ZeffyImportBatch> {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<ZeffyImportBatch>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports/preview`,
+      `${this.env.apiUrl}/zeffy-imports/preview`,
       formData,
     );
   }
@@ -54,22 +54,22 @@ export class ZeffyImportService {
     );
   }
 
-  commit(orgId: string, batchId: string): Observable<ZeffyImportCommitResult> {
+  commit(batchId: string): Observable<ZeffyImportCommitResult> {
     return this.http.post<ZeffyImportCommitResult>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports/${batchId}/commit`,
+      `${this.env.apiUrl}/zeffy-imports/${batchId}/commit`,
       {},
     );
   }
 
-  getMappingsForOrg(orgId: string): Observable<ZeffyCampaignMapping[]> {
+  getMappings(): Observable<ZeffyCampaignMapping[]> {
     return this.http.get<ZeffyCampaignMapping[]>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-campaign-mappings`,
+      `${this.env.apiUrl}/zeffy-campaign-mappings`,
     );
   }
 
-  upsertMappings(orgId: string, requests: ZeffyCampaignMappingRequest[]): Observable<ZeffyCampaignMapping[]> {
+  upsertMappings(requests: ZeffyCampaignMappingRequest[]): Observable<ZeffyCampaignMapping[]> {
     return this.http.post<ZeffyCampaignMapping[]>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-campaign-mappings/bulk`,
+      `${this.env.apiUrl}/zeffy-campaign-mappings/bulk`,
       requests,
     );
   }
@@ -80,9 +80,9 @@ export class ZeffyImportService {
 
   /** One-time backfill for already-committed Ticket rows whose campaign has since been flagged
    *  as a membership payment — safe to call more than once (idempotent on the backend). */
-  reprocessMembershipRows(orgId: string): Observable<ReprocessMembershipResult> {
+  reprocessMembershipRows(): Observable<ReprocessMembershipResult> {
     return this.http.post<ReprocessMembershipResult>(
-      `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports/reprocess-membership-rows`,
+      `${this.env.apiUrl}/zeffy-imports/reprocess-membership-rows`,
       {},
     );
   }

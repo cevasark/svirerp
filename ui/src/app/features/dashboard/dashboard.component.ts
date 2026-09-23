@@ -67,7 +67,7 @@ interface QuickLink {
 export class DashboardComponent {
   readonly modules: QuickLink[] = [
     { label: 'People',        icon: 'people',             route: '/persons',       description: 'Contacts and individuals',              color: '#3f51b5' },
-    { label: 'Organizations', icon: 'business',           route: '/organizations', description: 'Church and org profiles',               color: '#0097a7' },
+    { label: 'Organization',  icon: 'business',           route: '/settings/organization', description: 'Church profile and contact details', color: '#0097a7' },
     { label: 'Membership',    icon: 'card_membership',    route: '/membership',    description: 'Members, types and dues',               color: '#388e3c' },
     { label: 'Governance',    icon: 'gavel',              route: '/governance',    description: 'Trustees, committees and resolutions',  color: '#f57c00' },
     { label: 'Volunteers',    icon: 'volunteer_activism', route: '/volunteers',    description: 'Volunteer hours and assignments',       color: '#7b1fa2' },

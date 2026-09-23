@@ -15,7 +15,6 @@ import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
 import com.svivanrilski.svirerp.membership.MemberPaymentRepository;
 import com.svivanrilski.svirerp.membership.MembershipService;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -51,14 +50,12 @@ class ZeffyImportRowApplierTest {
     @InjectMocks
     private ZeffyImportRowApplier applier;
 
-    private UUID orgId;
     private UUID depositAccountId;
     private UUID donationAccountId;
     private UUID ticketAccountId;
 
     @BeforeEach
     void setUp() {
-        orgId = UUID.randomUUID();
         depositAccountId = UUID.randomUUID();
         donationAccountId = UUID.randomUUID();
         ticketAccountId = UUID.randomUUID();
@@ -73,11 +70,8 @@ class ZeffyImportRowApplierTest {
     }
 
     private ZeffyImportRow rowOf(String category) {
-        Organization org = new Organization();
-        org.setId(orgId);
         return ZeffyImportRow.builder()
                 .id(UUID.randomUUID())
-                .org(org)
                 .rowNumber(2)
                 .transactionId("txn_1")
                 .amount(new BigDecimal("75.00"))
@@ -97,10 +91,10 @@ class ZeffyImportRowApplierTest {
         when(personService.findByEmailIfExists("donor@example.com")).thenReturn(Optional.empty());
         Person person = Person.builder().id(UUID.randomUUID()).build();
         when(personService.create(any(Person.class))).thenReturn(person);
-        when(membershipService.hasMembership(person.getId(), orgId)).thenReturn(false);
+        when(membershipService.hasMembership(person.getId())).thenReturn(false);
         Member member = new Member();
         member.setId(UUID.randomUUID());
-        when(membershipService.findOrCreateFollowerMember(person.getId(), orgId, row.getTransactionDate()))
+        when(membershipService.findOrCreateFollowerMember(person.getId(), row.getTransactionDate()))
                 .thenReturn(member);
         when(memberPaymentRepo.save(any(MemberPayment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(membershipService.recomputeTier(member.getId())).thenReturn(member);
@@ -130,7 +124,7 @@ class ZeffyImportRowApplierTest {
         assertThat(row.getOutcome()).isEqualTo("committed");
         assertThat(row.getMember()).isNull();
         assertThat(row.getMemberPayment()).isNull();
-        verify(membershipService, never()).findOrCreateFollowerMember(any(), any(), any());
+        verify(membershipService, never()).findOrCreateFollowerMember(any(), any());
         verify(membershipService, never()).recomputeTier(any());
         verify(memberPaymentRepo, never()).save(any());
 
@@ -150,16 +144,16 @@ class ZeffyImportRowApplierTest {
         Fund fund = Fund.builder().id(UUID.randomUUID()).build();
         ZeffyCampaignMapping mapping = ZeffyCampaignMapping.builder()
                 .id(UUID.randomUUID()).fund(fund).isMembershipPayment(true).build();
-        when(mappingRepo.findByOrgIdAndCampaignTitleIgnoreCase(orgId, row.getCampaignTitle()))
+        when(mappingRepo.findByCampaignTitleIgnoreCase(row.getCampaignTitle()))
                 .thenReturn(Optional.of(mapping));
 
         when(personService.findByEmailIfExists("donor@example.com")).thenReturn(Optional.empty());
         Person person = Person.builder().id(UUID.randomUUID()).build();
         when(personService.create(any(Person.class))).thenReturn(person);
-        when(membershipService.hasMembership(person.getId(), orgId)).thenReturn(false);
+        when(membershipService.hasMembership(person.getId())).thenReturn(false);
         Member member = new Member();
         member.setId(UUID.randomUUID());
-        when(membershipService.findOrCreateFollowerMember(person.getId(), orgId, row.getTransactionDate()))
+        when(membershipService.findOrCreateFollowerMember(person.getId(), row.getTransactionDate()))
                 .thenReturn(member);
         when(memberPaymentRepo.save(any(MemberPayment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(membershipService.recomputeTier(member.getId())).thenReturn(member);
@@ -186,7 +180,7 @@ class ZeffyImportRowApplierTest {
 
         Member member = new Member();
         member.setId(UUID.randomUUID());
-        when(membershipService.findOrCreateFollowerMember(person.getId(), orgId, row.getTransactionDate()))
+        when(membershipService.findOrCreateFollowerMember(person.getId(), row.getTransactionDate()))
                 .thenReturn(member);
         when(memberPaymentRepo.save(any(MemberPayment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(membershipService.recomputeTier(member.getId())).thenReturn(member);
@@ -197,7 +191,7 @@ class ZeffyImportRowApplierTest {
         assertThat(row.getMemberPayment()).isNotNull();
         assertThat(row.getMemberPayment().getTransactionRef()).isEqualTo("txn_1");
         verify(membershipService).recomputeTier(member.getId());
-        verify(financeService).reclassifyIncome(eq(orgId), eq(row.getTransactionDate()), eq(row.getAmount()),
+        verify(financeService).reclassifyIncome(eq(row.getTransactionDate()), eq(row.getAmount()),
                 anyString(), eq(ticketAccountId), eq(donationAccountId));
     }
 
@@ -210,8 +204,8 @@ class ZeffyImportRowApplierTest {
 
         applier.reprocessAsMembership(row.getId(), donationAccountId, ticketAccountId);
 
-        verify(membershipService, never()).findOrCreateFollowerMember(any(), any(), any());
-        verify(financeService, never()).reclassifyIncome(any(), any(), any(), anyString(), any(), any());
+        verify(membershipService, never()).findOrCreateFollowerMember(any(), any());
+        verify(financeService, never()).reclassifyIncome(any(), any(), anyString(), any(), any());
     }
 
     @Test
@@ -222,6 +216,6 @@ class ZeffyImportRowApplierTest {
 
         applier.reprocessAsMembership(row.getId(), donationAccountId, ticketAccountId);
 
-        verify(membershipService, never()).findOrCreateFollowerMember(any(), any(), any());
+        verify(membershipService, never()).findOrCreateFollowerMember(any(), any());
     }
 }

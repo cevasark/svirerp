@@ -5,7 +5,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 import { PersonService } from '../../services/person.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Person } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -53,11 +52,9 @@ import { PersonImportDialogComponent } from '../person-import-dialog/person-impo
 })
 export class PersonListComponent implements OnInit {
   private personService = inject(PersonService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<Person> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -77,7 +74,6 @@ export class PersonListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPage();
-    this.orgContext.ensureOrgId().subscribe(orgId => { this.orgId = orgId; });
   }
 
   onPageChange(event: PageEvent): void {
@@ -111,11 +107,7 @@ export class PersonListComponent implements OnInit {
   }
 
   downloadTemplate(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
-    this.personService.downloadImportTemplate(this.orgId).subscribe({
+    this.personService.downloadImportTemplate().subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -128,12 +120,8 @@ export class PersonListComponent implements OnInit {
   }
 
   openImportDialog(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(PersonImportDialogComponent, { width: '600px', data: { orgId: this.orgId } })
+      .open(PersonImportDialogComponent, { width: '600px' })
       .afterClosed()
       .subscribe(imported => { if (imported) this.loadPage(); });
   }

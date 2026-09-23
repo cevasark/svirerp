@@ -29,16 +29,9 @@ class PersonImportRowApplierTest {
     @InjectMocks
     private PersonImportRowApplier applier;
 
-    private UUID orgId;
-
     private PersonImportRow rowOf(String email, boolean unsubscribed) {
         return new PersonImportRow("Jane", "Doe", email, "555-0100", "123 Main St", "Springfield", "62704",
                 unsubscribed);
-    }
-
-    @org.junit.jupiter.api.BeforeEach
-    void setUp() {
-        orgId = UUID.randomUUID();
     }
 
     @Test
@@ -48,14 +41,14 @@ class PersonImportRowApplierTest {
         Person created = Person.builder().id(UUID.randomUUID()).build();
         when(personService.create(any(Person.class))).thenReturn(created);
 
-        PersonImportRowApplier.ApplyOutcome outcome = applier.applyRow(orgId, row);
+        PersonImportRowApplier.ApplyOutcome outcome = applier.applyRow(row);
 
         assertThat(outcome).isEqualTo(PersonImportRowApplier.ApplyOutcome.CREATED);
         ArgumentCaptor<Person> personCaptor = ArgumentCaptor.forClass(Person.class);
         verify(personService).create(personCaptor.capture());
         assertThat(personCaptor.getValue().getFirstName()).isEqualTo("Jane");
         assertThat(personCaptor.getValue().getEmail()).isEqualTo("jane.doe@example.com");
-        verify(membershipService).createFollowerMember(created.getId(), orgId, true);
+        verify(membershipService).createFollowerMember(created.getId(), true);
     }
 
     @Test
@@ -65,9 +58,9 @@ class PersonImportRowApplierTest {
         Person created = Person.builder().id(UUID.randomUUID()).build();
         when(personService.create(any(Person.class))).thenReturn(created);
 
-        applier.applyRow(orgId, row);
+        applier.applyRow(row);
 
-        verify(membershipService).createFollowerMember(created.getId(), orgId, false);
+        verify(membershipService).createFollowerMember(created.getId(), false);
     }
 
     @Test
@@ -76,10 +69,10 @@ class PersonImportRowApplierTest {
         Person existing = Person.builder().id(UUID.randomUUID()).build();
         when(personService.findByEmailIfExists(row.email())).thenReturn(Optional.of(existing));
 
-        PersonImportRowApplier.ApplyOutcome outcome = applier.applyRow(orgId, row);
+        PersonImportRowApplier.ApplyOutcome outcome = applier.applyRow(row);
 
         assertThat(outcome).isEqualTo(PersonImportRowApplier.ApplyOutcome.SKIPPED_EXISTING);
         verify(personService, never()).create(any());
-        verify(membershipService, never()).createFollowerMember(any(), any(), anyBoolean());
+        verify(membershipService, never()).createFollowerMember(any(), anyBoolean());
     }
 }

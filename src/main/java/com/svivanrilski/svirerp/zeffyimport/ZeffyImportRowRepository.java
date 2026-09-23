@@ -18,12 +18,12 @@ public interface ZeffyImportRowRepository extends JpaRepository<ZeffyImportRow, 
     // serviceRequest/categoryAccount/fund); listing only "journalEntry" leaves those as
     // uninitialized proxies that blow up at serialization time ("no session").
     @EntityGraph(attributePaths = {
-        "batch", "batch.org", "org",
+        "batch",
         "person",
-        "member", "member.person", "member.org", "member.membershipType",
+        "member", "member.person", "member.membershipType",
         "fund",
         "memberPayment", "memberPayment.member",
-        "journalEntry", "journalEntry.org", "journalEntry.createdBy", "journalEntry.approvedBy",
+        "journalEntry", "journalEntry.createdBy", "journalEntry.approvedBy",
         "journalEntry.payer", "journalEntry.vendor", "journalEntry.serviceRequest",
         "journalEntry.categoryAccount", "journalEntry.fund",
     })
@@ -32,15 +32,15 @@ public interface ZeffyImportRowRepository extends JpaRepository<ZeffyImportRow, 
     /** Internal use only (row.getOutcome()/getAmount()/etc.) inside the commit transaction — never serialized. */
     List<ZeffyImportRow> findByBatchIdOrderByRowNumber(UUID batchId);
 
-    boolean existsByOrgIdAndDedupeKeyAndOutcome(UUID orgId, String dedupeKey, String outcome);
+    boolean existsByDedupeKeyAndOutcome(String dedupeKey, String outcome);
 
     /** Internal use only inside reprocessMembershipRows' transaction — never serialized. Committed
      *  Ticket rows whose campaign has since been flagged as a membership payment (see
      *  ZeffyCampaignMapping#isMembershipPayment) and that haven't been backfilled yet
      *  (member IS NULL — makes this safe to re-run). */
-    @Query("SELECT r FROM ZeffyImportRow r WHERE r.org.id = :orgId AND r.outcome = 'committed' "
+    @Query("SELECT r FROM ZeffyImportRow r WHERE r.outcome = 'committed' "
             + "AND r.category = 'Ticket' AND r.member IS NULL "
-            + "AND EXISTS (SELECT 1 FROM ZeffyCampaignMapping m WHERE m.org.id = :orgId "
-            + "AND LOWER(m.campaignTitle) = LOWER(r.campaignTitle) AND m.isMembershipPayment = true)")
-    List<ZeffyImportRow> findCommittedTicketRowsNeedingMembershipReprocess(UUID orgId);
+            + "AND EXISTS (SELECT 1 FROM ZeffyCampaignMapping m "
+            + "WHERE LOWER(m.campaignTitle) = LOWER(r.campaignTitle) AND m.isMembershipPayment = true)")
+    List<ZeffyImportRow> findCommittedTicketRowsNeedingMembershipReprocess();
 }

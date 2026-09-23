@@ -10,11 +10,11 @@ import java.util.UUID;
 @Repository
 public interface ChurchEventRepository extends JpaRepository<ChurchEvent, UUID> {
 
-    @EntityGraph(attributePaths = {"calendarEvent", "calendarEvent.org", "calendarEvent.createdBy"})
+    @EntityGraph(attributePaths = {"calendarEvent", "calendarEvent.createdBy"})
     @Override
     Optional<ChurchEvent> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"calendarEvent", "calendarEvent.org", "calendarEvent.createdBy"})
+    @EntityGraph(attributePaths = {"calendarEvent", "calendarEvent.createdBy"})
     Optional<ChurchEvent> findByCalendarEventId(UUID calendarEventId);
 
     boolean existsByCalendarEventId(UUID calendarEventId);

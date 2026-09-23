@@ -24,9 +24,9 @@ public class GovernanceController {
 
     // ── Trustee ──────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/trustees")
-    public Page<Trustee> listTrustees(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findTrusteesByOrg(orgId, pageable);
+    @GetMapping("/api/trustees")
+    public Page<Trustee> listTrustees(Pageable pageable) {
+        return service.findTrustees(pageable);
     }
 
     @GetMapping("/api/trustees/{id}")
@@ -85,9 +85,9 @@ public class GovernanceController {
 
     // ── Committee ─────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/committees")
-    public Page<Committee> listCommittees(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findCommitteesByOrg(orgId, pageable);
+    @GetMapping("/api/committees")
+    public Page<Committee> listCommittees(Pageable pageable) {
+        return service.findCommittees(pageable);
     }
 
     @GetMapping("/api/committees/{id}")
@@ -197,12 +197,12 @@ public class GovernanceController {
 
     // ── MeetingMinutes ───────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/meeting-minutes")
-    public Page<MeetingMinutes> listMeetingMinutes(@PathVariable UUID orgId,
+    @GetMapping("/api/meeting-minutes")
+    public Page<MeetingMinutes> listMeetingMinutes(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, defaultValue = "false") boolean openActionItemsOnly,
             Pageable pageable) {
-        return service.findMeetingMinutesByOrg(orgId, fromDate, openActionItemsOnly, pageable);
+        return service.findMeetingMinutes(fromDate, openActionItemsOnly, pageable);
     }
 
     @GetMapping("/api/meeting-minutes/{id}")
@@ -251,10 +251,10 @@ public class GovernanceController {
 
     // ── Project ──────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/projects")
-    public Page<Project> listProjects(@PathVariable UUID orgId,
+    @GetMapping("/api/projects")
+    public Page<Project> listProjects(
             @RequestParam(required = false) String status, Pageable pageable) {
-        return service.findProjectsByOrg(orgId, status, pageable);
+        return service.findProjects(status, pageable);
     }
 
     @GetMapping("/api/projects/{id}")

@@ -8,20 +8,20 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class MembershipTypeService extends ResourceService<MembershipType> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('membership-types');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<MembershipType>> {
+  /** List all membership types in this installation. */
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<MembershipType>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<MembershipType>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/membership-types`,
+      `${this.apiEnv.apiUrl}/membership-types`,
       { params: p },
     );
   }

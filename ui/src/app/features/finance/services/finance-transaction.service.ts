@@ -22,8 +22,7 @@ export class FinanceTransactionService {
   private readonly http = inject(HttpClient);
   private readonly env = inject(ENVIRONMENT);
 
-  getPageForOrg(
-    orgId: string,
+  getPage(
     params: PageParams = DEFAULT_PAGE_PARAMS,
     filter: TransactionFilter = {},
   ): Observable<Page<JournalEntry>> {
@@ -44,28 +43,28 @@ export class FinanceTransactionService {
       p = p.set('entryDateTo', filter.entryDateTo);
     }
     return this.http.get<Page<JournalEntry>>(
-      `${this.env.apiUrl}/organizations/${orgId}/journal-entries`,
+      `${this.env.apiUrl}/journal-entries`,
       { params: p },
     );
   }
 
-  recordIncome(orgId: string, request: RecordIncomeRequest): Observable<JournalEntry> {
+  recordIncome(request: RecordIncomeRequest): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(
-      `${this.env.apiUrl}/organizations/${orgId}/income-transactions`,
+      `${this.env.apiUrl}/income-transactions`,
       request,
     );
   }
 
-  recordExpense(orgId: string, request: RecordExpenseRequest): Observable<JournalEntry> {
+  recordExpense(request: RecordExpenseRequest): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(
-      `${this.env.apiUrl}/organizations/${orgId}/expense-transactions`,
+      `${this.env.apiUrl}/expense-transactions`,
       request,
     );
   }
 
-  recordTransfer(orgId: string, request: RecordTransferRequest): Observable<JournalEntry> {
+  recordTransfer(request: RecordTransferRequest): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(
-      `${this.env.apiUrl}/organizations/${orgId}/transfer-transactions`,
+      `${this.env.apiUrl}/transfer-transactions`,
       request,
     );
   }

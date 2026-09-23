@@ -8,15 +8,14 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class ServiceRequestService extends ResourceService<ServiceRequest> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('service-requests');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(
-    orgId: string,
+  /** List all service requests in this installation. */
+  override getPage(
     params: PageParams = DEFAULT_PAGE_PARAMS,
   ): Observable<Page<ServiceRequest>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
@@ -24,7 +23,7 @@ export class ServiceRequestService extends ResourceService<ServiceRequest> {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<ServiceRequest>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/service-requests`,
+      `${this.apiEnv.apiUrl}/service-requests`,
       { params: p },
     );
   }

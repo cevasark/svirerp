@@ -3,7 +3,6 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 
 import { VendorService } from '../../services/vendor.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Vendor } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -39,11 +38,9 @@ import { VendorFormComponent } from '../vendor-form/vendor-form.component';
 })
 export class VendorListComponent implements OnInit {
   private vendorService = inject(VendorService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<Vendor> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -71,12 +68,8 @@ export class VendorListComponent implements OnInit {
   }
 
   openForm(vendor?: Vendor): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(VendorFormComponent, { width: '560px', data: { orgId: this.orgId, vendor: vendor ?? null } })
+      .open(VendorFormComponent, { width: '560px', data: { vendor: vendor ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
@@ -96,18 +89,9 @@ export class VendorListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.vendorService.getPageForOrg(orgId, this.pageParams()).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.vendorService.getPage(this.pageParams()).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

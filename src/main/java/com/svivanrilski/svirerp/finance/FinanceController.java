@@ -21,9 +21,9 @@ public class FinanceController {
 
     // ── Fund ─────────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/funds")
-    public Page<Fund> listFunds(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findFundsByOrg(orgId, pageable);
+    @GetMapping("/api/funds")
+    public Page<Fund> listFunds(Pageable pageable) {
+        return service.findFunds(pageable);
     }
 
     @GetMapping("/api/funds/{id}")
@@ -55,14 +55,14 @@ public class FinanceController {
 
     // ── Account ──────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/accounts")
-    public Page<Account> listAccounts(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findAccountsByOrg(orgId, pageable);
+    @GetMapping("/api/accounts")
+    public Page<Account> listAccounts(Pageable pageable) {
+        return service.findAccounts(pageable);
     }
 
-    @GetMapping("/api/organizations/{orgId}/accounts/roots")
-    public List<Account> rootAccounts(@PathVariable UUID orgId) {
-        return service.findRootAccounts(orgId);
+    @GetMapping("/api/accounts/roots")
+    public List<Account> rootAccounts() {
+        return service.findRootAccounts();
     }
 
     @GetMapping("/api/accounts/{id}")
@@ -93,14 +93,14 @@ public class FinanceController {
 
     // ── JournalEntry ──────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/journal-entries")
-    public Page<JournalEntry> listEntries(@PathVariable UUID orgId,
+    @GetMapping("/api/journal-entries")
+    public Page<JournalEntry> listEntries(
             @RequestParam(required = false) UUID fundId,
             @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) LocalDate entryDateFrom,
             @RequestParam(required = false) LocalDate entryDateTo,
             Pageable pageable) {
-        return service.findEntriesByOrg(orgId, fundId, paymentMethod, entryDateFrom, entryDateTo, pageable);
+        return service.findEntries(fundId, paymentMethod, entryDateFrom, entryDateTo, pageable);
     }
 
     @GetMapping("/api/journal-entries/{id}")
@@ -156,9 +156,9 @@ public class FinanceController {
 
     // ── Budget ────────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/budgets")
-    public Page<Budget> listBudgets(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findBudgetsByOrg(orgId, pageable);
+    @GetMapping("/api/budgets")
+    public Page<Budget> listBudgets(Pageable pageable) {
+        return service.findBudgets(pageable);
     }
 
     @GetMapping("/api/budgets/{id}")
@@ -184,9 +184,9 @@ public class FinanceController {
 
     // ── BankAccount ───────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/bank-accounts")
-    public Page<BankAccount> listBankAccounts(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findBankAccountsByOrg(orgId, pageable);
+    @GetMapping("/api/bank-accounts")
+    public Page<BankAccount> listBankAccounts(Pageable pageable) {
+        return service.findBankAccounts(pageable);
     }
 
     @GetMapping("/api/bank-accounts/{id}")
@@ -298,9 +298,9 @@ public class FinanceController {
 
     // ── Vendor ───────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/vendors")
-    public Page<Vendor> listVendors(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findVendorsByOrg(orgId, pageable);
+    @GetMapping("/api/vendors")
+    public Page<Vendor> listVendors(Pageable pageable) {
+        return service.findVendors(pageable);
     }
 
     @GetMapping("/api/vendors/{id}")
@@ -326,9 +326,9 @@ public class FinanceController {
 
     // ── ServiceRequest ───────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/service-requests")
-    public Page<ServiceRequest> listServiceRequests(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findServiceRequestsByOrg(orgId, pageable);
+    @GetMapping("/api/service-requests")
+    public Page<ServiceRequest> listServiceRequests(Pageable pageable) {
+        return service.findServiceRequests(pageable);
     }
 
     @GetMapping("/api/service-requests/{id}")
@@ -359,20 +359,18 @@ public class FinanceController {
 
     // ── Record Income / Record Expense ──────────────────────────────────────
 
-    @PostMapping("/api/organizations/{orgId}/income-transactions")
-    public ResponseEntity<JournalEntry> recordIncome(@PathVariable UUID orgId,
-            @RequestBody RecordIncomeRequest body) {
-        RecordIncomeRequest req = new RecordIncomeRequest(orgId, body.entryDate(), body.amount(),
+    @PostMapping("/api/income-transactions")
+    public ResponseEntity<JournalEntry> recordIncome(@RequestBody RecordIncomeRequest body) {
+        RecordIncomeRequest req = new RecordIncomeRequest(body.entryDate(), body.amount(),
                 body.description(), body.categoryAccountId(), body.depositAccountId(), body.fundId(),
                 body.payerId(), body.serviceRequestId(), body.paymentMethod(), body.checkNumber(),
                 body.feeAmount(), body.feeAccountId());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordIncome(req));
     }
 
-    @PostMapping("/api/organizations/{orgId}/expense-transactions")
-    public ResponseEntity<JournalEntry> recordExpense(@PathVariable UUID orgId,
-            @RequestBody RecordExpenseRequest body) {
-        RecordExpenseRequest req = new RecordExpenseRequest(orgId, body.entryDate(), body.amount(),
+    @PostMapping("/api/expense-transactions")
+    public ResponseEntity<JournalEntry> recordExpense(@RequestBody RecordExpenseRequest body) {
+        RecordExpenseRequest req = new RecordExpenseRequest(body.entryDate(), body.amount(),
                 body.description(), body.categoryAccountId(), body.paymentAccountId(), body.fundId(),
                 body.vendorId(), body.paymentMethod(), body.checkNumber());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordExpense(req));
@@ -380,32 +378,31 @@ public class FinanceController {
 
     /** Records a pass-through platform's payout landing in the real bank account — a transfer from
      *  its "Undeposited Funds" clearing account into Checking, no revenue account touched. */
-    @PostMapping("/api/organizations/{orgId}/transfer-transactions")
-    public ResponseEntity<JournalEntry> recordTransfer(@PathVariable UUID orgId,
-            @RequestBody RecordTransferRequest body) {
-        RecordTransferRequest req = new RecordTransferRequest(orgId, body.entryDate(), body.amount(),
+    @PostMapping("/api/transfer-transactions")
+    public ResponseEntity<JournalEntry> recordTransfer(@RequestBody RecordTransferRequest body) {
+        RecordTransferRequest req = new RecordTransferRequest(body.entryDate(), body.amount(),
                 body.description(), body.fromAccountId(), body.toAccountId());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordTransfer(req));
     }
 
     // ── Reports ──────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/reports/statement-of-activities")
-    public StatementOfActivities statementOfActivities(@PathVariable UUID orgId,
+    @GetMapping("/api/reports/statement-of-activities")
+    public StatementOfActivities statementOfActivities(
             @RequestParam LocalDate entryDateFrom,
             @RequestParam LocalDate entryDateTo,
             @RequestParam(required = false) UUID fundId) {
-        return service.statementOfActivities(orgId, entryDateFrom, entryDateTo, fundId);
+        return service.statementOfActivities(entryDateFrom, entryDateTo, fundId);
     }
 
-    @GetMapping("/api/organizations/{orgId}/reports/statement-of-financial-position")
-    public StatementOfFinancialPosition statementOfFinancialPosition(@PathVariable UUID orgId,
+    @GetMapping("/api/reports/statement-of-financial-position")
+    public StatementOfFinancialPosition statementOfFinancialPosition(
             @RequestParam LocalDate asOf) {
-        return service.statementOfFinancialPosition(orgId, asOf);
+        return service.statementOfFinancialPosition(asOf);
     }
 
-    @GetMapping("/api/organizations/{orgId}/reports/funds-overview")
-    public List<FundOverviewRow> fundsOverview(@PathVariable UUID orgId) {
-        return service.fundsOverview(orgId);
+    @GetMapping("/api/reports/funds-overview")
+    public List<FundOverviewRow> fundsOverview() {
+        return service.fundsOverview();
     }
 }

@@ -20,7 +20,6 @@ import { Project, Person } from '../../../../core/models/domain.model';
 import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
 
 interface ProjectDialogData {
-  orgId: string;
   project: Project | null;
 }
 
@@ -138,7 +137,6 @@ export class ProjectFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<ProjectDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private project = this.data.project;
   isEdit = !!this.project;
   saving = signal(false);
@@ -194,7 +192,6 @@ export class ProjectFormComponent implements OnInit {
     const value = this.form.getRawValue();
     // Backend only reads .getId() off nested org/assignee references on write.
     const payload = {
-      org: { id: this.orgId },
       name: value.name,
       description: value.description || null,
       status: value.status,

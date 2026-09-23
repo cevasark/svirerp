@@ -56,8 +56,8 @@ public class PersonController {
 
     // ── Import (Zeffy contacts export — see PersonImportService) ──────────────
 
-    @GetMapping("/api/organizations/{orgId}/persons/import-template")
-    public ResponseEntity<byte[]> importTemplate(@PathVariable UUID orgId) {
+    @GetMapping("/api/persons/import-template")
+    public ResponseEntity<byte[]> importTemplate() {
         byte[] csv = importService.buildImportTemplate();
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/csv"))
@@ -68,9 +68,8 @@ public class PersonController {
                 .body(csv);
     }
 
-    @PostMapping("/api/organizations/{orgId}/persons/import")
-    public PersonImportService.PersonImportResult importPeople(
-            @PathVariable UUID orgId, @RequestParam("file") MultipartFile file) {
-        return importService.importPeople(orgId, file);
+    @PostMapping("/api/persons/import")
+    public PersonImportService.PersonImportResult importPeople(@RequestParam("file") MultipartFile file) {
+        return importService.importPeople(file);
     }
 }

@@ -18,29 +18,19 @@ public interface MeetingMinutesRepository extends JpaRepository<MeetingMinutes, 
     // spring.jpa.open-in-view=false closes the Hibernate session before the
     // controller layer serializes the response, so the lazy `org` association
     // must be eagerly fetched here or Jackson hits a LazyInitializationException.
-    @EntityGraph(attributePaths = {"org"})
-    @Override
-    Optional<MeetingMinutes> findById(UUID id);
-
-    @EntityGraph(attributePaths = {"org"})
-    Page<MeetingMinutes> findByOrgId(UUID orgId, Pageable pageable);
-
     // ActionItem has no inverse @OneToMany back to MeetingMinutes, so the
     // "has an open action item" filter needs an EXISTS subquery rather than a
     // derived-query collection traversal. openActionItemsOnly=false makes that
     // clause a no-op instead of a separate query method for every combination
     // of the two filters.
-    @EntityGraph(attributePaths = {"org"})
     @Query("""
         SELECT DISTINCT mm FROM MeetingMinutes mm
-        WHERE mm.org.id = :orgId
-        AND (:fromDate IS NULL OR mm.meetingDate >= :fromDate)
+        WHERE (:fromDate IS NULL OR mm.meetingDate >= :fromDate)
         AND (:openActionItemsOnly = false OR EXISTS (
             SELECT 1 FROM ActionItem ai WHERE ai.meetingMinutes = mm AND ai.status <> 'done'
         ))
         """)
-    Page<MeetingMinutes> search(@Param("orgId") UUID orgId,
-                                 @Param("fromDate") LocalDate fromDate,
+    Page<MeetingMinutes> search(@Param("fromDate") LocalDate fromDate,
                                  @Param("openActionItemsOnly") boolean openActionItemsOnly,
                                  Pageable pageable);
 }

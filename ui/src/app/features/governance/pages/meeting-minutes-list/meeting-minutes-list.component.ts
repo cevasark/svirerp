@@ -8,7 +8,6 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 
 import { MeetingMinutesService } from '../../services/meeting-minutes.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { MeetingMinutes } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -63,12 +62,10 @@ function excerpt(text: string | undefined, maxLength = 80): string {
 })
 export class MeetingMinutesListComponent implements OnInit {
   private meetingMinutesService = inject(MeetingMinutesService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
   private router = inject(Router);
 
-  private orgId: string | null = null;
   page = signal<Page<MeetingMinutes> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -112,14 +109,10 @@ export class MeetingMinutesListComponent implements OnInit {
   }
 
   openForm(minutes?: MeetingMinutes): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
       .open(MeetingMinutesFormComponent, {
         width: '540px',
-        data: { orgId: this.orgId, minutes: minutes ?? null },
+        data: { minutes: minutes ?? null },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
@@ -140,18 +133,9 @@ export class MeetingMinutesListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.meetingMinutesService.getPageForOrg(orgId, this.pageParams(), this.fromDateFilter, this.openActionItemsOnlyFilter).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.meetingMinutesService.getPage(this.pageParams(), this.fromDateFilter, this.openActionItemsOnlyFilter).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

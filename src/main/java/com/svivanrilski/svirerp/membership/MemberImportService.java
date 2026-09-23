@@ -57,7 +57,7 @@ public class MemberImportService {
         return out.toByteArray();
     }
 
-    public MemberImportResult importMembers(UUID orgId, MultipartFile file) {
+    public MemberImportResult importMembers(MultipartFile file) {
         int created = 0;
         int updated = 0;
         List<MemberImportRowError> failed = new ArrayList<>();
@@ -80,7 +80,7 @@ public class MemberImportService {
                 try {
                     MemberImportRow row = parseRow(record);
                     MembershipService.ImportOutcome outcome =
-                            membershipService.importOrUpdateMemberFromRow(orgId, row);
+                            membershipService.importOrUpdateMemberFromRow(row);
                     if (outcome == MembershipService.ImportOutcome.CREATED) {
                         created++;
                     } else {

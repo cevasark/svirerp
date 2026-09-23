@@ -59,7 +59,7 @@ public class ZeffyImportRowApplier {
         // Always looked up (not just when fund isn't already stamped) — isMembershipPayment below
         // needs it regardless, and this is a single cheap indexed lookup either way.
         ZeffyCampaignMapping mapping = (row.getCampaignTitle() != null && !row.getCampaignTitle().isBlank())
-                ? mappingRepo.findByOrgIdAndCampaignTitleIgnoreCase(row.getOrg().getId(), row.getCampaignTitle())
+                ? mappingRepo.findByCampaignTitleIgnoreCase(row.getCampaignTitle())
                         .orElse(null)
                 : null;
         if (fund == null && row.getCampaignTitle() != null && !row.getCampaignTitle().isBlank()) {
@@ -98,9 +98,9 @@ public class ZeffyImportRowApplier {
         MemberPayment payment = null;
 
         if (!isTicket) {
-            isNewMember = !membershipService.hasMembership(person.getId(), row.getOrg().getId());
+            isNewMember = !membershipService.hasMembership(person.getId());
             Member member = membershipService.findOrCreateFollowerMember(
-                    person.getId(), row.getOrg().getId(), row.getTransactionDate());
+                    person.getId(), row.getTransactionDate());
 
             payment = memberPaymentRepo.save(MemberPayment.builder()
                     .member(member)
@@ -121,7 +121,6 @@ public class ZeffyImportRowApplier {
         // Person/Member/MemberPayment above so it counts toward tier computation.
         JournalEntry entry = row.getAmount().signum() > 0
                 ? financeService.recordIncome(new RecordIncomeRequest(
-                        row.getOrg().getId(),
                         row.getTransactionDate(),
                         row.getAmount(),
                         buildDescription(row),
@@ -169,7 +168,7 @@ public class ZeffyImportRowApplier {
         }
 
         Member member = membershipService.findOrCreateFollowerMember(
-                person.getId(), row.getOrg().getId(), row.getTransactionDate());
+                person.getId(), row.getTransactionDate());
 
         MemberPayment payment = memberPaymentRepo.save(MemberPayment.builder()
                 .member(member)
@@ -188,7 +187,7 @@ public class ZeffyImportRowApplier {
         if (row.getAmount().signum() > 0) {
             String campaign = row.getCampaignTitle() != null && !row.getCampaignTitle().isBlank()
                     ? row.getCampaignTitle() : "Zeffy donation";
-            financeService.reclassifyIncome(row.getOrg().getId(), row.getTransactionDate(), row.getAmount(),
+            financeService.reclassifyIncome(row.getTransactionDate(), row.getAmount(),
                     "Reclassify Zeffy Ticket → membership: " + campaign,
                     ticketAccountId, donationAccountId);
         }

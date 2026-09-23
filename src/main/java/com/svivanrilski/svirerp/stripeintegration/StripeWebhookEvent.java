@@ -8,7 +8,6 @@ import com.svivanrilski.svirerp.finance.JournalEntry;
 import com.svivanrilski.svirerp.finance.ServiceRequest;
 import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 
 import java.math.BigDecimal;
@@ -34,11 +33,6 @@ public class StripeWebhookEvent {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotBlank
     @Column(name = "stripe_event_id", nullable = false, unique = true, length = 255)

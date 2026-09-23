@@ -14,7 +14,6 @@ export class FinanceReportService {
   private readonly env = inject(ENVIRONMENT);
 
   statementOfActivities(
-    orgId: string,
     entryDateFrom: string,
     entryDateTo: string,
     fundId?: string,
@@ -24,22 +23,22 @@ export class FinanceReportService {
       p = p.set('fundId', fundId);
     }
     return this.http.get<StatementOfActivities>(
-      `${this.env.apiUrl}/organizations/${orgId}/reports/statement-of-activities`,
+      `${this.env.apiUrl}/reports/statement-of-activities`,
       { params: p },
     );
   }
 
-  statementOfFinancialPosition(orgId: string, asOf: string): Observable<StatementOfFinancialPosition> {
+  statementOfFinancialPosition(asOf: string): Observable<StatementOfFinancialPosition> {
     const p = new HttpParams().set('asOf', asOf);
     return this.http.get<StatementOfFinancialPosition>(
-      `${this.env.apiUrl}/organizations/${orgId}/reports/statement-of-financial-position`,
+      `${this.env.apiUrl}/reports/statement-of-financial-position`,
       { params: p },
     );
   }
 
-  fundsOverview(orgId: string): Observable<FundOverviewRow[]> {
+  fundsOverview(): Observable<FundOverviewRow[]> {
     return this.http.get<FundOverviewRow[]>(
-      `${this.env.apiUrl}/organizations/${orgId}/reports/funds-overview`,
+      `${this.env.apiUrl}/reports/funds-overview`,
     );
   }
 }

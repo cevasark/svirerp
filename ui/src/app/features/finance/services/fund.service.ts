@@ -8,20 +8,20 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class FundService extends ResourceService<Fund> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('funds');
   }
 
-  /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Fund>> {
+  /** List all funds in this installation. */
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Fund>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Fund>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/funds`,
+      `${this.apiEnv.apiUrl}/funds`,
       { params: p },
     );
   }

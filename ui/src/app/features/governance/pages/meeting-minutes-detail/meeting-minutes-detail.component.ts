@@ -214,7 +214,7 @@ export class MeetingMinutesDetailComponent implements OnInit {
     this.dialog
       .open(MeetingMinutesFormComponent, {
         width: '540px',
-        data: { orgId: m.org.id, minutes: m },
+        data: { minutes: m },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadMinutes(); });
@@ -277,7 +277,7 @@ export class MeetingMinutesDetailComponent implements OnInit {
     this.meetingMinutesService.getById(this.meetingMinutesId).subscribe({
       next: minutes => {
         this.minutes.set(minutes);
-        this.trusteeService.getPageForOrg(minutes.org.id, { page: 0, size: 200 }).subscribe(page => {
+        this.trusteeService.getPage({ page: 0, size: 200 }).subscribe(page => {
           this.trustees.set(page.content.filter(t => t.isActive));
         });
       },

@@ -3,7 +3,6 @@ package com.svivanrilski.svirerp.finance;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,7 +13,7 @@ import java.util.UUID;
 @Table(
     name = "budget",
     uniqueConstraints = @UniqueConstraint(name = "uq_budget_account_fund_year_period",
-        columnNames = {"org_id", "account_id", "fund_id", "fiscal_year", "period"})
+        columnNames = {"account_id", "fund_id", "fiscal_year", "period"})
 )
 @Getter
 @Setter
@@ -27,11 +26,6 @@ public class Budget {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)

@@ -1,15 +1,11 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { ZeffyImportService } from '../../services/zeffy-import.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ZeffyImportBatch } from '../../../../core/models/domain.model';
-
-interface ZeffyImportUploadDialogData {
-  orgId: string;
-}
 
 /** Uploads a Zeffy CSV and hands the resulting batch back to the caller, which navigates to the
  * detail page — the substantive preview/mapping/commit flow lives there, not in this dialog. */
@@ -56,7 +52,6 @@ export class ZeffyImportUploadDialogComponent {
   private zeffyImportService = inject(ZeffyImportService);
   private dialogRef = inject(MatDialogRef<ZeffyImportUploadDialogComponent>);
   private notifications = inject(NotificationService);
-  private data = inject<ZeffyImportUploadDialogData>(MAT_DIALOG_DATA);
 
   selectedFile = signal<File | null>(null);
   fileName = signal<string | null>(null);
@@ -75,7 +70,7 @@ export class ZeffyImportUploadDialogComponent {
       return;
     }
     this.uploading.set(true);
-    this.zeffyImportService.preview(this.data.orgId, file).subscribe({
+    this.zeffyImportService.preview(file).subscribe({
       next: (batch: ZeffyImportBatch) => {
         this.uploading.set(false);
         this.dialogRef.close(batch);

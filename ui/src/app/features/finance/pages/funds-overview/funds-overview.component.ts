@@ -4,7 +4,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { FinanceReportService } from '../../services/finance-report.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { FundOverviewRow } from '../../../../core/models/domain.model';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
@@ -68,7 +67,6 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
 })
 export class FundsOverviewComponent implements OnInit {
   private reportService = inject(FinanceReportService);
-  private orgContext = inject(OrgContextService);
   private notifications = inject(NotificationService);
 
   readonly columns = ['fundName', 'fundType', 'openingBalance', 'totalIncome', 'totalExpense', 'balance'];
@@ -78,17 +76,9 @@ export class FundsOverviewComponent implements OnInit {
 
   ngOnInit(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.reportService.fundsOverview(orgId).subscribe({
-          next: rows => { this.rows.set(rows); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.reportService.fundsOverview().subscribe({
+      next: rows => { this.rows.set(rows); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 }

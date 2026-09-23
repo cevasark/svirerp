@@ -4,6 +4,8 @@ High-level design/architecture reference for SVIR ERP — a single-organization 
 
 **Shape of the system:** a Spring Boot backend and an Angular frontend, built and shipped as **one deployable artifact** — `mvn package` copies the Angular production build into the jar's static resources, so in production Spring Boot serves both the UI and `/api/**` from a single origin. That single-origin choice is deliberate, not incidental: auth is session-cookie based, and same-origin avoids the cross-origin `SameSite`/CORS complications a cookie-based session would otherwise need. Locally the two run separately (Angular dev server on 4200, API on 8080) with a dev proxy standing in for that same-origin relationship.
 
+Each installation has exactly one Organization profile. The database enforces that singleton, while all domain records belong to it implicitly and therefore carry no organization foreign key. The admin-only profile API is `GET/PUT /api/organization`; business APIs use flat installation-wide routes.
+
 ---
 
 ## Backend

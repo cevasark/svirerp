@@ -8,14 +8,14 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class MemberPaymentService extends ResourceService<MemberPayment> {
-  private readonly orgScopedEnv = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('member-payments');
   }
 
   /** Org-wide list, for the Contributions tab. */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS, fromDate?: string | null): Observable<Page<MemberPayment>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS, fromDate?: string | null): Observable<Page<MemberPayment>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
@@ -24,7 +24,7 @@ export class MemberPaymentService extends ResourceService<MemberPayment> {
       p = p.set('fromDate', fromDate);
     }
     return this.http.get<Page<MemberPayment>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/member-payments`,
+      `${this.apiEnv.apiUrl}/member-payments`,
       { params: p },
     );
   }
@@ -36,7 +36,7 @@ export class MemberPaymentService extends ResourceService<MemberPayment> {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<MemberPayment>>(
-      `${this.orgScopedEnv.apiUrl}/members/${memberId}/payments`,
+      `${this.apiEnv.apiUrl}/members/${memberId}/payments`,
       { params: p },
     );
   }

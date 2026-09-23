@@ -20,7 +20,6 @@ import { Trustee, Person } from '../../../../core/models/domain.model';
 import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
 
 interface TrusteeDialogData {
-  orgId: string;
   trustee: Trustee | null;
 }
 
@@ -141,7 +140,6 @@ export class TrusteeFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<TrusteeDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private trustee = this.data.trustee;
   isEdit = !!this.trustee;
   saving = signal(false);
@@ -200,7 +198,6 @@ export class TrusteeFormComponent implements OnInit {
     // { id } stubs are all that's needed here.
     const payload = {
       person: { id: value.personId },
-      org: { id: this.orgId },
       title: value.title || null,
       role: value.role,
       termStart: value.termStart,

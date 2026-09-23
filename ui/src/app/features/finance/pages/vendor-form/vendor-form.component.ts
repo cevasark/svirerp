@@ -12,7 +12,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { Vendor } from '../../../../core/models/domain.model';
 
 interface VendorDialogData {
-  orgId: string;
   vendor: Vendor | null;
 }
 
@@ -121,7 +120,6 @@ export class VendorFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<VendorDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private vendor = this.data.vendor;
   isEdit = !!this.vendor;
   saving = signal(false);
@@ -166,7 +164,6 @@ export class VendorFormComponent implements OnInit {
     this.saving.set(true);
     const value = this.form.getRawValue();
     const payload = {
-      org: { id: this.orgId },
       name: value.name,
       category: value.category || null,
       contactName: value.contactName || null,

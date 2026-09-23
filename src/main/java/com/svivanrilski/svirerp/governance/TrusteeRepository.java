@@ -15,12 +15,12 @@ public interface TrusteeRepository extends JpaRepository<Trustee, UUID> {
     // spring.jpa.open-in-view=false closes the Hibernate session before the
     // controller layer serializes the response, so these LAZY associations
     // must be eagerly fetched here or Jackson hits a LazyInitializationException.
-    @EntityGraph(attributePaths = {"person", "org"})
+    @EntityGraph(attributePaths = {"person"})
     @Override
     Optional<Trustee> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"person", "org"})
-    Page<Trustee> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person"})
+    Page<Trustee> findAll(Pageable pageable);
 
-    Page<Trustee> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+    Page<Trustee> findByIsActive(boolean isActive, Pageable pageable);
 }

@@ -6,8 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -34,13 +32,12 @@ public class MembershipService {
     private final MembershipTypeRepository typeRepo;
     private final MemberRepository memberRepo;
     private final MemberPaymentRepository paymentRepo;
-    private final OrganizationService orgService;
     private final PersonService personService;
 
     // ── MembershipType ──────────────────────────────────────────────────────
 
-    public Page<MembershipType> findAllTypes(UUID orgId, Pageable pageable) {
-        return typeRepo.findByOrgId(orgId, pageable);
+    public Page<MembershipType> findAllTypes(Pageable pageable) {
+        return typeRepo.findAll(pageable);
     }
 
     public MembershipType findTypeById(UUID id) {
@@ -50,9 +47,6 @@ public class MembershipService {
 
     @Transactional
     public MembershipType createType(MembershipType type) {
-        // Ensure the org exists before saving
-        Organization org = orgService.findById(type.getOrg().getId());
-        type.setOrg(org);
         return typeRepo.save(type);
     }
 
@@ -78,21 +72,21 @@ public class MembershipService {
 
     // ── Member ───────────────────────────────────────────────────────────────
 
-    public Page<Member> findAllMembers(UUID orgId, String status, UUID membershipTypeId, Pageable pageable) {
+    public Page<Member> findAllMembers(String status, UUID membershipTypeId, Pageable pageable) {
         if (status != null && !status.isBlank()) {
             validateMemberStatus(status);
         }
         boolean hasStatus = status != null && !status.isBlank();
         if (hasStatus && membershipTypeId != null) {
-            return memberRepo.findByOrgIdAndStatusAndMembershipTypeId(orgId, status, membershipTypeId, pageable);
+            return memberRepo.findByStatusAndMembershipTypeId(status, membershipTypeId, pageable);
         }
         if (hasStatus) {
-            return memberRepo.findByOrgIdAndStatus(orgId, status, pageable);
+            return memberRepo.findByStatus(status, pageable);
         }
         if (membershipTypeId != null) {
-            return memberRepo.findByOrgIdAndMembershipTypeId(orgId, membershipTypeId, pageable);
+            return memberRepo.findByMembershipTypeId(membershipTypeId, pageable);
         }
-        return memberRepo.findByOrgId(orgId, pageable);
+        return memberRepo.findAll(pageable);
     }
 
     public Member findMemberById(UUID id) {
@@ -109,16 +103,16 @@ public class MembershipService {
     /** Counts by tier/status for the Members list header — tier is TierCalculator.MEMBER/
      *  BENEFACTOR/FOLLOWER stored as the member's membershipType name (see TierCalculator's class
      *  doc for why "Member" here means the $150+ tier, not the generic "has a Member row" sense).
-     *  Followers have no active/inactive distinction (always active — see TierCalculator), so just
-     *  one count. totalMembers is every Member row for the org, regardless of tier/status. */
-    public MemberSummary getMemberSummary(UUID orgId) {
+     *  Followers are shown as one count even though staff/imports may explicitly set their status.
+     *  totalMembers is every Member row in the installation, regardless of tier/status. */
+    public MemberSummary getMemberSummary() {
         return new MemberSummary(
-                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.MEMBER),
-                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.MEMBER),
-                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.BENEFACTOR),
-                memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.BENEFACTOR),
-                memberRepo.countByOrgIdAndMembershipType_NameIgnoreCase(orgId, TierCalculator.FOLLOWER),
-                memberRepo.countByOrgId(orgId));
+                memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.MEMBER),
+                memberRepo.countByStatusAndMembershipType_NameIgnoreCase("inactive", TierCalculator.MEMBER),
+                memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.BENEFACTOR),
+                memberRepo.countByStatusAndMembershipType_NameIgnoreCase("inactive", TierCalculator.BENEFACTOR),
+                memberRepo.countByMembershipType_NameIgnoreCase(TierCalculator.FOLLOWER),
+                memberRepo.count());
     }
 
     /** Returns all members whose expiry date is before today (candidates for renewal notices). */
@@ -130,16 +124,14 @@ public class MembershipService {
     public Member createMember(Member member) {
         validateMemberStatus(member.getStatus());
         Person person = personService.findById(member.getPerson().getId());
-        Organization org = orgService.findById(member.getOrg().getId());
         MembershipType type = findTypeById(member.getMembershipType().getId());
         // A person may hold at most one membership per organisation — to switch
         // membership type, update the existing Member record instead of creating another.
-        if (memberRepo.existsByPersonIdAndOrgId(person.getId(), org.getId())) {
+        if (memberRepo.existsByPersonId(person.getId())) {
             throw new IllegalArgumentException(
                     person.getFirstName() + " " + person.getLastName() + " already has a membership in this organization");
         }
         member.setPerson(person);
-        member.setOrg(org);
         member.setMembershipType(type);
         return memberRepo.save(member);
     }
@@ -173,11 +165,10 @@ public class MembershipService {
      * discarding otherwise-successful rows despite catching the exception.
      */
     @Transactional
-    public ImportOutcome importOrUpdateMemberFromRow(UUID orgId, MemberImportRow row) {
+    public ImportOutcome importOrUpdateMemberFromRow(MemberImportRow row) {
         validateMemberStatus(row.status());
-        Organization org = orgService.findById(orgId);
 
-        MembershipType type = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, row.membershipTypeName())
+        MembershipType type = typeRepo.findByNameIgnoreCase(row.membershipTypeName())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown membership type: " + row.membershipTypeName()));
 
         Person person = personService.findByEmailIfExists(row.email())
@@ -193,7 +184,7 @@ public class MembershipService {
                         .dateOfBirth(row.dateOfBirth())
                         .build()));
 
-        Optional<Member> existing = memberRepo.findByPersonIdAndOrgId(person.getId(), orgId);
+        Optional<Member> existing = memberRepo.findByPersonId(person.getId());
         if (existing.isPresent()) {
             Member member = existing.get();
             member.setMembershipType(type);
@@ -208,7 +199,6 @@ public class MembershipService {
 
         Member member = Member.builder()
                 .person(person)
-                .org(org)
                 .membershipType(type)
                 .memberNumber(row.memberNumber())
                 .joinDate(row.joinDate())
@@ -226,11 +216,11 @@ public class MembershipService {
         return paymentRepo.findByMemberId(memberId, pageable);
     }
 
-    public Page<MemberPayment> findPaymentsByOrg(UUID orgId, LocalDate fromDate, Pageable pageable) {
+    public Page<MemberPayment> findPayments(LocalDate fromDate, Pageable pageable) {
         if (fromDate == null) {
-            return paymentRepo.findByMemberOrgId(orgId, pageable);
+            return paymentRepo.findAll(pageable);
         }
-        return paymentRepo.findByMemberOrgIdAndPaymentDateGreaterThanEqual(orgId, fromDate, pageable);
+        return paymentRepo.findByPaymentDateGreaterThanEqual(fromDate, pageable);
     }
 
     public MemberPayment findPaymentById(UUID id) {
@@ -285,12 +275,10 @@ public class MembershipService {
      * silently skip seeding these. Idempotent per-row instead.
      */
     @Transactional
-    public void ensureZeffyTierTypesSeeded(UUID orgId) {
-        Organization org = orgService.findById(orgId);
+    public void ensureZeffyTierTypesSeeded() {
         for (String name : ZEFFY_TIER_TYPES) {
-            if (!typeRepo.existsByOrgIdAndNameIgnoreCase(orgId, name)) {
+            if (!typeRepo.existsByNameIgnoreCase(name)) {
                 typeRepo.save(MembershipType.builder()
-                        .org(org)
                         .name(name)
                         .canVote(!TierCalculator.FOLLOWER.equals(name))
                         .annualFee(BigDecimal.ZERO)
@@ -304,15 +292,15 @@ public class MembershipService {
     /**
      * Recomputes a member's tier (MembershipType), expiryDate, and status from their full
      * completed-payment history — see TierCalculator's class doc for the chaining rule. "inactive"
-     * now covers two distinct cases: (a) zero completed-payment history at all (unreachable via
-     * Zeffy import, but possible for a manually-created Member with no payments) — tier is left
-     * untouched in that case; (b) the member's last $150+ membership period has expired — tier is
-     * still updated to whatever that last period was (not reverted to Follower), only status flips.
+     * A Follower with no completed-payment history keeps the status assigned by staff or import.
+     * A non-Follower with no completed-payment history becomes inactive without changing tier. If
+     * the member's last $150+ membership period has expired, the tier remains whatever that last
+     * period was (rather than reverting to Follower) and only the status changes.
      */
     @Transactional
     public Member recomputeTier(UUID memberId) {
         Member member = findMemberById(memberId);
-        ensureZeffyTierTypesSeeded(member.getOrg().getId());
+        ensureZeffyTierTypesSeeded();
 
         List<TierCalculator.PaymentSnapshot> snapshots = paymentRepo
                 .findByMemberIdAndStatus(memberId, "completed").stream()
@@ -321,11 +309,13 @@ public class MembershipService {
         TierCalculator.TierResult result = TierCalculator.compute(snapshots);
 
         if (result == null) {
-            member.setStatus("inactive");
+            if (!TierCalculator.FOLLOWER.equalsIgnoreCase(member.getMembershipType().getName())) {
+                member.setStatus("inactive");
+            }
             return memberRepo.save(member);
         }
 
-        MembershipType tierType = typeRepo.findByOrgIdAndNameIgnoreCase(member.getOrg().getId(), result.tierName())
+        MembershipType tierType = typeRepo.findByNameIgnoreCase(result.tierName())
                 .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + result.tierName()));
         member.setMembershipType(tierType);
         member.setStatus(result.status());
@@ -333,8 +323,8 @@ public class MembershipService {
         return memberRepo.save(member);
     }
 
-    public boolean hasMembership(UUID personId, UUID orgId) {
-        return memberRepo.existsByPersonIdAndOrgId(personId, orgId);
+    public boolean hasMembership(UUID personId) {
+        return memberRepo.existsByPersonId(personId);
     }
 
     /**
@@ -351,8 +341,8 @@ public class MembershipService {
      * committed first, which can be wrong by however far out of order the import was.
      */
     @Transactional
-    public Member findOrCreateFollowerMember(UUID personId, UUID orgId, LocalDate transactionDate) {
-        return memberRepo.findByPersonIdAndOrgId(personId, orgId)
+    public Member findOrCreateFollowerMember(UUID personId, LocalDate transactionDate) {
+        return memberRepo.findByPersonId(personId)
                 .map(existing -> {
                     if (transactionDate != null && existing.getJoinDate() != null
                             && transactionDate.isBefore(existing.getJoinDate())) {
@@ -362,12 +352,11 @@ public class MembershipService {
                     return existing;
                 })
                 .orElseGet(() -> {
-                    ensureZeffyTierTypesSeeded(orgId);
-                    MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+                    ensureZeffyTierTypesSeeded();
+                    MembershipType follower = typeRepo.findByNameIgnoreCase(TierCalculator.FOLLOWER)
                             .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
                     return memberRepo.save(Member.builder()
                             .person(personService.findById(personId))
-                            .org(orgService.findById(orgId))
                             .membershipType(follower)
                             .joinDate(transactionDate)
                             .status("active")
@@ -385,13 +374,12 @@ public class MembershipService {
      * emailOptIn together — a person Zeffy reports as unsubscribed is neither.
      */
     @Transactional
-    public Member createFollowerMember(UUID personId, UUID orgId, boolean active) {
-        ensureZeffyTierTypesSeeded(orgId);
-        MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+    public Member createFollowerMember(UUID personId, boolean active) {
+        ensureZeffyTierTypesSeeded();
+        MembershipType follower = typeRepo.findByNameIgnoreCase(TierCalculator.FOLLOWER)
                 .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
         return memberRepo.save(Member.builder()
                 .person(personService.findById(personId))
-                .org(orgService.findById(orgId))
                 .membershipType(follower)
                 .joinDate(LocalDate.now())
                 .status(active ? "active" : "inactive")
@@ -401,8 +389,8 @@ public class MembershipService {
 
     /** Backs the manual "Recompute Tiers" action — tier can go stale purely from time passing. */
     @Transactional
-    public int recomputeAllTiersForOrg(UUID orgId) {
-        List<Member> members = memberRepo.findByOrgId(orgId, Pageable.unpaged()).getContent();
+    public int recomputeAllTiers() {
+        List<Member> members = memberRepo.findAll(Pageable.unpaged()).getContent();
         for (Member member : members) {
             recomputeTier(member.getId());
         }

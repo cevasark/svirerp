@@ -392,7 +392,7 @@ export class ProjectDetailComponent implements OnInit {
     const p = this.project();
     if (!p) return;
     this.dialog
-      .open(ProjectFormComponent, { width: '540px', data: { orgId: p.org.id, project: p } })
+      .open(ProjectFormComponent, { width: '540px', data: { project: p } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadProject(); });
   }

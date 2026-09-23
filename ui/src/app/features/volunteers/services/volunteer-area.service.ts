@@ -9,17 +9,17 @@ import { ENVIRONMENT } from '../../../core/tokens/environment.token';
 
 @Injectable({ providedIn: 'root' })
 export class VolunteerAreaService extends ResourceService<VolunteerArea> {
-  private orgScopedEnv = inject(ENVIRONMENT);
+  private apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('volunteer-areas');
   }
 
-  getPageForOrg(orgId: string, params: PageParams): Observable<Page<VolunteerArea>> {
+  override getPage(params: PageParams): Observable<Page<VolunteerArea>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) p = p.set('sort', params.sort);
     return this.http.get<Page<VolunteerArea>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/volunteer-areas`,
+      `${this.apiEnv.apiUrl}/volunteer-areas`,
       { params: p },
     );
   }

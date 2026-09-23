@@ -1,5 +1,5 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -7,10 +7,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MemberService } from '../../services/member.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { MemberImportResult } from '../../../../core/models/api.model';
-
-interface MemberImportDialogData {
-  orgId: string;
-}
 
 @Component({
   selector: 'app-member-import-dialog',
@@ -91,7 +87,6 @@ export class MemberImportDialogComponent {
   private memberService = inject(MemberService);
   private dialogRef = inject(MatDialogRef<MemberImportDialogComponent>);
   private notifications = inject(NotificationService);
-  private data = inject<MemberImportDialogData>(MAT_DIALOG_DATA);
 
   selectedFile = signal<File | null>(null);
   fileName = signal<string | null>(null);
@@ -112,7 +107,7 @@ export class MemberImportDialogComponent {
       return;
     }
     this.uploading.set(true);
-    this.memberService.importMembers(this.data.orgId, file).subscribe({
+    this.memberService.importMembers(file).subscribe({
       next: res => {
         this.uploading.set(false);
         this.result.set(res);

@@ -6,8 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -29,19 +27,18 @@ public class EventService {
     private final ChurchEventRepository churchRepo;
     private final EventRegistrationRepository registrationRepo;
     private final EventResourceRepository resourceRepo;
-    private final OrganizationService orgService;
     private final PersonService personService;
     private final GoogleCalendarService googleCalendarService;
 
     // ── CalendarEvent ─────────────────────────────────────────────────────────
 
-    public Page<CalendarEvent> findEventsByOrg(UUID orgId, Pageable pageable) {
-        return eventRepo.findByOrgId(orgId, pageable);
+    public Page<CalendarEvent> findEvents(Pageable pageable) {
+        return eventRepo.findAll(pageable);
     }
 
-    public Page<CalendarEvent> findEventsByOrgAndDateRange(UUID orgId, OffsetDateTime from,
+    public Page<CalendarEvent> findEventsByDateRange(OffsetDateTime from,
             OffsetDateTime to, Pageable pageable) {
-        return eventRepo.findByOrgIdAndStartDatetimeBetween(orgId, from, to, pageable);
+        return eventRepo.findByStartDatetimeBetween(from, to, pageable);
     }
 
     public CalendarEvent findEventById(UUID id) {
@@ -53,8 +50,6 @@ public class EventService {
     public CalendarEvent createEvent(CalendarEvent event) {
         validateEventStatus(event.getStatus());
         validateVisibility(event.getVisibility());
-        Organization org = orgService.findById(event.getOrg().getId());
-        event.setOrg(org);
         if (event.getCreatedBy() != null) {
             Person creator = personService.findById(event.getCreatedBy().getId());
             event.setCreatedBy(creator);

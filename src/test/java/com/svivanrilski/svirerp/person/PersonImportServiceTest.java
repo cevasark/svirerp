@@ -31,8 +31,6 @@ class PersonImportServiceTest {
     @InjectMocks
     private PersonImportService service;
 
-    private UUID orgId;
-
     private MockMultipartFile csvOf(String... dataRows) {
         String content = HEADER + "\n" + String.join("\n", dataRows) + "\n";
         return new MockMultipartFile("file", "contacts.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8));
@@ -43,17 +41,12 @@ class PersonImportServiceTest {
                 "62704", "USA", "IL", "555-0100", unsubscribed);
     }
 
-    @org.junit.jupiter.api.BeforeEach
-    void setUp() {
-        orgId = UUID.randomUUID();
-    }
-
     @Test
     void createdRow_incrementsCreatedCount() {
-        when(rowApplier.applyRow(any(), any())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
+        when(rowApplier.applyRow(any())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
 
         PersonImportService.PersonImportResult result =
-                service.importPeople(orgId, csvOf(row("Jane", "Doe", "jane@example.com", "No")));
+                service.importPeople(csvOf(row("Jane", "Doe", "jane@example.com", "No")));
 
         assertThat(result.created()).isEqualTo(1);
         assertThat(result.skippedExisting()).isZero();
@@ -62,10 +55,10 @@ class PersonImportServiceTest {
 
     @Test
     void existingRow_incrementsSkippedExistingCount() {
-        when(rowApplier.applyRow(any(), any())).thenReturn(PersonImportRowApplier.ApplyOutcome.SKIPPED_EXISTING);
+        when(rowApplier.applyRow(any())).thenReturn(PersonImportRowApplier.ApplyOutcome.SKIPPED_EXISTING);
 
         PersonImportService.PersonImportResult result =
-                service.importPeople(orgId, csvOf(row("Jane", "Doe", "jane@example.com", "No")));
+                service.importPeople(csvOf(row("Jane", "Doe", "jane@example.com", "No")));
 
         assertThat(result.created()).isZero();
         assertThat(result.skippedExisting()).isEqualTo(1);
@@ -73,9 +66,9 @@ class PersonImportServiceTest {
 
     @Test
     void missingRequiredField_goesToFailedList_withoutAbortingTheBatch() {
-        when(rowApplier.applyRow(any(), any())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
+        when(rowApplier.applyRow(any())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
 
-        PersonImportService.PersonImportResult result = service.importPeople(orgId, csvOf(
+        PersonImportService.PersonImportResult result = service.importPeople(csvOf(
                 row("", "Doe", "blank-first-name@example.com", "No"),
                 row("John", "Smith", "john@example.com", "No")));
 
@@ -89,9 +82,9 @@ class PersonImportServiceTest {
     @Test
     void unsubscribedColumn_isParsedCaseInsensitively() {
         ArgumentCaptor<PersonImportRow> rowCaptor = ArgumentCaptor.forClass(PersonImportRow.class);
-        when(rowApplier.applyRow(any(), rowCaptor.capture())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
+        when(rowApplier.applyRow(rowCaptor.capture())).thenReturn(PersonImportRowApplier.ApplyOutcome.CREATED);
 
-        service.importPeople(orgId, csvOf(row("Jane", "Doe", "jane@example.com", "YES")));
+        service.importPeople(csvOf(row("Jane", "Doe", "jane@example.com", "YES")));
 
         assertThat(rowCaptor.getValue().unsubscribed()).isTrue();
     }
@@ -102,6 +95,6 @@ class PersonImportServiceTest {
                 "Not,The,Right,Columns\na,b,c,d\n".getBytes(StandardCharsets.UTF_8));
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> service.importPeople(orgId, badFile));
+                () -> service.importPeople(badFile));
     }
 }

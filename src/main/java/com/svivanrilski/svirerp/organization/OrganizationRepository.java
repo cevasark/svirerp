@@ -9,5 +9,5 @@ import java.util.UUID;
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
 
-    Optional<Organization> findByTaxIdEin(String taxIdEin);
+    Optional<Organization> findFirstByOrderByCreatedAtAsc();
 }

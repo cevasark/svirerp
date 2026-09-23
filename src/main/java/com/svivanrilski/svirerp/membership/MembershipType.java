@@ -3,9 +3,7 @@ package com.svivanrilski.svirerp.membership;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -15,8 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "membership_type",
-    uniqueConstraints = @UniqueConstraint(name = "uq_membership_type_name_org",
-        columnNames = {"org_id", "name"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_membership_type_name", columnNames = "name")
 )
 @Getter
 @Setter
@@ -29,11 +26,6 @@ public class MembershipType {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotBlank
     @Column(nullable = false, length = 100)

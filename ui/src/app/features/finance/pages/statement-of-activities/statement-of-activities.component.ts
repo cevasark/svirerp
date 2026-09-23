@@ -9,7 +9,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { FinanceReportService } from '../../services/finance-report.service';
 import { FundService } from '../../services/fund.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Fund, StatementOfActivities } from '../../../../core/models/domain.model';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
@@ -139,10 +138,8 @@ function firstOfMonth(date: Date): string {
 export class StatementOfActivitiesComponent implements OnInit {
   private reportService = inject(FinanceReportService);
   private fundService = inject(FundService);
-  private orgContext = inject(OrgContextService);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   readonly columns = ['label', 'amount'];
 
   from = firstOfMonth(new Date());
@@ -157,23 +154,16 @@ export class StatementOfActivitiesComponent implements OnInit {
   expenseRows = signal<DisplayRow[]>([]);
 
   ngOnInit(): void {
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.fundService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
-          this.funds.set(page.content);
-        });
-        this.load();
-      },
-      error: () => this.notifications.error('No organization found — create one first, under Organizations.'),
+    this.fundService.getPage({ page: 0, size: 100 }).subscribe(page => {
+      this.funds.set(page.content);
     });
+    this.load();
   }
 
   load(): void {
-    if (!this.orgId) return;
     this.loading.set(true);
     this.reportService
-      .statementOfActivities(this.orgId, this.from, this.to, this.fundId ?? undefined)
+      .statementOfActivities(this.from, this.to, this.fundId ?? undefined)
       .subscribe({
         next: r => {
           this.report.set(r);

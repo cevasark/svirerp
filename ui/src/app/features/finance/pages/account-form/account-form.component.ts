@@ -13,7 +13,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { Account } from '../../../../core/models/domain.model';
 
 interface AccountDialogData {
-  orgId: string;
   account: Account | null;
 }
 
@@ -105,7 +104,6 @@ export class AccountFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<AccountDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private account = this.data.account;
   isEdit = !!this.account;
   saving = signal(false);
@@ -138,7 +136,6 @@ export class AccountFormComponent implements OnInit {
     this.saving.set(true);
     const value = this.form.getRawValue();
     const payload = {
-      org: { id: this.orgId },
       accountNumber: value.accountNumber,
       accountName: value.accountName,
       accountType: value.accountType,

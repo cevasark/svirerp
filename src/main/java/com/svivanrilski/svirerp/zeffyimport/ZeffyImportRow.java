@@ -7,7 +7,6 @@ import com.svivanrilski.svirerp.finance.Fund;
 import com.svivanrilski.svirerp.finance.JournalEntry;
 import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 
 import java.math.BigDecimal;
@@ -37,11 +36,6 @@ public class ZeffyImportRow {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id", nullable = false)
     private ZeffyImportBatch batch;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     // Column is "csv_row_number", not "row_number" — ROW_NUMBER is a reserved MariaDB 10.2+ keyword.
     @Column(name = "csv_row_number", nullable = false)

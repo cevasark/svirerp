@@ -17,17 +17,17 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, UU
     // controller layer serializes the response, so the lazy `org`/`createdBy`
     // associations must be eagerly fetched here or Jackson hits a
     // LazyInitializationException.
-    @EntityGraph(attributePaths = {"org", "createdBy"})
+    @EntityGraph(attributePaths = {"createdBy"})
     @Override
     Optional<CalendarEvent> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "createdBy"})
-    Page<CalendarEvent> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"createdBy"})
+    Page<CalendarEvent> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "createdBy"})
-    Page<CalendarEvent> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
+    @EntityGraph(attributePaths = {"createdBy"})
+    Page<CalendarEvent> findByStatus(String status, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "createdBy"})
-    Page<CalendarEvent> findByOrgIdAndStartDatetimeBetween(UUID orgId, OffsetDateTime from,
+    @EntityGraph(attributePaths = {"createdBy"})
+    Page<CalendarEvent> findByStartDatetimeBetween(OffsetDateTime from,
             OffsetDateTime to, Pageable pageable);
 }

@@ -18,7 +18,7 @@ import { PersonFormComponent } from '../../../persons/pages/person-form/person-f
 import { VolunteerService } from '../../services/volunteer.service';
 import { VolunteerAreaService } from '../../services/volunteer-area.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Person, Volunteer, VolunteerArea, Organization } from '../../../../core/models/domain.model';
+import { Person, Volunteer, VolunteerArea } from '../../../../core/models/domain.model';
 import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
 
 function personLabel(p: Person): string {
@@ -26,7 +26,6 @@ function personLabel(p: Person): string {
 }
 
 export interface VolunteerFormData {
-  orgId: string;
   entity: Volunteer | null;
 }
 
@@ -161,7 +160,6 @@ export class VolunteerFormComponent implements OnInit {
   private notifications = inject(NotificationService);
 
   data = inject<VolunteerFormData>(MAT_DIALOG_DATA);
-  orgId = this.data.orgId;
   entity = this.data.entity;
 
   isEdit = !!this.entity;
@@ -188,7 +186,7 @@ export class VolunteerFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.areaService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.areaService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.areas.set(page.content);
     });
 
@@ -236,7 +234,7 @@ export class VolunteerFormComponent implements OnInit {
     if (!name) return;
     this.addingArea.set(true);
     this.areaService
-      .create({ org: { id: this.orgId } as Organization, name })
+      .create({ name })
       .subscribe({
         next: created => {
           this.areas.update(list => [...list, created]);
@@ -258,7 +256,6 @@ export class VolunteerFormComponent implements OnInit {
     // Backend only reads .getId() off nested relations on write, never the full object.
     const payload: Partial<Volunteer> = {
       person: { id: raw.personId } as Person,
-      org: { id: this.orgId } as Organization,
       contactPerson: raw.contactPersonId ? ({ id: raw.contactPersonId } as Person) : undefined,
       onboardDate: raw.onboardDate,
       isActive: raw.isActive,

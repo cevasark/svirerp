@@ -10,7 +10,5 @@ import java.util.UUID;
 @Repository
 public interface CommitteeRepository extends JpaRepository<Committee, UUID> {
 
-    Page<Committee> findByOrgId(UUID orgId, Pageable pageable);
-
-    Page<Committee> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+    Page<Committee> findByIsActive(boolean isActive, Pageable pageable);
 }

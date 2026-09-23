@@ -9,8 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import com.svivanrilski.svirerp.finance.FinanceService;
 import com.svivanrilski.svirerp.membership.MembershipService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.nio.charset.StandardCharsets;
@@ -44,7 +42,6 @@ class ZeffyImportServiceTest {
     @Mock private ZeffyImportRowRepository rowRepo;
     @Mock private ZeffyCampaignMappingRepository mappingRepo;
     @Mock private ZeffyImportRowApplier rowApplier;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
     @Mock private MembershipService membershipService;
     @Mock private FinanceService financeService;
@@ -52,14 +49,8 @@ class ZeffyImportServiceTest {
     @InjectMocks
     private ZeffyImportService service;
 
-    private UUID orgId;
-
     @BeforeEach
     void setUp() {
-        orgId = UUID.randomUUID();
-        Organization org = new Organization();
-        org.setId(orgId);
-        lenient().when(orgService.findById(orgId)).thenReturn(org);
         lenient().when(batchRepo.save(any(ZeffyImportBatch.class))).thenAnswer(inv -> {
             ZeffyImportBatch batch = inv.getArgument(0);
             if (batch.getId() == null) batch.setId(UUID.randomUUID());
@@ -67,7 +58,7 @@ class ZeffyImportServiceTest {
         });
         lenient().when(rowRepo.save(any(ZeffyImportRow.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(personService.findByEmailIfExists(anyString())).thenReturn(Optional.empty());
-        lenient().when(mappingRepo.findByOrgIdAndCampaignTitleIgnoreCase(any(), anyString())).thenReturn(Optional.empty());
+        lenient().when(mappingRepo.findByCampaignTitleIgnoreCase(anyString())).thenReturn(Optional.empty());
     }
 
     private MockMultipartFile csvOf(String... dataRows) {
@@ -83,14 +74,14 @@ class ZeffyImportServiceTest {
 
     @Test
     void ready_row_gets_dedupeKey_equal_to_transactionId() {
-        ZeffyImportBatch batch = service.previewImport(orgId, csvOf(row("txn_1", "100", "Donation", "a@example.com")));
+        ZeffyImportBatch batch = service.previewImport(csvOf(row("txn_1", "100", "Donation", "a@example.com")));
 
         assertThat(batch.getRowCount()).isEqualTo(1);
     }
 
     @Test
     void duplicate_transactionId_within_same_batch_is_flagged() {
-        service.previewImport(orgId, csvOf(
+        service.previewImport(csvOf(
                 row("txn_1", "100", "Donation", "a@example.com"),
                 row("txn_1", "100", "Donation", "a@example.com")));
 
@@ -105,9 +96,9 @@ class ZeffyImportServiceTest {
 
     @Test
     void previously_committed_transactionId_is_flagged_duplicate() {
-        when(rowRepo.existsByOrgIdAndDedupeKeyAndOutcome(orgId, "txn_1", "committed")).thenReturn(true);
+        when(rowRepo.existsByDedupeKeyAndOutcome("txn_1", "committed")).thenReturn(true);
 
-        service.previewImport(orgId, csvOf(row("txn_1", "100", "Donation", "a@example.com")));
+        service.previewImport(csvOf(row("txn_1", "100", "Donation", "a@example.com")));
 
         var captor = org.mockito.ArgumentCaptor.forClass(ZeffyImportRow.class);
         org.mockito.Mockito.verify(rowRepo).save(captor.capture());
@@ -116,7 +107,7 @@ class ZeffyImportServiceTest {
 
     @Test
     void unrecognized_category_is_an_error() {
-        service.previewImport(orgId, csvOf(row("txn_1", "100", "Refund", "a@example.com")));
+        service.previewImport(csvOf(row("txn_1", "100", "Refund", "a@example.com")));
 
         var captor = org.mockito.ArgumentCaptor.forClass(ZeffyImportRow.class);
         org.mockito.Mockito.verify(rowRepo).save(captor.capture());
@@ -126,7 +117,7 @@ class ZeffyImportServiceTest {
 
     @Test
     void negative_amount_is_an_error() {
-        service.previewImport(orgId, csvOf(row("txn_1", "-10", "Donation", "a@example.com")));
+        service.previewImport(csvOf(row("txn_1", "-10", "Donation", "a@example.com")));
 
         var captor = org.mockito.ArgumentCaptor.forClass(ZeffyImportRow.class);
         org.mockito.Mockito.verify(rowRepo).save(captor.capture());
@@ -135,7 +126,7 @@ class ZeffyImportServiceTest {
 
     @Test
     void missing_transactionId_is_an_error() {
-        service.previewImport(orgId, csvOf(row("", "10", "Donation", "a@example.com")));
+        service.previewImport(csvOf(row("", "10", "Donation", "a@example.com")));
 
         var captor = org.mockito.ArgumentCaptor.forClass(ZeffyImportRow.class);
         org.mockito.Mockito.verify(rowRepo).save(captor.capture());
@@ -152,7 +143,7 @@ class ZeffyImportServiceTest {
         MockMultipartFile file = new MockMultipartFile("file", "payments.csv", "text/csv",
                 (paymentsHeader + "\n").getBytes(StandardCharsets.UTF_8));
 
-        assertThatThrownBy(() -> service.previewImport(orgId, file))
+        assertThatThrownBy(() -> service.previewImport(file))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Transactions export");
     }
@@ -163,8 +154,8 @@ class ZeffyImportServiceTest {
         donationAccount.setId(UUID.randomUUID());
         com.svivanrilski.svirerp.finance.Account ticketAccount = new com.svivanrilski.svirerp.finance.Account();
         ticketAccount.setId(UUID.randomUUID());
-        when(financeService.findAccountByNumber(orgId, "4010")).thenReturn(donationAccount);
-        when(financeService.findAccountByNumber(orgId, "4030")).thenReturn(ticketAccount);
+        when(financeService.findAccountByNumber("4010")).thenReturn(donationAccount);
+        when(financeService.findAccountByNumber("4030")).thenReturn(ticketAccount);
 
         com.svivanrilski.svirerp.person.Person newPersonAlready = com.svivanrilski.svirerp.person.Person.builder()
                 .id(UUID.randomUUID()).build();
@@ -172,12 +163,12 @@ class ZeffyImportServiceTest {
                 .id(UUID.randomUUID()).build();
         ZeffyImportRow row1 = ZeffyImportRow.builder().id(UUID.randomUUID()).person(newPersonAlready).build();
         ZeffyImportRow row2 = ZeffyImportRow.builder().id(UUID.randomUUID()).person(alreadyMemberPerson).build();
-        when(rowRepo.findCommittedTicketRowsNeedingMembershipReprocess(orgId)).thenReturn(List.of(row1, row2));
+        when(rowRepo.findCommittedTicketRowsNeedingMembershipReprocess()).thenReturn(List.of(row1, row2));
 
-        when(membershipService.hasMembership(newPersonAlready.getId(), orgId)).thenReturn(false);
-        when(membershipService.hasMembership(alreadyMemberPerson.getId(), orgId)).thenReturn(true);
+        when(membershipService.hasMembership(newPersonAlready.getId())).thenReturn(false);
+        when(membershipService.hasMembership(alreadyMemberPerson.getId())).thenReturn(true);
 
-        ZeffyImportService.ReprocessMembershipResult result = service.reprocessMembershipRows(orgId);
+        ZeffyImportService.ReprocessMembershipResult result = service.reprocessMembershipRows();
 
         assertThat(result.rowsProcessed()).isEqualTo(2);
         assertThat(result.membersCreated()).isEqualTo(1);

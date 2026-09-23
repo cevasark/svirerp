@@ -15,22 +15,21 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the controller layer
     // serializes the response, so lazy associations must be eagerly fetched here.
-    @EntityGraph(attributePaths = {"org", "parentAccount"})
+    @EntityGraph(attributePaths = {"parentAccount"})
     @Override
     Optional<Account> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "parentAccount"})
-    Page<Account> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"parentAccount"})
+    Page<Account> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "parentAccount"})
-    Page<Account> findByOrgIdAndAccountType(UUID orgId, String accountType, Pageable pageable);
+    @EntityGraph(attributePaths = {"parentAccount"})
+    Page<Account> findByAccountType(String accountType, Pageable pageable);
 
     /** Returns root accounts (no parent) for a given org — used to build the account tree. */
-    @EntityGraph(attributePaths = {"org"})
-    List<Account> findByOrgIdAndParentAccountIsNull(UUID orgId);
+    List<Account> findByParentAccountIsNull();
 
-    boolean existsByOrgIdAndAccountNumber(UUID orgId, String accountNumber);
+    boolean existsByAccountNumber(String accountNumber);
 
-    @EntityGraph(attributePaths = {"org", "parentAccount"})
-    Optional<Account> findByOrgIdAndAccountNumber(UUID orgId, String accountNumber);
+    @EntityGraph(attributePaths = {"parentAccount"})
+    Optional<Account> findByAccountNumber(String accountNumber);
 }

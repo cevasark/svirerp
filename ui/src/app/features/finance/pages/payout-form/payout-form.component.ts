@@ -17,7 +17,6 @@ function toIsoDate(date: Date): string {
 }
 
 interface PayoutDialogData {
-  orgId: string;
 }
 
 /**
@@ -107,7 +106,6 @@ export class PayoutFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<PayoutDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   saving = signal(false);
 
   accounts = signal<Account[]>([]);
@@ -125,7 +123,7 @@ export class PayoutFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.accountService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.accountService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.accounts.set(page.content);
     });
   }
@@ -145,7 +143,7 @@ export class PayoutFormComponent implements OnInit {
       toAccountId: this.checkingAccountId(),
     };
 
-    this.transactionService.recordTransfer(this.orgId, request).subscribe({
+    this.transactionService.recordTransfer(request).subscribe({
       next: () => {
         this.notifications.success('Payout recorded.');
         this.dialogRef.close(true);
