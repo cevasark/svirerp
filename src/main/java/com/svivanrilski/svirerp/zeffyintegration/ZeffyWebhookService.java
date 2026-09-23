@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.OffsetDateTime;
@@ -38,6 +39,7 @@ public class ZeffyWebhookService {
     private final ZeffyWebhookEventStore eventStore;
     private final ZeffyWebhookEventRepository eventRepository;
     private final ObjectMapper objectMapper;
+    private final ZeffyPaymentProcessingCoordinator processingCoordinator;
 
     public ReceiptResponse receive(byte[] rawBody, String signatureHeader) {
         String mode = settingService.getDecryptedValue(MODE).orElse("DISABLED");
@@ -72,6 +74,13 @@ public class ZeffyWebhookService {
 
         try {
             ZeffyWebhookEvent inserted = eventStore.insert(event);
+            if ("LIVE".equalsIgnoreCase(mode) && supported
+                    && "payment.completed".equals(envelope.type())) {
+                processingCoordinator.process(inserted.getId());
+                String finalStatus = eventRepository.findById(inserted.getId())
+                        .map(ZeffyWebhookEvent::getStatus).orElse(inserted.getStatus());
+                return new ReceiptResponse(inserted.getId(), finalStatus, false);
+            }
             return new ReceiptResponse(inserted.getId(), inserted.getStatus(), false);
         } catch (DataIntegrityViolationException duplicateOrConstraintFailure) {
             try {
@@ -111,6 +120,17 @@ public class ZeffyWebhookService {
                     cb.lessThanOrEqualTo(root.get("receivedAt"), receivedTo));
         }
         return eventRepository.findAll(spec, pageable).map(this::toResponse);
+    }
+
+    public EventResponse reprocess(UUID eventId) {
+        String mode = settingService.getDecryptedValue(MODE).orElse("DISABLED");
+        if (!"LIVE".equalsIgnoreCase(mode)) {
+            throw new IllegalArgumentException("Zeffy payment reprocessing requires LIVE mode");
+        }
+        processingCoordinator.process(eventId);
+        ZeffyWebhookEvent event = eventRepository.findDetailedById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
+        return toResponse(event);
     }
 
     private Envelope parseEnvelope(byte[] rawBody) {
@@ -169,12 +189,31 @@ public class ZeffyWebhookService {
     }
 
     private EventResponse toResponse(ZeffyWebhookEvent event) {
+        ZeffyPayment payment = event.getZeffyPayment();
         return new EventResponse(event.getId(), event.getZeffyEventId(), event.getEventType(),
                 event.getSchemaVersion(), event.getResourceType(), event.getZeffyResourceId(),
                 event.getStatus(), event.getDeliveryCount(), text(event.getDispatchedAt()),
                 text(event.getReceivedAt()), text(event.getLastReceivedAt()),
                 event.getProcessingAttemptCount(), text(event.getLastAttemptedAt()),
-                text(event.getProcessedAt()), event.getErrorSummary());
+                text(event.getProcessedAt()), event.getErrorSummary(),
+                payment == null ? null : payment.getId(),
+                payment == null ? null : payment.getStatus(),
+                payment == null ? null : payment.getAmount(),
+                payment == null ? null : payment.getEligibleAmount(),
+                payment == null ? null : payment.getCurrency(),
+                payment == null ? null : text(payment.getPaymentCreatedAt()),
+                payment == null ? null : payment.getCampaignId(),
+                payment == null ? null : payment.getCampaignTitle(),
+                payment == null ? null : payment.getMappingAction(),
+                payment == null || payment.getMappedFund() == null ? null : payment.getMappedFund().getFundName(),
+                payment == null || payment.getMappedAccount() == null ? null
+                        : payment.getMappedAccount().getAccountNumber() + " " + payment.getMappedAccount().getAccountName(),
+                payment != null && Boolean.TRUE.equals(payment.getMembershipCredit()),
+                payment == null ? null : payment.getBuyerEmail(),
+                payment == null || payment.getPerson() == null ? null : payment.getPerson().getId(),
+                payment == null || payment.getMember() == null ? null : payment.getMember().getId(),
+                payment == null || payment.getMemberPayment() == null ? null : payment.getMemberPayment().getId(),
+                payment == null || payment.getJournalEntry() == null ? null : payment.getJournalEntry().getId());
     }
 
     private String text(OffsetDateTime value) {
@@ -200,6 +239,12 @@ public class ZeffyWebhookService {
                                 String resourceType, String zeffyResourceId, String status,
                                 int deliveryCount, String dispatchedAt, String receivedAt,
                                 String lastReceivedAt, int processingAttemptCount,
-                                String lastAttemptedAt, String processedAt, String errorSummary) {
+                                String lastAttemptedAt, String processedAt, String errorSummary,
+                                UUID paymentRecordId, String paymentStatus, BigDecimal amount,
+                                BigDecimal eligibleAmount, String currency, String paymentCreatedAt,
+                                String campaignId, String campaignTitle, String mappingAction,
+                                String mappedFund, String mappedAccount, boolean membershipCredit,
+                                String buyerEmail, UUID personId, UUID memberId,
+                                UUID memberPaymentId, UUID journalEntryId) {
     }
 }

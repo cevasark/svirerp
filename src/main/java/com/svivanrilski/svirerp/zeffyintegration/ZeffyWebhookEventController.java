@@ -9,8 +9,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/zeffy-webhook-events")
@@ -31,5 +34,10 @@ public class ZeffyWebhookEventController {
             @PageableDefault(sort = "receivedAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
             Pageable pageable) {
         return service.findEvents(eventType, status, resourceId, receivedFrom, receivedTo, pageable);
+    }
+
+    @PostMapping("/{id}/reprocess")
+    public ZeffyWebhookService.EventResponse reprocess(@PathVariable UUID id) {
+        return service.reprocess(id);
     }
 }

@@ -85,7 +85,7 @@ export interface ZeffyConfigurationRequest {
   apiKey?: string;
   webhookSigningSecret?: string;
   validateApiKey: boolean;
-  integrationMode?: 'DISABLED' | 'RECORD_ONLY';
+  integrationMode?: 'DISABLED' | 'RECORD_ONLY' | 'LIVE';
 }
 
 export interface ZeffyWebhookEventFilters {

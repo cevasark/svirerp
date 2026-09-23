@@ -57,6 +57,13 @@ public class PersonService {
         return repo.findByEmail(email);
     }
 
+    /** Returns every trim/case-insensitive email match so integration flows can refuse an
+     * ambiguous identity rather than silently choosing one person. */
+    public List<Person> findByNormalizedEmail(String email) {
+        if (email == null || email.isBlank()) return List.of();
+        return repo.findAllByNormalizedEmail(email.trim());
+    }
+
     @Transactional
     public Person create(Person person) {
         if (person.getEmail() != null && repo.existsByEmail(person.getEmail())) {
@@ -73,13 +80,17 @@ public class PersonService {
     @Transactional
     public Person fillBlankFields(UUID id, Person source) {
         Person existing = findById(id);
-        if (existing.getPhone() == null) existing.setPhone(source.getPhone());
-        if (existing.getAddressLine1() == null) existing.setAddressLine1(source.getAddressLine1());
-        if (existing.getCity() == null) existing.setCity(source.getCity());
-        if (existing.getState() == null) existing.setState(source.getState());
-        if (existing.getZip() == null) existing.setZip(source.getZip());
+        if (isBlank(existing.getPhone())) existing.setPhone(source.getPhone());
+        if (isBlank(existing.getAddressLine1())) existing.setAddressLine1(source.getAddressLine1());
+        if (isBlank(existing.getCity())) existing.setCity(source.getCity());
+        if (isBlank(existing.getState())) existing.setState(source.getState());
+        if (isBlank(existing.getZip())) existing.setZip(source.getZip());
         if (existing.getDateOfBirth() == null) existing.setDateOfBirth(source.getDateOfBirth());
         return repo.save(existing);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     @Transactional

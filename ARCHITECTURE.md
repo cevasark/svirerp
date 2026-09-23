@@ -46,7 +46,7 @@ Once authenticated via either method, a user has the same full API access — au
 
 ### Signed webhook ingress
 
-Only the exact `/api/webhooks/stripe` and `/api/webhooks/zeffy` routes bypass session authentication and CSRF. Each provider authenticates its own raw request body with a signing-secret header; other `/api/webhooks/**` paths remain behind the normal session gate. Zeffy Phase 2 separates receipt from future business processing: it verifies `Zeffy-Signature`, durably stores the original payload in `zeffy_webhook_event`, and acknowledges the delivery. Authenticated Finance APIs expose normalized audit fields but never the raw donor payload.
+Only the exact `/api/webhooks/stripe` and `/api/webhooks/zeffy` routes bypass session authentication and CSRF. Each provider authenticates its own raw request body with a signing-secret header; other `/api/webhooks/**` paths remain behind the normal session gate. Zeffy separates durable receipt from business processing: it verifies `Zeffy-Signature` and commits the original payload to `zeffy_webhook_event` before LIVE processing starts. `zeffy_payment` is the payment-ID idempotency boundary shared with the future historical sync. Applying a payment locks the integration rows and commits Person, membership, tier, journal, and integration links in one transaction; blocked mappings/data update the integration outcome without partial domain writes. Authenticated Finance APIs expose normalized audit fields but never the raw donor payload.
 
 ### Backend third-party dependencies
 

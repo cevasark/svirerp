@@ -8,7 +8,8 @@ import { MatSelectModule } from '@angular/material/select';
 
 import { DEFAULT_PAGE_PARAMS, Page, PageParams, ZeffyWebhookEventFilters } from '../../../../core/models/api.model';
 import { ZeffyWebhookEvent } from '../../../../core/models/domain.model';
-import { DataTableComponent, TableColumn } from '../../../../shared/components/data-table/data-table.component';
+import { NotificationService } from '../../../../core/services/notification.service';
+import { DataTableComponent, TableAction, TableColumn } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ZeffyIntegrationService } from '../../services/zeffy-integration.service';
 
@@ -40,7 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
     <div class="page-container">
       <app-page-header
         title="Zeffy Webhook Events"
-        subtitle="Signed Zeffy deliveries recorded for review; Phase 2 does not create business records" />
+        subtitle="Signed Zeffy deliveries and their payment-processing outcomes" />
 
       <div class="filters">
         <mat-form-field appearance="outline">
@@ -86,6 +87,7 @@ const STATUS_LABELS: Record<string, string> = {
 
       <app-data-table
         [columns]="columns"
+        [actions]="actions"
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
@@ -107,6 +109,7 @@ const STATUS_LABELS: Record<string, string> = {
 })
 export class ZeffyWebhookEventListComponent implements OnInit {
   private readonly service = inject(ZeffyIntegrationService);
+  private readonly notifications = inject(NotificationService);
 
   readonly eventTypes = [
     'payment.completed', 'payment.created', 'payment.updated', 'payment.deleted',
@@ -131,10 +134,22 @@ export class ZeffyWebhookEventListComponent implements OnInit {
       cell: (event: ZeffyWebhookEvent) => new Date(event.receivedAt).toLocaleString(),
     },
     { key: 'eventType', header: 'Event', sortable: true },
-    { key: 'resourceType', header: 'Resource', type: 'status' },
     {
-      key: 'zeffyResourceId', header: 'Payment / Contact ID',
+      key: 'zeffyResourceId', header: 'Payment / Contact ID', type: 'text',
       cell: (event: ZeffyWebhookEvent) => event.zeffyResourceId ?? '-',
+    },
+    {
+      key: 'amount', header: 'Amount', type: 'number',
+      cell: (event: ZeffyWebhookEvent) => event.amount == null
+        ? '-' : `${event.currency ?? ''} ${event.amount.toFixed(2)}`.trim(),
+    },
+    {
+      key: 'campaignTitle', header: 'Campaign',
+      cell: (event: ZeffyWebhookEvent) => event.campaignTitle ?? event.campaignId ?? '-',
+    },
+    {
+      key: 'mapping', header: 'Mapping',
+      cell: (event: ZeffyWebhookEvent) => this.mappingDetail(event),
     },
     {
       key: 'status', header: 'Status', type: 'status', sortable: true,
@@ -145,6 +160,20 @@ export class ZeffyWebhookEventListComponent implements OnInit {
       key: 'detail', header: 'Detail',
       cell: (event: ZeffyWebhookEvent) => event.errorSummary ??
         (event.status === 'RECEIVED' ? 'Recorded only' : '-'),
+    },
+    {
+      key: 'records', header: 'Local records',
+      cell: (event: ZeffyWebhookEvent) => this.localRecords(event),
+    },
+  ];
+
+  readonly actions: TableAction[] = [
+    {
+      icon: 'replay',
+      label: 'Reprocess completed payment',
+      disabled: (event: ZeffyWebhookEvent) => event.eventType !== 'payment.completed'
+        || ['PROCESSED', 'IGNORED', 'UNSUPPORTED', 'PROCESSING'].includes(event.status),
+      action: (event: ZeffyWebhookEvent) => this.reprocess(event),
     },
   ];
 
@@ -187,6 +216,36 @@ export class ZeffyWebhookEventListComponent implements OnInit {
 
   statusLabel(status: string): string {
     return STATUS_LABELS[status] ?? status;
+  }
+
+  mappingDetail(event: ZeffyWebhookEvent): string {
+    if (!event.mappingAction) return '-';
+    if (event.mappingAction === 'IGNORE') return 'Ignore';
+    const membership = event.membershipCredit ? '; membership credit' : '';
+    return `${event.mappedFund ?? 'No fund'} / ${event.mappedAccount ?? 'No account'}${membership}`;
+  }
+
+  localRecords(event: ZeffyWebhookEvent): string {
+    const records = [
+      event.personId ? `Person ${event.personId}` : null,
+      event.memberId ? `Member ${event.memberId}` : null,
+      event.memberPaymentId ? `Contribution ${event.memberPaymentId}` : null,
+      event.journalEntryId ? `Journal ${event.journalEntryId}` : null,
+    ].filter(Boolean);
+    return records.length ? records.join('; ') : '-';
+  }
+
+  reprocess(event: ZeffyWebhookEvent): void {
+    this.service.reprocessWebhookEvent(event.id).subscribe({
+      next: updated => {
+        if (updated.status === 'PROCESSED' || updated.status === 'IGNORED') {
+          this.notifications.success(`Zeffy event is now ${this.statusLabel(updated.status).toLowerCase()}.`);
+        } else {
+          this.notifications.error(updated.errorSummary ?? `Event remains ${this.statusLabel(updated.status)}.`);
+        }
+        this.load();
+      },
+    });
   }
 
   private load(): void {

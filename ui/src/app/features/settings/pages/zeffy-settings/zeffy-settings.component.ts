@@ -72,11 +72,12 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
             <mat-select [(ngModel)]="modeDraft">
               <mat-option value="DISABLED">Disabled</mat-option>
               <mat-option value="RECORD_ONLY">Record only</mat-option>
+              <mat-option value="LIVE">Live</mat-option>
             </mat-select>
           </mat-form-field>
           <p class="hint">
-            Record only verifies and stores webhook events without creating people, membership,
-            contribution, or accounting records. Live processing becomes available in Phase 3.
+            Record only verifies and stores events. Live applies completed payments using confirmed
+            campaign mappings and can create people, membership contributions, and journal entries.
           </p>
 
           <div class="button-row">
@@ -172,7 +173,7 @@ export class ZeffySettingsComponent implements OnInit {
   apiKeyDraft = '';
   webhookSecretDraft = '';
   validateApiKey = true;
-  modeDraft: 'DISABLED' | 'RECORD_ONLY' = 'DISABLED';
+  modeDraft: 'DISABLED' | 'RECORD_ONLY' | 'LIVE' = 'DISABLED';
 
   readonly runColumns: TableColumn[] = [
     { key: 'startedAt', header: 'Started', type: 'date', cell: (r: ZeffySyncRun) => this.displayDate(r.startedAt) },
@@ -201,7 +202,7 @@ export class ZeffySettingsComponent implements OnInit {
         this.apiKeyDraft = '';
         this.webhookSecretDraft = '';
         this.saving.set(false);
-        this.modeDraft = status.integrationMode === 'RECORD_ONLY' ? 'RECORD_ONLY' : 'DISABLED';
+        this.modeDraft = status.integrationMode;
         this.notifications.success('Zeffy configuration saved.');
       },
       error: () => this.saving.set(false),
@@ -275,7 +276,7 @@ export class ZeffySettingsComponent implements OnInit {
   private loadStatus(): void {
     this.service.getStatus().subscribe(status => {
       this.status.set(status);
-      this.modeDraft = status.integrationMode === 'RECORD_ONLY' ? 'RECORD_ONLY' : 'DISABLED';
+      this.modeDraft = status.integrationMode;
     });
   }
 

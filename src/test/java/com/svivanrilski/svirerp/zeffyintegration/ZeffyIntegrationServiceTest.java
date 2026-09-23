@@ -74,6 +74,36 @@ class ZeffyIntegrationServiceTest {
     }
 
     @Test
+    void liveModeRequiresSynchronizedAndConfirmedCampaigns() {
+        when(settings.hasValue("zeffy.api-key")).thenReturn(true);
+        when(settings.hasValue("zeffy.webhook-signing-secret")).thenReturn(true);
+        when(campaigns.count()).thenReturn(2L);
+        when(campaigns.countByMappingConfirmedFalseAndStatusIgnoreCaseAndIsArchivedFalseAndZeffyDeletedAtIsNull("active"))
+                .thenReturn(1L);
+
+        assertThatThrownBy(() -> service.saveConfiguration(
+                new ZeffyIntegrationService.ConfigurationRequest(null, null, false, "LIVE")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Confirm every current");
+
+        verify(settings, never()).updateValue("zeffy.integration-mode", "LIVE");
+    }
+
+    @Test
+    void liveModeTestsConnectionBeforeSavingMode() {
+        when(settings.hasValue("zeffy.api-key")).thenReturn(true);
+        when(settings.hasValue("zeffy.webhook-signing-secret")).thenReturn(true);
+        when(campaigns.count()).thenReturn(2L);
+
+        service.saveConfiguration(
+                new ZeffyIntegrationService.ConfigurationRequest(null, null, false, "LIVE"));
+
+        InOrder order = inOrder(apiClient, settings);
+        order.verify(apiClient).testConnection();
+        order.verify(settings).updateValue("zeffy.integration-mode", "LIVE");
+    }
+
+    @Test
     void failedCampaignSyncIsRecordedBeforeErrorIsRethrown() {
         ZeffySyncRun run = ZeffySyncRun.builder().id(UUID.randomUUID()).build();
         when(runs.start("CAMPAIGNS", "MANUAL", "admin@example.com")).thenReturn(run);

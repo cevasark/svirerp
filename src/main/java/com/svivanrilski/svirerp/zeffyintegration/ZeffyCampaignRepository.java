@@ -25,4 +25,6 @@ public interface ZeffyCampaignRepository extends JpaRepository<ZeffyCampaign, UU
     Optional<ZeffyCampaign> findWithMappingByZeffyCampaignId(@Param("campaignId") String campaignId);
 
     long countByMappingConfirmedTrue();
+
+    long countByMappingConfirmedFalseAndStatusIgnoreCaseAndIsArchivedFalseAndZeffyDeletedAtIsNull(String status);
 }

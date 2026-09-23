@@ -130,15 +130,33 @@ public class ZeffyIntegrationService {
         String mode = trimToNull(request.integrationMode());
         if (mode != null) {
             mode = mode.toUpperCase(Locale.ROOT);
-            if (!"DISABLED".equals(mode) && !"RECORD_ONLY".equals(mode)) {
-                throw new IllegalArgumentException("Zeffy integration mode must be DISABLED or RECORD_ONLY in Phase 2");
+            if (!"DISABLED".equals(mode) && !"RECORD_ONLY".equals(mode) && !"LIVE".equals(mode)) {
+                throw new IllegalArgumentException("Zeffy integration mode must be DISABLED, RECORD_ONLY, or LIVE");
             }
-            if ("RECORD_ONLY".equals(mode) && webhookSecret == null && !settingService.hasValue(WEBHOOK_SECRET)) {
-                throw new IllegalArgumentException("Configure the Zeffy webhook signing secret before enabling RECORD_ONLY mode");
+            if (!"DISABLED".equals(mode) && webhookSecret == null && !settingService.hasValue(WEBHOOK_SECRET)) {
+                throw new IllegalArgumentException("Configure the Zeffy webhook signing secret before enabling webhook receipt");
             }
         }
+        boolean candidateTested = false;
         if (apiKey != null && Boolean.TRUE.equals(request.validateApiKey())) {
             apiClient.testConnection(apiKey);
+            candidateTested = true;
+        }
+        if ("LIVE".equals(mode)) {
+            if (apiKey == null && !settingService.hasValue(API_KEY)) {
+                throw new IllegalArgumentException("Configure the Zeffy API key before enabling LIVE mode");
+            }
+            if (campaignRepository.count() == 0) {
+                throw new IllegalArgumentException("Synchronize Zeffy campaigns before enabling LIVE mode");
+            }
+            if (campaignRepository
+                    .countByMappingConfirmedFalseAndStatusIgnoreCaseAndIsArchivedFalseAndZeffyDeletedAtIsNull("active") > 0) {
+                throw new IllegalArgumentException("Confirm every current Zeffy campaign mapping before enabling LIVE mode");
+            }
+            if (!candidateTested) {
+                if (apiKey != null) apiClient.testConnection(apiKey);
+                else apiClient.testConnection();
+            }
         }
         if (apiKey != null) settingService.updateValue(API_KEY, apiKey);
 

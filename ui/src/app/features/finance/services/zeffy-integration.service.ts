@@ -87,4 +87,10 @@ export class ZeffyIntegrationService {
       `${this.env.apiUrl}/zeffy-webhook-events`, { params },
     );
   }
+
+  reprocessWebhookEvent(id: string): Observable<ZeffyWebhookEvent> {
+    return this.http.post<ZeffyWebhookEvent>(
+      `${this.env.apiUrl}/zeffy-webhook-events/${id}/reprocess`, {},
+    );
+  }
 }

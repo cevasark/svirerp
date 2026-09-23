@@ -21,6 +21,8 @@ class ZeffyWebhookServiceTest {
     private AppSettingService settings;
     private ZeffyWebhookSignatureVerifier verifier;
     private ZeffyWebhookEventStore store;
+    private ZeffyWebhookEventRepository repository;
+    private ZeffyPaymentProcessingCoordinator coordinator;
     private ZeffyWebhookService service;
 
     @BeforeEach
@@ -28,8 +30,11 @@ class ZeffyWebhookServiceTest {
         settings = mock(AppSettingService.class);
         verifier = mock(ZeffyWebhookSignatureVerifier.class);
         store = mock(ZeffyWebhookEventStore.class);
+        repository = mock(ZeffyWebhookEventRepository.class);
+        coordinator = mock(ZeffyPaymentProcessingCoordinator.class);
         service = new ZeffyWebhookService(settings, verifier, store,
-                mock(ZeffyWebhookEventRepository.class), new ObjectMapper());
+                repository, new ObjectMapper(),
+                coordinator);
         when(settings.getDecryptedValue("zeffy.integration-mode"))
                 .thenReturn(Optional.of("RECORD_ONLY"));
         when(settings.getDecryptedValue("zeffy.webhook-signing-secret"))
@@ -104,6 +109,40 @@ class ZeffyWebhookServiceTest {
                 .isInstanceOf(ZeffyWebhookException.class)
                 .hasMessageContaining("id is required");
         verify(store, never()).insert(any());
+    }
+
+    @Test
+    void recordOnlyModeNeverInvokesPaymentProcessing() {
+        service.receive(payload("payment.completed"), "valid");
+
+        verifyNoInteractions(coordinator);
+    }
+
+    @Test
+    void liveModeProcessesNewCompletedPaymentAfterDurableInsert() {
+        UUID id = UUID.randomUUID();
+        when(settings.getDecryptedValue("zeffy.integration-mode")).thenReturn(Optional.of("LIVE"));
+        when(store.insert(any())).thenAnswer(invocation -> {
+            ZeffyWebhookEvent event = invocation.getArgument(0);
+            event.setId(id);
+            return event;
+        });
+        when(repository.findById(id)).thenReturn(Optional.of(
+                ZeffyWebhookEvent.builder().id(id).status("PROCESSED").build()));
+
+        ZeffyWebhookService.ReceiptResponse response =
+                service.receive(payload("payment.completed"), "valid");
+
+        verify(coordinator).process(id);
+        assertThat(response.status()).isEqualTo("PROCESSED");
+    }
+
+    @Test
+    void reprocessRequiresLiveMode() {
+        assertThatThrownBy(() -> service.reprocess(UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("LIVE mode");
+        verifyNoInteractions(coordinator);
     }
 
     private byte[] payload(String type) {

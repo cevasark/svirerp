@@ -489,6 +489,10 @@ The implemented receiver limits bodies to 1 MiB. `DISABLED` or a missing signing
 
 ## 11. Phase 3 — Apply completed payments
 
+Implementation: migration V56 and the LIVE processing path implement this phase. LIVE activation
+requires configured credentials, a successful connection check, synchronized campaigns, and
+confirmed policies for every current non-archived campaign. Historical API ingestion remains Phase 4.
+
 ### 11.1 Functional behavior
 
 When mode is LIVE, a supported `payment.completed` event is passed to the shared processor after receipt. Processing outcomes are:

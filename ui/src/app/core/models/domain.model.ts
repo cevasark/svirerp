@@ -604,6 +604,23 @@ export interface ZeffyWebhookEvent {
   lastAttemptedAt?: string;
   processedAt?: string;
   errorSummary?: string;
+  paymentRecordId?: string;
+  paymentStatus?: string;
+  amount?: number;
+  eligibleAmount?: number;
+  currency?: string;
+  paymentCreatedAt?: string;
+  campaignId?: string;
+  campaignTitle?: string;
+  mappingAction?: 'APPLY' | 'IGNORE';
+  mappedFund?: string;
+  mappedAccount?: string;
+  membershipCredit: boolean;
+  buyerEmail?: string;
+  personId?: string;
+  memberId?: string;
+  memberPaymentId?: string;
+  journalEntryId?: string;
 }
 
 // ─── Stripe Integration ──────────────────────────────────────────────────────
