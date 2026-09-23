@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTie
 
 @Injectable({ providedIn: 'root' })
 export class MemberService extends ResourceService<Member> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('members');
@@ -31,20 +31,20 @@ export class MemberService extends ResourceService<Member> {
       p = p.set('membershipTypeId', membershipTypeId);
     }
     return this.http.get<Page<Member>>(
-      `${this.env.apiUrl}/members`,
+      `${this.apiEnv.apiUrl}/members`,
       { params: p },
     );
   }
 
   getSummary(): Observable<MemberSummary> {
     return this.http.get<MemberSummary>(
-      `${this.env.apiUrl}/members/summary`,
+      `${this.apiEnv.apiUrl}/members/summary`,
     );
   }
 
   downloadImportTemplate(): Observable<Blob> {
     return this.http.get(
-      `${this.env.apiUrl}/members/import-template`,
+      `${this.apiEnv.apiUrl}/members/import-template`,
       { responseType: 'blob' },
     );
   }
@@ -53,7 +53,7 @@ export class MemberService extends ResourceService<Member> {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<MemberImportResult>(
-      `${this.env.apiUrl}/members/import`,
+      `${this.apiEnv.apiUrl}/members/import`,
       formData,
     );
   }
@@ -62,7 +62,7 @@ export class MemberService extends ResourceService<Member> {
    *  (a qualifying payment ages past its window with no new payment event). */
   recomputeTiers(): Observable<RecomputeTiersResult> {
     return this.http.post<RecomputeTiersResult>(
-      `${this.env.apiUrl}/members/recompute-tiers`,
+      `${this.apiEnv.apiUrl}/members/recompute-tiers`,
       {},
     );
   }

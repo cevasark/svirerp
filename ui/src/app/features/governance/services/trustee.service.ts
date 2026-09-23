@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class TrusteeService extends ResourceService<Trustee> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('trustees');
@@ -21,7 +21,7 @@ export class TrusteeService extends ResourceService<Trustee> {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Trustee>>(
-      `${this.env.apiUrl}/trustees`,
+      `${this.apiEnv.apiUrl}/trustees`,
       { params: p },
     );
   }

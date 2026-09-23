@@ -13,9 +13,9 @@ public interface ProjectChecklistItemRepository extends JpaRepository<ProjectChe
 
     // Same EntityGraph gotcha as ProjectTaskCommentRepository — spring.jpa.open-in-view=false
     // closes the Hibernate session before Jackson serializes the response, so every lazy path
-    // walked by the response body (checklist -> its project -> that project's own org/assignee)
+    // walked by the response body (checklist -> its project -> that project's assignee)
     // must be listed explicitly. This chain is 3 hops deep from the item's own root, same depth as
-    // ProjectTaskCommentRepository's proven-working "projectTask.project.org" — the declarative
+    // ProjectTaskCommentRepository's proven-working nested paths — the declarative
     // dotted-string form is reliable at this depth (unlike the 4-hop chain this feature had before
     // moving the checklist off ProjectTask, which needed an explicit JOIN FETCH @Query instead).
     @EntityGraph(attributePaths = {"checklist", "checklist.project", "checklist.project.assignee"})

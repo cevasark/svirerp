@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class ServiceRequestService extends ResourceService<ServiceRequest> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('service-requests');
@@ -23,7 +23,7 @@ export class ServiceRequestService extends ResourceService<ServiceRequest> {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<ServiceRequest>>(
-      `${this.env.apiUrl}/service-requests`,
+      `${this.apiEnv.apiUrl}/service-requests`,
       { params: p },
     );
   }

@@ -9,7 +9,7 @@ import { ENVIRONMENT } from '../../../core/tokens/environment.token';
 
 @Injectable({ providedIn: 'root' })
 export class VolunteerService extends ResourceService<Volunteer> {
-  private env = inject(ENVIRONMENT);
+  private apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('volunteers');
@@ -20,7 +20,7 @@ export class VolunteerService extends ResourceService<Volunteer> {
     if (params.sort) p = p.set('sort', params.sort);
     if (areaId) p = p.set('areaId', areaId);
     return this.http.get<Page<Volunteer>>(
-      `${this.env.apiUrl}/volunteers`,
+      `${this.apiEnv.apiUrl}/volunteers`,
       { params: p },
     );
   }

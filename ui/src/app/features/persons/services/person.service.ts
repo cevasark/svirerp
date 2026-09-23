@@ -8,7 +8,7 @@ import { PersonImportResult } from '../../../core/models/api.model';
 
 @Injectable({ providedIn: 'root' })
 export class PersonService extends ResourceService<Person> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('persons');
@@ -25,7 +25,7 @@ export class PersonService extends ResourceService<Person> {
    *  show up in a Zeffy Transactions import, since they never produced a financial transaction. */
   downloadImportTemplate(): Observable<Blob> {
     return this.http.get(
-      `${this.env.apiUrl}/persons/import-template`,
+      `${this.apiEnv.apiUrl}/persons/import-template`,
       { responseType: 'blob' },
     );
   }
@@ -34,7 +34,7 @@ export class PersonService extends ResourceService<Person> {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<PersonImportResult>(
-      `${this.env.apiUrl}/persons/import`,
+      `${this.apiEnv.apiUrl}/persons/import`,
       formData,
     );
   }

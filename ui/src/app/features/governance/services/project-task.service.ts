@@ -6,7 +6,7 @@ import { ProjectTask, ProjectTaskComment } from '../../../core/models/domain.mod
 
 @Injectable({ providedIn: 'root' })
 export class ProjectTaskService extends ResourceService<ProjectTask> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('project-tasks');
@@ -15,7 +15,7 @@ export class ProjectTaskService extends ResourceService<ProjectTask> {
   /** Deliberately unpaginated — a project's tasks are meant to be seen as one whole list on the
    *  project's detail page, not paged through (same idiom as ActionItemService#getForMeeting). */
   getForProject(projectId: string): Observable<ProjectTask[]> {
-    return this.http.get<ProjectTask[]>(`${this.env.apiUrl}/projects/${projectId}/tasks`);
+    return this.http.get<ProjectTask[]>(`${this.apiEnv.apiUrl}/projects/${projectId}/tasks`);
   }
 
   getComments(taskId: string): Observable<ProjectTaskComment[]> {
@@ -28,6 +28,6 @@ export class ProjectTaskService extends ResourceService<ProjectTask> {
   }
 
   removeComment(commentId: string): Observable<void> {
-    return this.http.delete<void>(`${this.env.apiUrl}/project-task-comments/${commentId}`);
+    return this.http.delete<void>(`${this.apiEnv.apiUrl}/project-task-comments/${commentId}`);
   }
 }

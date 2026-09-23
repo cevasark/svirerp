@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class EventService extends ResourceService<CalendarEvent> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('events');
@@ -27,7 +27,7 @@ export class EventService extends ResourceService<CalendarEvent> {
       p = p.set('to', to);
     }
     return this.http.get<Page<CalendarEvent>>(
-      `${this.env.apiUrl}/events`,
+      `${this.apiEnv.apiUrl}/events`,
       { params: p },
     );
   }

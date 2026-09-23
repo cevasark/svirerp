@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService extends ResourceService<Project> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('projects');
@@ -24,7 +24,7 @@ export class ProjectService extends ResourceService<Project> {
       p = p.set('status', status);
     }
     return this.http.get<Page<Project>>(
-      `${this.env.apiUrl}/projects`,
+      `${this.apiEnv.apiUrl}/projects`,
       { params: p },
     );
   }
@@ -41,6 +41,6 @@ export class ProjectService extends ResourceService<Project> {
   }
 
   removeComment(commentId: string): Observable<void> {
-    return this.http.delete<void>(`${this.env.apiUrl}/project-comments/${commentId}`);
+    return this.http.delete<void>(`${this.apiEnv.apiUrl}/project-comments/${commentId}`);
   }
 }

@@ -103,8 +103,8 @@ public class MembershipService {
     /** Counts by tier/status for the Members list header — tier is TierCalculator.MEMBER/
      *  BENEFACTOR/FOLLOWER stored as the member's membershipType name (see TierCalculator's class
      *  doc for why "Member" here means the $150+ tier, not the generic "has a Member row" sense).
-     *  Followers have no active/inactive distinction (always active — see TierCalculator), so just
-     *  one count. totalMembers is every Member row in the installation, regardless of tier/status. */
+     *  Followers are shown as one count even though staff/imports may explicitly set their status.
+     *  totalMembers is every Member row in the installation, regardless of tier/status. */
     public MemberSummary getMemberSummary() {
         return new MemberSummary(
                 memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.MEMBER),
@@ -292,10 +292,10 @@ public class MembershipService {
     /**
      * Recomputes a member's tier (MembershipType), expiryDate, and status from their full
      * completed-payment history — see TierCalculator's class doc for the chaining rule. "inactive"
-     * now covers two distinct cases: (a) zero completed-payment history at all (unreachable via
-     * Zeffy import, but possible for a manually-created Member with no payments) — tier is left
-     * untouched in that case; (b) the member's last $150+ membership period has expired — tier is
-     * still updated to whatever that last period was (not reverted to Follower), only status flips.
+     * A Follower with no completed-payment history keeps the status assigned by staff or import.
+     * A non-Follower with no completed-payment history becomes inactive without changing tier. If
+     * the member's last $150+ membership period has expired, the tier remains whatever that last
+     * period was (rather than reverting to Follower) and only the status changes.
      */
     @Transactional
     public Member recomputeTier(UUID memberId) {

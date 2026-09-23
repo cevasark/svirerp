@@ -8,7 +8,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.
 
 @Injectable({ providedIn: 'root' })
 export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
-  private readonly env = inject(ENVIRONMENT);
+  private readonly apiEnv = inject(ENVIRONMENT);
 
   constructor() {
     super('meeting-minutes');
@@ -31,7 +31,7 @@ export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
       p = p.set('openActionItemsOnly', 'true');
     }
     return this.http.get<Page<MeetingMinutes>>(
-      `${this.env.apiUrl}/meeting-minutes`,
+      `${this.apiEnv.apiUrl}/meeting-minutes`,
       { params: p },
     );
   }
