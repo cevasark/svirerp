@@ -587,6 +587,25 @@ export interface ZeffyCampaign {
   suggestedMembershipCredit: boolean;
 }
 
+export interface ZeffyWebhookEvent {
+  id: string;
+  zeffyEventId: string;
+  eventType: string;
+  schemaVersion: number;
+  resourceType: 'PAYMENT' | 'CONTACT' | 'UNKNOWN';
+  zeffyResourceId?: string;
+  status: 'RECEIVED' | 'PROCESSING' | 'PROCESSED' | 'NEEDS_MAPPING' |
+    'NEEDS_REVIEW' | 'ERROR' | 'IGNORED' | 'UNSUPPORTED';
+  deliveryCount: number;
+  dispatchedAt: string;
+  receivedAt: string;
+  lastReceivedAt: string;
+  processingAttemptCount: number;
+  lastAttemptedAt?: string;
+  processedAt?: string;
+  errorSummary?: string;
+}
+
 // ─── Stripe Integration ──────────────────────────────────────────────────────
 /** Routes a Stripe Price to what a completed payment against it means, and where it posts. */
 export interface StripeProductMapping {

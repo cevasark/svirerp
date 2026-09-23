@@ -51,14 +51,14 @@ svirerp/
 │       │   ├── event/
 │       │   ├── volunteer/
 │       │   ├── finance/
-│       │   ├── zeffyintegration/ # Zeffy API campaigns, synchronization history, and future webhooks
+│       │   ├── zeffyintegration/ # Zeffy API campaigns, signed webhook inbox, and sync history
 │       │   ├── stripeintegration/  # Stripe webhook receiver — spans membership + finance
 │       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
 │       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V54 SQL scripts
+│           └── db/migration/                       # Flyway V1–V55 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -251,7 +251,7 @@ The Stripe tab under Settings (`/settings/stripe`, migration V42) lets svirerp r
 2. On the admin Settings → Stripe page, paste the **Secret Key** (`sk_live_...` / `sk_test_...`) and the webhook's **Signing Secret** (`whsec_...`) and save. Both are stored encrypted in `app_setting` (`stripe.secret-key`, `stripe.webhook-signing-secret`), same pattern as the Google/Gmail OAuth credentials — rotating either takes effect on the next webhook delivery, no restart needed.
 3. Under Finance → Stripe → Mappings, map each Stripe Price to what a completed payment against it means: **Membership Dues** (posts a `MemberPayment` and recomputes the payer's Follower/Member/Benefactor tier, same as Zeffy), **Church Service** (creates a `ServiceRequest` for the office to schedule), **Event Ticket**, or **General Income** — plus which `Fund`/`Account` it posts to. The mapping list has a "Sync from Stripe" action that pulls in your account's current active Prices so you don't have to type Price IDs by hand.
 
-`POST /api/webhooks/stripe` is the one unauthenticated route under `/api/**` (see `SecurityConfig`) — Stripe calls it server-to-server with no session, authenticated instead by the request's `Stripe-Signature` header. A validly-signed event always gets a `200` back, even if applying it failed for a business reason (e.g. its Price isn't mapped yet) — Stripe would otherwise keep retrying for up to ~3 days, which wouldn't fix a mapping problem. Those events land under Finance → Stripe → Payments with a status (`needs_mapping`/`error`/`processed`) and a **Reprocess** action once the underlying issue (usually: add the missing mapping) is fixed. A bad/forged signature gets a `400`; the secrets not being configured yet gets a `503`.
+`POST /api/webhooks/stripe` is one of the two exact unauthenticated webhook routes under `/api/**` (see `SecurityConfig`) — Stripe calls it server-to-server with no session, authenticated instead by the request's `Stripe-Signature` header. A validly-signed event always gets a `200` back, even if applying it failed for a business reason (e.g. its Price isn't mapped yet) — Stripe would otherwise keep retrying for up to ~3 days, which wouldn't fix a mapping problem. Those events land under Finance → Stripe → Payments with a status (`needs_mapping`/`error`/`processed`) and a **Reprocess** action once the underlying issue (usually: add the missing mapping) is fixed. A bad/forged signature gets a `400`; the secrets not being configured yet gets a `503`.
 
 An event's data object only deserializes "safely" when its Stripe API version's release train (e.g. `2026-04-22.dahlia`) matches the one the `stripe-java` dependency in `pom.xml` is pinned to — otherwise Stripe's own SDK refuses to risk silently-wrong field mapping and the request 500s. Keep that dependency's version bumped to whatever train the church's Stripe account is on (see the comment on the dependency in `pom.xml`); `StripeWebhookService#deserialize` also falls back to Stripe's `deserializeUnsafe()` for the gap in between an account moving trains and this dependency catching up.
 
@@ -259,11 +259,13 @@ An event's data object only deserializes "safely" when its Stripe API version's 
 
 ### Zeffy (API integration)
 
-The Zeffy tab under Settings (`/settings/zeffy`, migrations V53–V54) configures the encrypted API key and the webhook signing secret reserved for Phase 2. Phase 1 supports connection testing and full campaign-catalog synchronization. The client requests up to 100 campaigns per page and globally limits all outbound Zeffy requests to one per second.
+The Zeffy tab under Settings (`/settings/zeffy`, migrations V53–V55) configures the encrypted API key, webhook signing secret, and `DISABLED`/`RECORD_ONLY` mode. Phase 1 supports connection testing and full campaign-catalog synchronization. Phase 2 receives signature-authenticated events at `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and records them without creating domain or accounting records. The API client requests up to 100 campaigns per page and globally limits all outbound Zeffy requests to one per second.
 
 Configuration remains in `app_setting`: `zeffy.api-key`, `zeffy.webhook-signing-secret`, and `zeffy.integration-mode`. Synchronization results are operational history and are stored in `zeffy_sync_run`, including successful, partial, and failed attempts, timestamps, cursors, initiating user, counts, and a sanitized error summary. The latest status is derived from that history; there are no `zeffy.last-*` settings.
 
 Under Finance → Zeffy, each synchronized campaign must be explicitly assigned `APPLY` or `IGNORE`. Applying a campaign requires a Fund and revenue Account and records whether its payments grant membership credit. Zeffy type/category suggestions remain inactive until an operator confirms them. Campaign identity uses the immutable Zeffy campaign ID, so a title change does not lose the local policy.
+
+Finance → Zeffy → Webhook Events shows the paginated receipt audit with filters for event type, status, payment/contact ID, and receipt dates. The raw signed JSON is retained in `zeffy_webhook_event` for recovery and later phases but is never returned by the list API or exposed in the UI. Event IDs are unique; a retry increments its delivery count, while the same event ID carrying a different signed payload is flagged `NEEDS_REVIEW`.
 
 The older Zeffy Contacts and Transactions spreadsheet imports were removed in V53. The generic Member CSV import remains available.
 
@@ -476,6 +478,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Google Calendar (admin) | `GET /api/settings/calendar/authorize-url` | `GET .../callback`, `POST .../test-connection`; `ROLE_ADMIN` only. One-way push only (ERP → Calendar, never the reverse) — see `CalendarEvent.publishToOfficial`/`publishToInternal` and their `google*SyncError` fields |
 | Zeffy settings and synchronization (admin) | `GET /api/settings/zeffy/status` | `PUT .../configuration`, `POST .../test-connection`, `POST .../sync-campaigns`, `GET .../sync-runs`; credentials are redacted, every sync attempt is retained, and all outbound requests are paced at one per second |
 | Zeffy API campaigns | `GET /api/zeffy-campaigns` | Paginated synchronized campaign catalog; `PUT /api/zeffy-campaigns/{campaignId}/mapping` confirms APPLY/IGNORE, Fund, revenue Account, and membership-credit policy by immutable Zeffy ID |
+| Zeffy webhook (unauthenticated) | `POST /api/webhooks/zeffy` | Accepts at most 1 MiB of JSON, authenticated by raw-body HMAC in `Zeffy-Signature`; available only outside `DISABLED` mode and records events without domain writes in `RECORD_ONLY` |
+| Zeffy webhook events | `GET /api/zeffy-webhook-events` | Authenticated, paginated, filterable receipt audit; deliberately excludes raw payloads |
 | Recompute member tiers | `POST /api/members/recompute-tiers` | Re-runs Follower/Member/Benefactor tier computation for every member; a Follower with no qualifying payments keeps the staff/import-assigned active status |
 | Stripe webhook (unauthenticated) | `POST /api/webhooks/stripe` | Checkout happens on WordPress, a Stripe Invoice, or a mobile card-reader app, never in svirerp — this is purely a receiver for `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded`, authenticated by the `Stripe-Signature` header instead of a session. Always `200`s a validly-signed event (even on a business-rule failure — see [Admin Settings](#admin-settings)); `400` on a bad signature, `503` if the secrets aren't configured yet |
 | Stripe product mappings | `GET/POST /api/stripe-product-mappings` | `PUT/DELETE /api/stripe-product-mappings/{id}` — routes a Stripe Price to a purpose (`membership_dues`/`service_request`/`event_ticket`/`general_income`) plus `Fund`/`Account`; `GET /api/stripe-prices` lists active Prices straight from the Stripe API to map without waiting for a live payment |
@@ -541,3 +545,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V52 | Enforces one organization profile with a singleton key; removes `org_id` foreign keys/indexes from domain tables and makes formerly organization-scoped business keys installation-wide |
 | V53 | Removes the obsolete Zeffy Contacts/Transactions spreadsheet-import tables: `zeffy_import_row`, `zeffy_import_batch`, and title-based `zeffy_campaign_mapping` |
 | V54 | Zeffy API Phase 1: `zeffy_campaign`, durable `zeffy_sync_run` history, and the three Zeffy configuration rows in `app_setting` |
+| V55 | Zeffy Phase 2 signed webhook inbox: `zeffy_webhook_event`, event-ID idempotency, delivery audit counts, processing status, resource identity, raw recovery payload, and payload hash |

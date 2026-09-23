@@ -75,6 +75,7 @@ export interface ZeffyIntegrationStatus {
   apiKeyConfigured: boolean;
   webhookSecretConfigured: boolean;
   integrationMode: 'DISABLED' | 'RECORD_ONLY' | 'LIVE';
+  webhookPath: string;
   campaignCount: number;
   confirmedMappingCount: number;
   latestCampaignSync?: ZeffySyncRun;
@@ -84,6 +85,15 @@ export interface ZeffyConfigurationRequest {
   apiKey?: string;
   webhookSigningSecret?: string;
   validateApiKey: boolean;
+  integrationMode?: 'DISABLED' | 'RECORD_ONLY';
+}
+
+export interface ZeffyWebhookEventFilters {
+  eventType?: string;
+  status?: string;
+  resourceId?: string;
+  receivedFrom?: string;
+  receivedTo?: string;
 }
 
 export interface ZeffyConnectionTestResult {

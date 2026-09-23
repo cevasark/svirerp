@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
-import { ZeffyCampaign } from '../../../core/models/domain.model';
+import { ZeffyCampaign, ZeffyWebhookEvent } from '../../../core/models/domain.model';
 import {
   Page,
   PageParams,
@@ -12,6 +12,7 @@ import {
   ZeffyConnectionTestResult,
   ZeffyIntegrationStatus,
   ZeffySyncRun,
+  ZeffyWebhookEventFilters,
 } from '../../../core/models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -66,6 +67,24 @@ export class ZeffyIntegrationService {
   ): Observable<ZeffyCampaign> {
     return this.http.put<ZeffyCampaign>(
       `${this.env.apiUrl}/zeffy-campaigns/${encodeURIComponent(campaignId)}/mapping`, request,
+    );
+  }
+
+  getWebhookEvents(
+    pageParams: PageParams,
+    filters: ZeffyWebhookEventFilters,
+  ): Observable<Page<ZeffyWebhookEvent>> {
+    let params = new HttpParams()
+      .set('page', pageParams.page)
+      .set('size', pageParams.size);
+    if (pageParams.sort) params = params.set('sort', pageParams.sort);
+    if (filters.eventType) params = params.set('eventType', filters.eventType);
+    if (filters.status) params = params.set('status', filters.status);
+    if (filters.resourceId) params = params.set('resourceId', filters.resourceId);
+    if (filters.receivedFrom) params = params.set('receivedFrom', filters.receivedFrom);
+    if (filters.receivedTo) params = params.set('receivedTo', filters.receivedTo);
+    return this.http.get<Page<ZeffyWebhookEvent>>(
+      `${this.env.apiUrl}/zeffy-webhook-events`, { params },
     );
   }
 }

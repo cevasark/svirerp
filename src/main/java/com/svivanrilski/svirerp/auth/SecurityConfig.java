@@ -90,10 +90,9 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/settings/**", "/api/organization", "/api/organization/**").hasRole("ADMIN")
-                        // Stripe calls this server-to-server with no session — authenticated
-                        // instead by the payload signature (see StripeWebhookController). Must be
-                        // matched before the blanket /api/** authenticated() rule below.
-                        .requestMatchers("/api/webhooks/**").permitAll()
+                        // Provider servers call these exact routes with no session. Each controller
+                        // authenticates the unmodified payload with its provider signature header.
+                        .requestMatchers("/api/webhooks/stripe", "/api/webhooks/zeffy").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2
@@ -120,9 +119,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        // Stripe's webhook POST carries no XSRF-TOKEN cookie (it's not a browser
-                        // request) — verified instead by the Stripe-Signature header.
-                        .ignoringRequestMatchers("/api/webhooks/**"))
+                        // Server-to-server webhook POSTs have no browser XSRF cookie; their raw
+                        // request bodies are authenticated by provider signatures instead.
+                        .ignoringRequestMatchers("/api/webhooks/stripe", "/api/webhooks/zeffy"))
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .defaultAuthenticationEntryPointFor(jsonAuthenticationEntryPoint, new AntPathRequestMatcher("/api/**")))

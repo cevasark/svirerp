@@ -1,7 +1,7 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Living specification; Phase 1 implemented
-**Date:** September 22, 2026
+**Status:** Living specification; Phases 1 and 2 implemented
+**Date:** September 23, 2026
 **Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
 
@@ -453,7 +453,7 @@ Settings endpoints are admin-only. Dedicated request/response DTOs prevent secre
 
 ### 10.1 Functional behavior
 
-Phase 2 adds `POST /api/webhooks/zeffy` and runs in RECORD_ONLY mode initially.
+Phase 2 adds `POST /api/webhooks/zeffy` and runs in RECORD_ONLY mode initially. The production URL is `https://svirerp.svivanrilski.com/api/webhooks/zeffy`.
 
 The endpoint:
 
@@ -464,6 +464,8 @@ The endpoint:
 5. Returns `2xx` after the record is durable.
 
 The Finance → Zeffy area will display webhook events with filters for type, status, payment ID, and received date. It will not expose raw payloads in the list.
+
+The implemented receiver limits bodies to 1 MiB. `DISABLED` or a missing signing secret returns `503`; signature/envelope failures return `400`; oversized bodies return `413`; a durable new or duplicate receipt returns `200`. Raw payloads are retained for recovery and later processing phases but have no application UI or API exposure in Phase 2.
 
 ### 10.2 Security configuration
 
@@ -792,6 +794,7 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 - Zeffy Contacts and Transactions spreadsheet imports are removed; the generic Member CSV import remains.
 - Synchronization history belongs in `zeffy_sync_run`, not `app_setting`.
 - All outbound Zeffy API requests are globally paced at one request per second.
+- Phase 2 retains verified raw webhook payloads for recovery without exposing them through the application UI or API. They remain stored until an explicit retention/redaction policy is approved.
 - Existing payment tier thresholds and renewal chaining remain in effect.
 - Posted accounting corrections use new entries rather than editing posted entries.
 
@@ -819,8 +822,8 @@ These must be answered before their affected phase is implemented:
 7. Which date should refund/reversal journal entries use: refund date, original payment date, or current accounting date?
 8. Should contact-created events automatically enroll every new Zeffy contact as an active Follower?
 9. Which Person fields may Zeffy update when local values already exist?
-10. Who may view raw webhook payloads containing donor information?
-11. How long should raw payloads be retained?
+10. If application-level raw-payload access is added later, which administrative users may use it?
+11. What eventual retention/redaction period should replace Phase 2's indefinite recovery retention?
 12. What historical cutoff/range should the first API synchronization use?
 
 ## 21. Definition of completion

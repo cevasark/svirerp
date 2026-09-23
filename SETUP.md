@@ -188,14 +188,17 @@ Full details, including the separate production client and the org's Workspace-d
 
 ## Step 12 (optional) — Connect Zeffy
 
-Phase 1 can synchronize the campaign catalog before webhook/payment processing is enabled:
+Phases 1 and 2 synchronize the campaign catalog and receive signed events in record-only mode:
 
 1. Generate an API key in Zeffy under **Settings → Integrations**.
 2. In SVIR ERP, open **Settings → Zeffy**, enter the API key, and leave validation enabled when saving.
 3. Use **Test Connection**, then **Sync Campaigns**. Every outbound request is paced at one request per second, and each synchronization attempt is retained in the history table.
 4. Open **Finance → Zeffy** and confirm an APPLY or IGNORE policy for each campaign. APPLY requires a Fund and revenue Account.
+5. In Zeffy, configure the production webhook URL `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and subscribe to the payment and contact events needed by the integration.
+6. Copy Zeffy's `whsec_...` signing secret into **Settings → Zeffy**, select **Record only**, and save.
+7. Confirm signed deliveries under **Finance → Zeffy → Webhook Events**. Record-only mode creates no Person, membership, contribution, or accounting records.
 
-The event-processing mode remains `DISABLED` in Phase 1. Do not configure the displayed webhook URL in Zeffy until Phase 2 enables the receiver.
+Use a publicly reachable HTTPS origin for non-production installations. `localhost` cannot receive Zeffy's server-to-server deliveries.
 
 ---
 

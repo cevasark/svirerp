@@ -7,6 +7,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 
 import { Page, PageParams, ZeffyIntegrationStatus, ZeffySyncRun } from '../../../../core/models/api.model';
 import { NotificationService } from '../../../../core/services/notification.service';
@@ -28,11 +29,12 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
   ],
   template: `
     <div class="page-container">
       <app-page-header title="Zeffy"
-        subtitle="Connect the Zeffy API and synchronize its campaign catalog" />
+        subtitle="Manage the Zeffy API, campaign catalog, and signed webhook receiver" />
 
       <mat-card class="setting-card">
         <mat-card-content>
@@ -44,8 +46,8 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
             <span>Last connection test</span><strong>{{ displayDate(lastConnectionTestAt()) }}</strong>
           </div>
           <p class="hint">
-            Phase 1 permits manual API synchronization while event processing remains disabled.
-            All outbound Zeffy requests are limited to one request per second.
+            API requests are limited to one request per second. Webhooks are independently
+            authenticated with the signing secret below.
           </p>
 
           <mat-form-field appearance="outline" class="full-width">
@@ -64,13 +66,25 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
               [placeholder]="status()?.webhookSecretConfigured ? 'Configured - enter a value to replace' : 'whsec_...'"
               autocomplete="new-password" />
           </mat-form-field>
-          <p class="hint">Stored for Phase 2. No Zeffy webhook endpoint is enabled in Phase 1.</p>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Webhook mode</mat-label>
+            <mat-select [(ngModel)]="modeDraft">
+              <mat-option value="DISABLED">Disabled</mat-option>
+              <mat-option value="RECORD_ONLY">Record only</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <p class="hint">
+            Record only verifies and stores webhook events without creating people, membership,
+            contribution, or accounting records. Live processing becomes available in Phase 3.
+          </p>
 
           <div class="button-row">
             <button mat-flat-button color="primary"
-              [disabled]="saving() || (!apiKeyDraft && !webhookSecretDraft)" (click)="save()">
+              [disabled]="saving() || (!apiKeyDraft && !webhookSecretDraft && modeDraft === status()?.integrationMode)"
+              (click)="save()">
               @if (saving()) { <mat-progress-spinner diameter="20" mode="indeterminate" /> }
-              @else { Save Credentials }
+              @else { Save Configuration }
             </button>
             <button mat-stroked-button [disabled]="testing() || !status()?.apiKeyConfigured"
               (click)="testConnection()">
@@ -117,9 +131,15 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
 
       <mat-card class="setting-card">
         <mat-card-content>
-          <h3>Future webhook endpoint</h3>
-          <code>{{ webhookUrl }}</code>
-          <p class="hint">Do not configure this URL in Zeffy until Phase 2 enables the receiver.</p>
+          <h3>Webhook endpoint</h3>
+          <code>{{ webhookUrl() }}</code>
+          <div class="button-row">
+            <button mat-stroked-button (click)="copyWebhookUrl()">Copy URL</button>
+          </div>
+          <p class="hint">
+            Configure this HTTPS URL under Zeffy Settings &gt; Integrations, copy the generated
+            whsec_ signing secret above, then select Record only.
+          </p>
         </mat-card-content>
       </mat-card>
     </div>
@@ -140,7 +160,6 @@ export class ZeffySettingsComponent implements OnInit {
   private readonly service = inject(ZeffyIntegrationService);
   private readonly notifications = inject(NotificationService);
 
-  readonly webhookUrl = `${window.location.origin}/api/webhooks/zeffy`;
   readonly status = signal<ZeffyIntegrationStatus | null>(null);
   readonly runs = signal<Page<ZeffySyncRun> | null>(null);
   readonly runPageParams = signal<PageParams>({ page: 0, size: 10, sort: 'startedAt,desc' });
@@ -153,6 +172,7 @@ export class ZeffySettingsComponent implements OnInit {
   apiKeyDraft = '';
   webhookSecretDraft = '';
   validateApiKey = true;
+  modeDraft: 'DISABLED' | 'RECORD_ONLY' = 'DISABLED';
 
   readonly runColumns: TableColumn[] = [
     { key: 'startedAt', header: 'Started', type: 'date', cell: (r: ZeffySyncRun) => this.displayDate(r.startedAt) },
@@ -174,13 +194,15 @@ export class ZeffySettingsComponent implements OnInit {
       apiKey: this.apiKeyDraft || undefined,
       webhookSigningSecret: this.webhookSecretDraft || undefined,
       validateApiKey: !!this.apiKeyDraft && this.validateApiKey,
+      integrationMode: this.modeDraft,
     }).subscribe({
       next: status => {
         this.status.set(status);
         this.apiKeyDraft = '';
         this.webhookSecretDraft = '';
         this.saving.set(false);
-        this.notifications.success('Zeffy credentials saved.');
+        this.modeDraft = status.integrationMode === 'RECORD_ONLY' ? 'RECORD_ONLY' : 'DISABLED';
+        this.notifications.success('Zeffy configuration saved.');
       },
       error: () => this.saving.set(false),
     });
@@ -224,6 +246,17 @@ export class ZeffySettingsComponent implements OnInit {
     return value ? new Date(value).toLocaleString() : 'Never';
   }
 
+  webhookUrl(): string {
+    return `${window.location.origin}${this.status()?.webhookPath ?? '/api/webhooks/zeffy'}`;
+  }
+
+  copyWebhookUrl(): void {
+    navigator.clipboard.writeText(this.webhookUrl()).then(
+      () => this.notifications.success('Webhook URL copied.'),
+      () => this.notifications.error('Could not copy the webhook URL.'),
+    );
+  }
+
   latestRunLabel(): string {
     const run = this.status()?.latestCampaignSync;
     return run ? `${run.status} - ${this.displayDate(run.startedAt)}` : 'Never';
@@ -240,7 +273,10 @@ export class ZeffySettingsComponent implements OnInit {
   }
 
   private loadStatus(): void {
-    this.service.getStatus().subscribe(status => this.status.set(status));
+    this.service.getStatus().subscribe(status => {
+      this.status.set(status);
+      this.modeDraft = status.integrationMode === 'RECORD_ONLY' ? 'RECORD_ONLY' : 'DISABLED';
+    });
   }
 
   private loadRuns(): void {

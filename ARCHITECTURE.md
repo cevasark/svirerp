@@ -44,6 +44,10 @@ Session-cookie based, not JWT/stateless. Two ways to sign in, both landing in th
 
 Once authenticated via either method, a user has the same full API access — auth here is a pure access gate, not a permission system, with the single exception of `/settings/**` (`ROLE_ADMIN`, which only the local-admin login carries). See the [README's Authentication section](README.md#authentication) for the full setup/rotation details.
 
+### Signed webhook ingress
+
+Only the exact `/api/webhooks/stripe` and `/api/webhooks/zeffy` routes bypass session authentication and CSRF. Each provider authenticates its own raw request body with a signing-secret header; other `/api/webhooks/**` paths remain behind the normal session gate. Zeffy Phase 2 separates receipt from future business processing: it verifies `Zeffy-Signature`, durably stores the original payload in `zeffy_webhook_event`, and acknowledges the delivery. Authenticated Finance APIs expose normalized audit fields but never the raw donor payload.
+
 ### Backend third-party dependencies
 
 | Dependency | Purpose |

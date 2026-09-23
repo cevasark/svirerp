@@ -1,6 +1,7 @@
 package com.svivanrilski.svirerp.common;
 
 import com.svivanrilski.svirerp.zeffyintegration.ZeffyApiException;
+import com.svivanrilski.svirerp.zeffyintegration.ZeffyWebhookException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -66,6 +67,11 @@ public class GlobalExceptionHandler {
             return error(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
         }
         return error(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
+    @ExceptionHandler(ZeffyWebhookException.class)
+    public ResponseEntity<Map<String, Object>> handleZeffyWebhook(ZeffyWebhookException ex) {
+        return error(ex.getStatus(), ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

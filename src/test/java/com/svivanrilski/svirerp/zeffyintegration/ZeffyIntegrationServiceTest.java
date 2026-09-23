@@ -37,7 +37,7 @@ class ZeffyIntegrationServiceTest {
                 .when(apiClient).testConnection("bad-key");
 
         assertThatThrownBy(() -> service.saveConfiguration(
-                new ZeffyIntegrationService.ConfigurationRequest("bad-key", null, true)))
+                new ZeffyIntegrationService.ConfigurationRequest("bad-key", null, true, null)))
                 .isInstanceOf(ZeffyApiException.class);
 
         verify(settings, never()).updateValue("zeffy.api-key", "bad-key");
@@ -46,11 +46,31 @@ class ZeffyIntegrationServiceTest {
     @Test
     void validatesCandidateBeforeSavingIt() {
         service.saveConfiguration(
-                new ZeffyIntegrationService.ConfigurationRequest("new-key", null, true));
+                new ZeffyIntegrationService.ConfigurationRequest("new-key", null, true, null));
 
         InOrder order = inOrder(apiClient, settings);
         order.verify(apiClient).testConnection("new-key");
         order.verify(settings).updateValue("zeffy.api-key", "new-key");
+    }
+
+    @Test
+    void recordOnlyModeRequiresWebhookSecret() {
+        when(settings.hasValue("zeffy.webhook-signing-secret")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.saveConfiguration(
+                new ZeffyIntegrationService.ConfigurationRequest(null, null, false, "RECORD_ONLY")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("webhook signing secret");
+    }
+
+    @Test
+    void savesSecretBeforeEnablingRecordOnlyMode() {
+        service.saveConfiguration(new ZeffyIntegrationService.ConfigurationRequest(
+                null, "whsec_new", false, "RECORD_ONLY"));
+
+        InOrder order = inOrder(settings);
+        order.verify(settings).updateValue("zeffy.webhook-signing-secret", "whsec_new");
+        order.verify(settings).updateValue("zeffy.integration-mode", "RECORD_ONLY");
     }
 
     @Test

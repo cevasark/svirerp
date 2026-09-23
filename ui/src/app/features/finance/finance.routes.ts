@@ -69,9 +69,24 @@ export const financeRoutes: Routes = [
       {
         path: 'zeffy',
         loadComponent: () =>
-          import('./pages/zeffy-campaign-list/zeffy-campaign-list.component').then(
-            m => m.ZeffyCampaignListComponent,
-          ),
+          import('./pages/zeffy-shell/zeffy-shell.component').then(m => m.ZeffyShellComponent),
+        children: [
+          { path: '', redirectTo: 'campaigns', pathMatch: 'full' },
+          {
+            path: 'campaigns',
+            loadComponent: () =>
+              import('./pages/zeffy-campaign-list/zeffy-campaign-list.component').then(
+                m => m.ZeffyCampaignListComponent,
+              ),
+          },
+          {
+            path: 'webhook-events',
+            loadComponent: () =>
+              import('./pages/zeffy-webhook-event-list/zeffy-webhook-event-list.component').then(
+                m => m.ZeffyWebhookEventListComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'reports',

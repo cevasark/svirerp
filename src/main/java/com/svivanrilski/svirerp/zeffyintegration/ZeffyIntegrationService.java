@@ -25,6 +25,7 @@ public class ZeffyIntegrationService {
     private static final String WEBHOOK_SECRET = "zeffy.webhook-signing-secret";
     private static final String MODE = "zeffy.integration-mode";
     private static final String CAMPAIGNS = "CAMPAIGNS";
+    private static final String WEBHOOK_PATH = "/api/webhooks/zeffy";
 
     private final AppSettingService settingService;
     private final ZeffyApiClient apiClient;
@@ -34,7 +35,8 @@ public class ZeffyIntegrationService {
     private final FinanceService financeService;
     private final AtomicBoolean campaignSyncRunning = new AtomicBoolean(false);
 
-    public record ConfigurationRequest(String apiKey, String webhookSigningSecret, Boolean validateApiKey) {
+    public record ConfigurationRequest(String apiKey, String webhookSigningSecret, Boolean validateApiKey,
+                                       String integrationMode) {
     }
 
     public record ConnectionTestResponse(boolean connected, String testedAt) {
@@ -44,6 +46,7 @@ public class ZeffyIntegrationService {
             boolean apiKeyConfigured,
             boolean webhookSecretConfigured,
             String integrationMode,
+            String webhookPath,
             long campaignCount,
             long confirmedMappingCount,
             SyncRunResponse latestCampaignSync) {
@@ -112,6 +115,7 @@ public class ZeffyIntegrationService {
                 settingService.hasValue(API_KEY),
                 settingService.hasValue(WEBHOOK_SECRET),
                 settingService.getDecryptedValue(MODE).orElse("DISABLED"),
+                WEBHOOK_PATH,
                 campaignRepository.count(),
                 campaignRepository.countByMappingConfirmedTrue(),
                 toResponse(syncRunService.latest(CAMPAIGNS)));
@@ -119,18 +123,27 @@ public class ZeffyIntegrationService {
 
     public StatusResponse saveConfiguration(ConfigurationRequest request) {
         String apiKey = trimToNull(request.apiKey());
+        String webhookSecret = trimToNull(request.webhookSigningSecret());
+        if (webhookSecret != null && !webhookSecret.startsWith("whsec_")) {
+            throw new IllegalArgumentException("Zeffy webhook signing secret must start with whsec_");
+        }
+        String mode = trimToNull(request.integrationMode());
+        if (mode != null) {
+            mode = mode.toUpperCase(Locale.ROOT);
+            if (!"DISABLED".equals(mode) && !"RECORD_ONLY".equals(mode)) {
+                throw new IllegalArgumentException("Zeffy integration mode must be DISABLED or RECORD_ONLY in Phase 2");
+            }
+            if ("RECORD_ONLY".equals(mode) && webhookSecret == null && !settingService.hasValue(WEBHOOK_SECRET)) {
+                throw new IllegalArgumentException("Configure the Zeffy webhook signing secret before enabling RECORD_ONLY mode");
+            }
+        }
         if (apiKey != null && Boolean.TRUE.equals(request.validateApiKey())) {
             apiClient.testConnection(apiKey);
         }
         if (apiKey != null) settingService.updateValue(API_KEY, apiKey);
 
-        String webhookSecret = trimToNull(request.webhookSigningSecret());
-        if (webhookSecret != null) {
-            if (!webhookSecret.startsWith("whsec_")) {
-                throw new IllegalArgumentException("Zeffy webhook signing secret must start with whsec_");
-            }
-            settingService.updateValue(WEBHOOK_SECRET, webhookSecret);
-        }
+        if (webhookSecret != null) settingService.updateValue(WEBHOOK_SECRET, webhookSecret);
+        if (mode != null) settingService.updateValue(MODE, mode);
         return status();
     }
 
