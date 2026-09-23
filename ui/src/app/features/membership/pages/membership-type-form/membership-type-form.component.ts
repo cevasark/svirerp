@@ -15,7 +15,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { MembershipType } from '../../../../core/models/domain.model';
 
 interface MembershipTypeDialogData {
-  orgId: string;
   type: MembershipType | null;
 }
 
@@ -104,7 +103,6 @@ export class MembershipTypeFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<MembershipTypeDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private type = this.data.type;
   isEdit = !!this.type;
   saving = signal(false);
@@ -143,9 +141,7 @@ export class MembershipTypeFormComponent implements OnInit {
     this.saving.set(true);
     const value = this.form.getRawValue();
     // The backend only reads `.getId()` off the nested `org` reference, so a
-    // { id } stub is all that's needed here — it doesn't need to satisfy the
-    // full Organization read shape.
-    const payload = { ...value, org: { id: this.orgId } } as Partial<MembershipType>;
+    const payload = value as Partial<MembershipType>;
     const op = this.isEdit
       ? this.typeService.update(this.type!.id, payload)
       : this.typeService.create(payload);

@@ -22,7 +22,6 @@ function toIsoDate(date: Date): string {
 }
 
 interface ExpenseDialogData {
-  orgId: string;
 }
 
 @Component({
@@ -172,7 +171,6 @@ export class ExpenseFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<ExpenseDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   saving = signal(false);
 
   accounts = signal<Account[]>([]);
@@ -194,24 +192,24 @@ export class ExpenseFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.accountService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.accountService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.accounts.set(page.content);
     });
-    this.fundService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.fundService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.funds.set(page.content);
     });
-    this.vendorService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.vendorService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.vendors.set(page.content);
     });
   }
 
   openNewVendorDialog(): void {
     this.dialog
-      .open(VendorFormComponent, { width: '560px', data: { orgId: this.orgId, vendor: null } })
+      .open(VendorFormComponent, { width: '560px', data: { vendor: null } })
       .afterClosed()
       .subscribe(saved => {
         if (saved) {
-          this.vendorService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+          this.vendorService.getPage({ page: 0, size: 100 }).subscribe(page => {
             this.vendors.set(page.content);
           });
         }
@@ -237,7 +235,7 @@ export class ExpenseFormComponent implements OnInit {
       checkNumber: value.paymentMethod === 'check' ? (value.checkNumber || undefined) : undefined,
     };
 
-    this.transactionService.recordExpense(this.orgId, request).subscribe({
+    this.transactionService.recordExpense(request).subscribe({
       next: () => {
         this.notifications.success('Expense recorded.');
         this.dialogRef.close(true);

@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -21,8 +20,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "account",
-    uniqueConstraints = @UniqueConstraint(name = "uq_account_number_org",
-        columnNames = {"org_id", "account_number"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_account_number", columnNames = "account_number")
 )
 @Getter
 @Setter
@@ -35,11 +33,6 @@ public class Account {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     /** Nullable for root-level accounts; not null for sub-accounts. */
     @ManyToOne(fetch = FetchType.LAZY)

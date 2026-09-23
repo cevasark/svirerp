@@ -2,9 +2,7 @@ package com.svivanrilski.svirerp.finance;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -16,8 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "fund",
-    uniqueConstraints = @UniqueConstraint(name = "uq_fund_code_org",
-        columnNames = {"org_id", "fund_code"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_fund_code", columnNames = "fund_code")
 )
 @Getter
 @Setter
@@ -30,11 +27,6 @@ public class Fund {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotBlank
     @Column(name = "fund_name", nullable = false, length = 150)

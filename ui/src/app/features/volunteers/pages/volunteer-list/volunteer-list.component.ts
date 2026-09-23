@@ -7,7 +7,6 @@ import { FormsModule } from '@angular/forms';
 
 import { VolunteerService } from '../../services/volunteer.service';
 import { VolunteerAreaService } from '../../services/volunteer-area.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Person, Volunteer, VolunteerArea } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -61,11 +60,9 @@ import { PersonDetailsDialogComponent } from '../../../persons/pages/person-deta
 export class VolunteerListComponent implements OnInit {
   private volunteerService = inject(VolunteerService);
   private areaService = inject(VolunteerAreaService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
 
   page = signal<Page<Volunteer> | null>(null);
   loading = signal(false);
@@ -92,15 +89,9 @@ export class VolunteerListComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.loadPage();
-        this.areaService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
-          this.areas.set(page.content);
-        });
-      },
-      error: err => this.notifications.error(err.message ?? 'Could not load organization.'),
+    this.loadPage();
+    this.areaService.getPage({ page: 0, size: 100 }).subscribe(page => {
+      this.areas.set(page.content);
     });
   }
 
@@ -124,9 +115,8 @@ export class VolunteerListComponent implements OnInit {
   }
 
   openForm(volunteer?: Volunteer): void {
-    if (!this.orgId) return;
     this.dialog
-      .open(VolunteerFormComponent, { width: '560px', data: { orgId: this.orgId, entity: volunteer ?? null } })
+      .open(VolunteerFormComponent, { width: '560px', data: { entity: volunteer ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
@@ -145,9 +135,8 @@ export class VolunteerListComponent implements OnInit {
   }
 
   private loadPage(): void {
-    if (!this.orgId) return;
     this.loading.set(true);
-    this.volunteerService.getPageForOrg(this.orgId, this.pageParams(), this.areaFilter).subscribe({
+    this.volunteerService.getPage(this.pageParams(), this.areaFilter).subscribe({
       next: data => { this.page.set(data); this.loading.set(false); },
       error: ()   => this.loading.set(false),
     });

@@ -18,17 +18,17 @@ public interface VolunteerRepository extends JpaRepository<Volunteer, UUID> {
     // them — omitting this throws LazyInitializationException at request time, not at compile time.
 
     @Override
-    @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
+    @EntityGraph(attributePaths = {"person", "contactPerson", "areas"})
     Optional<Volunteer> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
-    Page<Volunteer> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "contactPerson", "areas"})
+    Page<Volunteer> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
-    Page<Volunteer> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "contactPerson", "areas"})
+    Page<Volunteer> findByIsActive(boolean isActive, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
-    Page<Volunteer> findByOrgIdAndAreasId(UUID orgId, UUID areaId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "contactPerson", "areas"})
+    Page<Volunteer> findByAreasId(UUID areaId, Pageable pageable);
 
-    boolean existsByPersonIdAndOrgId(UUID personId, UUID orgId);
+    boolean existsByPersonId(UUID personId);
 }

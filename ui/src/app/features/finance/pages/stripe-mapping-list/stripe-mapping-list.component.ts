@@ -2,7 +2,6 @@ import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } 
 import { MatDialog } from '@angular/material/dialog';
 
 import { StripeIntegrationService } from '../../services/stripe-integration.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { StripeProductMapping } from '../../../../core/models/domain.model';
 import { Page } from '../../../../core/models/api.model';
@@ -46,11 +45,9 @@ const PURPOSE_LABELS: Record<string, string> = {
 })
 export class StripeMappingListComponent implements OnInit {
   private stripeIntegrationService = inject(StripeIntegrationService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   mappings = signal<StripeProductMapping[]>([]);
   loading = signal(false);
 
@@ -82,12 +79,8 @@ export class StripeMappingListComponent implements OnInit {
   }
 
   openForm(mapping?: StripeProductMapping): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(StripeProductMappingFormComponent, { width: '560px', data: { orgId: this.orgId, mapping: mapping ?? null } })
+      .open(StripeProductMappingFormComponent, { width: '560px', data: { mapping: mapping ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.load(); });
   }
@@ -107,18 +100,9 @@ export class StripeMappingListComponent implements OnInit {
 
   private load(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.stripeIntegrationService.getMappingsForOrg(orgId).subscribe({
-          next: mappings => { this.mappings.set(mappings); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.stripeIntegrationService.getMappings().subscribe({
+      next: mappings => { this.mappings.set(mappings); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

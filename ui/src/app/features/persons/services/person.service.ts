@@ -23,18 +23,18 @@ export class PersonService extends ResourceService<Person> {
 
   /** Imports a Zeffy contacts export — catches the free ($0) "Follower" registrations that never
    *  show up in a Zeffy Transactions import, since they never produced a financial transaction. */
-  downloadImportTemplate(orgId: string): Observable<Blob> {
+  downloadImportTemplate(): Observable<Blob> {
     return this.http.get(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/persons/import-template`,
+      `${this.orgScopedEnv.apiUrl}/persons/import-template`,
       { responseType: 'blob' },
     );
   }
 
-  importPeople(orgId: string, file: File): Observable<PersonImportResult> {
+  importPeople(file: File): Observable<PersonImportResult> {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<PersonImportResult>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/persons/import`,
+      `${this.orgScopedEnv.apiUrl}/persons/import`,
       formData,
     );
   }

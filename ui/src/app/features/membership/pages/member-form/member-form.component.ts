@@ -21,7 +21,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { Member, MembershipType, Person } from '../../../../core/models/domain.model';
 
 interface MemberDialogData {
-  orgId: string;
   member: Member | null;
 }
 
@@ -144,7 +143,6 @@ export class MemberFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<MemberDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private member = this.data.member;
   isEdit = !!this.member;
   saving = signal(false);
@@ -176,11 +174,11 @@ export class MemberFormComponent implements OnInit {
     // A person can hold at most one membership per org — exclude anyone who
     // already has one from the picklist (except the person on this very
     // member, when editing, so their own name stays visible/selected).
-    this.memberService.getPageForOrg(this.orgId, { page: 0, size: 500 }).subscribe(page => {
+    this.memberService.getPage({ page: 0, size: 500 }).subscribe(page => {
       this.memberedPersonIds = new Set(page.content.map(m => m.person.id));
       this.updateAvailablePersons();
     });
-    this.membershipTypeService.getPageForOrg(this.orgId, { page: 0, size: 100 })
+    this.membershipTypeService.getPage({ page: 0, size: 100 })
       .subscribe(page => this.membershipTypes.set(page.content));
 
     if (this.member) {
@@ -227,7 +225,6 @@ export class MemberFormComponent implements OnInit {
     // references, so { id } stubs are all that's needed here.
     const payload = {
       person: { id: value.personId },
-      org: { id: this.orgId },
       membershipType: { id: value.membershipTypeId },
       memberNumber: value.memberNumber,
       joinDate: value.joinDate,

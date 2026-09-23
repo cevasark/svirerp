@@ -15,11 +15,11 @@ export class VolunteerAreaService extends ResourceService<VolunteerArea> {
     super('volunteer-areas');
   }
 
-  getPageForOrg(orgId: string, params: PageParams): Observable<Page<VolunteerArea>> {
+  override getPage(params: PageParams): Observable<Page<VolunteerArea>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) p = p.set('sort', params.sort);
     return this.http.get<Page<VolunteerArea>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/volunteer-areas`,
+      `${this.orgScopedEnv.apiUrl}/volunteer-areas`,
       { params: p },
     );
   }

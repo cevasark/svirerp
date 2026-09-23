@@ -11,7 +11,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 
 /**
- * This is a single-org-per-installation app (see OrgContextService) — there's
+ * This is a single-organization installation, so there is
  * no organization list/picker anywhere else, so this is the one place the
  * org's own details are viewable/editable, embedded directly in Settings
  * rather than behind a dialog, matching the rest of the Settings page's
@@ -132,7 +132,6 @@ export class OrganizationSettingsComponent implements OnInit {
   private orgService = inject(OrganizationService);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   isEdit = signal(false);
   saving = signal(false);
 
@@ -151,13 +150,12 @@ export class OrganizationSettingsComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.orgService.getPage({ page: 0, size: 1 }).subscribe(page => {
-      const org = page.content[0];
-      if (org) {
-        this.orgId = org.id;
+    this.orgService.get().subscribe({
+      next: org => {
         this.isEdit.set(true);
         this.form.patchValue(org);
-      }
+      },
+      error: () => this.isEdit.set(false),
     });
   }
 
@@ -169,13 +167,8 @@ export class OrganizationSettingsComponent implements OnInit {
     this.saving.set(true);
     const wasEdit = this.isEdit();
     const payload = this.form.getRawValue();
-    const op = wasEdit
-      ? this.orgService.update(this.orgId!, payload)
-      : this.orgService.create(payload);
-
-    op.subscribe({
+    this.orgService.save(payload).subscribe({
       next: org => {
-        this.orgId = org.id;
         this.isEdit.set(true);
         this.saving.set(false);
         this.notifications.success(`Organization ${wasEdit ? 'updated' : 'created'}.`);

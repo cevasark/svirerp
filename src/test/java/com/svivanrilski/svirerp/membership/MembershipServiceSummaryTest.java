@@ -5,10 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
-
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -22,7 +19,6 @@ class MembershipServiceSummaryTest {
     @Mock private MembershipTypeRepository typeRepo;
     @Mock private MemberRepository memberRepo;
     @Mock private MemberPaymentRepository paymentRepo;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
 
     @InjectMocks
@@ -30,20 +26,19 @@ class MembershipServiceSummaryTest {
 
     @Test
     void getMemberSummary_mapsEachCountToTheRightTierAndStatus() {
-        UUID orgId = UUID.randomUUID();
-        when(memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.MEMBER))
+        when(memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.MEMBER))
                 .thenReturn(10L);
-        when(memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.MEMBER))
+        when(memberRepo.countByStatusAndMembershipType_NameIgnoreCase("inactive", TierCalculator.MEMBER))
                 .thenReturn(3L);
-        when(memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "active", TierCalculator.BENEFACTOR))
+        when(memberRepo.countByStatusAndMembershipType_NameIgnoreCase("active", TierCalculator.BENEFACTOR))
                 .thenReturn(2L);
-        when(memberRepo.countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(orgId, "inactive", TierCalculator.BENEFACTOR))
+        when(memberRepo.countByStatusAndMembershipType_NameIgnoreCase("inactive", TierCalculator.BENEFACTOR))
                 .thenReturn(1L);
-        when(memberRepo.countByOrgIdAndMembershipType_NameIgnoreCase(orgId, TierCalculator.FOLLOWER))
+        when(memberRepo.countByMembershipType_NameIgnoreCase(TierCalculator.FOLLOWER))
                 .thenReturn(5L);
-        when(memberRepo.countByOrgId(orgId)).thenReturn(21L);
+        when(memberRepo.count()).thenReturn(21L);
 
-        MembershipService.MemberSummary summary = service.getMemberSummary(orgId);
+        MembershipService.MemberSummary summary = service.getMemberSummary();
 
         assertThat(summary.activeMembers()).isEqualTo(10L);
         assertThat(summary.inactiveMembers()).isEqualTo(3L);

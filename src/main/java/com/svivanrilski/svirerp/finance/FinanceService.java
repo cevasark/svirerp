@@ -8,8 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
 import com.svivanrilski.svirerp.event.EventService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -93,15 +91,14 @@ public class FinanceService {
     private final ReconciliationItemRepository reconItemRepo;
     private final VendorRepository vendorRepo;
     private final ServiceRequestRepository serviceRequestRepo;
-    private final OrganizationService orgService;
     private final PersonService personService;
     private final EventService eventService;
     private final EntityManager entityManager;
 
     // ── Fund ─────────────────────────────────────────────────────────────────
 
-    public Page<Fund> findFundsByOrg(UUID orgId, Pageable pageable) {
-        return fundRepo.findByOrgId(orgId, pageable);
+    public Page<Fund> findFunds(Pageable pageable) {
+        return fundRepo.findAll(pageable);
     }
 
     public Fund findFundById(UUID id) {
@@ -112,8 +109,6 @@ public class FinanceService {
     @Transactional
     public Fund createFund(Fund fund) {
         validate(FUND_TYPES, fund.getFundType(), "fund type");
-        Organization org = orgService.findById(fund.getOrg().getId());
-        fund.setOrg(org);
         return fundRepo.save(fund);
     }
 
@@ -142,35 +137,33 @@ public class FinanceService {
 
     /** Not read-only: may lazily seed a default chart of accounts on an org's first request. */
     @Transactional
-    public Page<Account> findAccountsByOrg(UUID orgId, Pageable pageable) {
-        Page<Account> page = accountRepo.findByOrgId(orgId, pageable);
+    public Page<Account> findAccounts(Pageable pageable) {
+        Page<Account> page = accountRepo.findAll(pageable);
         if (page.isEmpty() && pageable.getPageNumber() == 0) {
-            seedDefaultChartOfAccounts(orgId);
-            page = accountRepo.findByOrgId(orgId, pageable);
+            seedDefaultChartOfAccounts();
+            page = accountRepo.findAll(pageable);
         }
         return page;
     }
 
     /** Returns root accounts; clients can traverse childAccounts for the full hierarchy. */
     @Transactional
-    public List<Account> findRootAccounts(UUID orgId) {
-        List<Account> accounts = accountRepo.findByOrgIdAndParentAccountIsNull(orgId);
+    public List<Account> findRootAccounts() {
+        List<Account> accounts = accountRepo.findByParentAccountIsNull();
         if (accounts.isEmpty()) {
-            seedDefaultChartOfAccounts(orgId);
-            accounts = accountRepo.findByOrgIdAndParentAccountIsNull(orgId);
+            seedDefaultChartOfAccounts();
+            accounts = accountRepo.findByParentAccountIsNull();
         }
         return accounts;
     }
 
-    private void seedDefaultChartOfAccounts(UUID orgId) {
-        Organization org = orgService.findById(orgId);
+    private void seedDefaultChartOfAccounts() {
         for (String[] def : DEFAULT_ACCOUNTS) {
-            if (!accountRepo.existsByOrgIdAndAccountNumber(orgId, def[0])) {
+            if (!accountRepo.existsByAccountNumber(def[0])) {
                 String accountType = def[2];
                 String normalBalance = "asset".equals(accountType) || "expense".equals(accountType)
                         ? "debit" : "credit";
                 accountRepo.save(Account.builder()
-                        .org(org)
                         .accountNumber(def[0])
                         .accountName(def[1])
                         .accountType(accountType)
@@ -188,25 +181,22 @@ public class FinanceService {
     }
 
     /** Looks up one of the lazily-seeded default accounts (e.g. "4010", "1010") by number. */
-    public Account findAccountByNumber(UUID orgId, String accountNumber) {
-        return accountRepo.findByOrgIdAndAccountNumber(orgId, accountNumber)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Account " + accountNumber + " not found for org " + orgId));
+    public Account findAccountByNumber(String accountNumber) {
+        return accountRepo.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + accountNumber));
     }
 
     /**
      * Finds an account by number, creating it if missing — for an account introduced to
      * {@link #DEFAULT_ACCOUNTS} after an org's chart of accounts was already seeded (seeding only
-     * runs once, on an org's very first accounts request — see {@link #findAccountsByOrg}), so an
+     * runs once, on the installation's first accounts request — see {@link #findAccounts}), so an
      * already-established org would otherwise never pick up a newly-added default account.
      */
     @Transactional
-    public Account findOrCreateAccountByNumber(UUID orgId, String accountNumber, String accountName, String accountType) {
-        return accountRepo.findByOrgIdAndAccountNumber(orgId, accountNumber).orElseGet(() -> {
-            Organization org = orgService.findById(orgId);
+    public Account findOrCreateAccountByNumber(String accountNumber, String accountName, String accountType) {
+        return accountRepo.findByAccountNumber(accountNumber).orElseGet(() -> {
             String normalBalance = "asset".equals(accountType) || "expense".equals(accountType) ? "debit" : "credit";
             return accountRepo.save(Account.builder()
-                    .org(org)
                     .accountNumber(accountNumber)
                     .accountName(accountName)
                     .accountType(accountType)
@@ -221,8 +211,6 @@ public class FinanceService {
     public Account createAccount(Account account) {
         validate(ACCOUNT_TYPES, account.getAccountType(), "account type");
         validate(NORMAL_BALANCES, account.getNormalBalance(), "normal balance");
-        Organization org = orgService.findById(account.getOrg().getId());
-        account.setOrg(org);
         if (account.getParentAccount() != null) {
             Account parent = findAccountById(account.getParentAccount().getId());
             account.setParentAccount(parent);
@@ -257,9 +245,9 @@ public class FinanceService {
 
     // ── JournalEntry ──────────────────────────────────────────────────────────
 
-    public Page<JournalEntry> findEntriesByOrg(UUID orgId, UUID fundId, String paymentMethod, LocalDate from,
+    public Page<JournalEntry> findEntries(UUID fundId, String paymentMethod, LocalDate from,
             LocalDate to, Pageable pageable) {
-        return journalEntryRepo.findByOrgIdAndFilters(orgId, fundId, paymentMethod, from, to, pageable);
+        return journalEntryRepo.findByFilters(fundId, paymentMethod, from, to, pageable);
     }
 
     public JournalEntry findEntryById(UUID id) {
@@ -271,8 +259,6 @@ public class FinanceService {
     public JournalEntry createEntry(JournalEntry entry) {
         validate(ENTRY_TYPES, entry.getEntryType(), "entry type");
         validate(ENTRY_STATUSES, entry.getStatus(), "entry status");
-        Organization org = orgService.findById(entry.getOrg().getId());
-        entry.setOrg(org);
         if (entry.getCreatedBy() != null) {
             entry.setCreatedBy(personService.findById(entry.getCreatedBy().getId()));
         }
@@ -365,8 +351,8 @@ public class FinanceService {
 
     // ── Budget ────────────────────────────────────────────────────────────────
 
-    public Page<Budget> findBudgetsByOrg(UUID orgId, Pageable pageable) {
-        return budgetRepo.findByOrgId(orgId, pageable);
+    public Page<Budget> findBudgets(Pageable pageable) {
+        return budgetRepo.findAll(pageable);
     }
 
     public Budget findBudgetById(UUID id) {
@@ -377,9 +363,7 @@ public class FinanceService {
     @Transactional
     public Budget createBudget(Budget budget) {
         validate(BUDGET_PERIODS, budget.getPeriod(), "budget period");
-        Organization org = orgService.findById(budget.getOrg().getId());
         Account account = findAccountById(budget.getAccount().getId());
-        budget.setOrg(org);
         budget.setAccount(account);
         if (budget.getFund() != null) {
             budget.setFund(findFundById(budget.getFund().getId()));
@@ -407,8 +391,8 @@ public class FinanceService {
 
     // ── BankAccount ───────────────────────────────────────────────────────────
 
-    public Page<BankAccount> findBankAccountsByOrg(UUID orgId, Pageable pageable) {
-        return bankAccountRepo.findByOrgId(orgId, pageable);
+    public Page<BankAccount> findBankAccounts(Pageable pageable) {
+        return bankAccountRepo.findAll(pageable);
     }
 
     public BankAccount findBankAccountById(UUID id) {
@@ -418,9 +402,7 @@ public class FinanceService {
 
     @Transactional
     public BankAccount createBankAccount(BankAccount bankAccount) {
-        Organization org = orgService.findById(bankAccount.getOrg().getId());
         Account glAccount = findAccountById(bankAccount.getGlAccount().getId());
-        bankAccount.setOrg(org);
         bankAccount.setGlAccount(glAccount);
         return bankAccountRepo.save(bankAccount);
     }
@@ -592,8 +574,8 @@ public class FinanceService {
 
     // ── Vendor ───────────────────────────────────────────────────────────────
 
-    public Page<Vendor> findVendorsByOrg(UUID orgId, Pageable pageable) {
-        return vendorRepo.findByOrgId(orgId, pageable);
+    public Page<Vendor> findVendors(Pageable pageable) {
+        return vendorRepo.findAll(pageable);
     }
 
     public Vendor findVendorById(UUID id) {
@@ -603,8 +585,6 @@ public class FinanceService {
 
     @Transactional
     public Vendor createVendor(Vendor vendor) {
-        Organization org = orgService.findById(vendor.getOrg().getId());
-        vendor.setOrg(org);
         return vendorRepo.save(vendor);
     }
 
@@ -633,8 +613,8 @@ public class FinanceService {
 
     // ── ServiceRequest ───────────────────────────────────────────────────────
 
-    public Page<ServiceRequest> findServiceRequestsByOrg(UUID orgId, Pageable pageable) {
-        return serviceRequestRepo.findByOrgId(orgId, pageable);
+    public Page<ServiceRequest> findServiceRequests(Pageable pageable) {
+        return serviceRequestRepo.findAll(pageable);
     }
 
     public ServiceRequest findServiceRequestById(UUID id) {
@@ -646,8 +626,6 @@ public class FinanceService {
     public ServiceRequest createServiceRequest(ServiceRequest request) {
         validate(SERVICE_TYPES, request.getServiceType(), "service type");
         validate(SERVICE_REQUEST_STATUSES, request.getStatus(), "service request status");
-        Organization org = orgService.findById(request.getOrg().getId());
-        request.setOrg(org);
         if (request.getRequestorPerson() != null) {
             request.setRequestorPerson(personService.findById(request.getRequestorPerson().getId()));
         }
@@ -701,7 +679,6 @@ public class FinanceService {
     @Transactional
     public JournalEntry recordIncome(RecordIncomeRequest req) {
         validate(PAYMENT_METHODS, req.paymentMethod(), "payment method");
-        Organization org = orgService.findById(req.orgId());
         Account category = findAccountById(req.categoryAccountId());
         requireAccountType(category, "revenue", "Income category account");
         Account deposit = findAccountById(req.depositAccountId());
@@ -726,7 +703,6 @@ public class FinanceService {
         }
 
         JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
-                .org(org)
                 .entryDate(req.entryDate())
                 .description(req.description())
                 .entryType("general")
@@ -762,7 +738,6 @@ public class FinanceService {
     @Transactional
     public JournalEntry recordExpense(RecordExpenseRequest req) {
         validate(PAYMENT_METHODS, req.paymentMethod(), "payment method");
-        Organization org = orgService.findById(req.orgId());
         Account category = findAccountById(req.categoryAccountId());
         requireAccountType(category, "expense", "Expense category account");
         Account payment = findAccountById(req.paymentAccountId());
@@ -771,7 +746,6 @@ public class FinanceService {
         Vendor vendor = req.vendorId() != null ? findVendorById(req.vendorId()) : null;
 
         JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
-                .org(org)
                 .entryDate(req.entryDate())
                 .description(req.description())
                 .entryType("general")
@@ -805,14 +779,12 @@ public class FinanceService {
      */
     @Transactional
     public JournalEntry recordTransfer(RecordTransferRequest req) {
-        Organization org = orgService.findById(req.orgId());
         Account from = findAccountById(req.fromAccountId());
         requireAccountType(from, "asset", "Source account");
         Account to = findAccountById(req.toAccountId());
         requireAccountType(to, "asset", "Destination account");
 
         JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
-                .org(org)
                 .entryDate(req.entryDate())
                 .description(req.description())
                 .entryType("general")
@@ -840,16 +812,14 @@ public class FinanceService {
      * cash-in-hand figures are unaffected; this is purely a categorization fix.
      */
     @Transactional
-    public JournalEntry reclassifyIncome(UUID orgId, LocalDate entryDate, BigDecimal amount, String description,
+    public JournalEntry reclassifyIncome(LocalDate entryDate, BigDecimal amount, String description,
             UUID fromCategoryAccountId, UUID toCategoryAccountId) {
-        Organization org = orgService.findById(orgId);
         Account from = findAccountById(fromCategoryAccountId);
         requireAccountType(from, "revenue", "Source account");
         Account to = findAccountById(toCategoryAccountId);
         requireAccountType(to, "revenue", "Destination account");
 
         JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
-                .org(org)
                 .entryDate(entryDate)
                 .description(description)
                 .entryType("general")
@@ -909,12 +879,12 @@ public class FinanceService {
     }
 
     /** Income vs. expense by category for a period — see StatementOfActivities. */
-    public StatementOfActivities statementOfActivities(UUID orgId, LocalDate from, LocalDate to, UUID fundId) {
+    public StatementOfActivities statementOfActivities(LocalDate from, LocalDate to, UUID fundId) {
         List<StatementOfActivitiesLine> income = journalLineRepo
-                .sumByAccountForOrgAndTypeAndDateRange(orgId, "revenue", from, to, fundId)
+                .sumByAccountForTypeAndDateRange("revenue", from, to, fundId)
                 .stream().map(this::toIncomeLine).toList();
         List<StatementOfActivitiesLine> expense = journalLineRepo
-                .sumByAccountForOrgAndTypeAndDateRange(orgId, "expense", from, to, fundId)
+                .sumByAccountForTypeAndDateRange("expense", from, to, fundId)
                 .stream().map(this::toExpenseLine).toList();
 
         BigDecimal totalIncome = income.stream().map(StatementOfActivitiesLine::amount)
@@ -928,19 +898,19 @@ public class FinanceService {
 
     /** Every account's balance as of a date, grouped Assets/Liabilities/Equity — see
      *  StatementOfFinancialPosition for the computed "Net Income (to date)" equity line. */
-    public StatementOfFinancialPosition statementOfFinancialPosition(UUID orgId, LocalDate asOf) {
+    public StatementOfFinancialPosition statementOfFinancialPosition(LocalDate asOf) {
         List<BalanceSheetLine> assets = journalLineRepo
-                .sumByAccountForOrgAndTypeAsOfDate(orgId, "asset", asOf)
+                .sumByAccountForTypeAsOfDate("asset", asOf)
                 .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
                         a.getAccountName(), a.getAmount()))
                 .toList();
         List<BalanceSheetLine> liabilities = journalLineRepo
-                .sumByAccountForOrgAndTypeAsOfDate(orgId, "liability", asOf)
+                .sumByAccountForTypeAsOfDate("liability", asOf)
                 .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
                         a.getAccountName(), a.getAmount().negate()))
                 .toList();
         List<BalanceSheetLine> equity = journalLineRepo
-                .sumByAccountForOrgAndTypeAsOfDate(orgId, "equity", asOf)
+                .sumByAccountForTypeAsOfDate("equity", asOf)
                 .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
                         a.getAccountName(), a.getAmount().negate()))
                 .toList();
@@ -955,9 +925,9 @@ public class FinanceService {
         // This app has no period-closing process that zeroes revenue/expense into equity, so a
         // real accounting equity account alone won't reflect income earned so far — compute it live
         // (never stored) so Assets == Liabilities + Equity still holds by the double-entry identity.
-        BigDecimal revenueToDate = journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "revenue", asOf)
+        BigDecimal revenueToDate = journalLineRepo.sumByAccountForTypeAsOfDate("revenue", asOf)
                 .stream().map(a -> a.getAmount().negate()).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal expenseToDate = journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "expense", asOf)
+        BigDecimal expenseToDate = journalLineRepo.sumByAccountForTypeAsOfDate("expense", asOf)
                 .stream().map(AccountAmount::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal netIncomeToDate = revenueToDate.subtract(expenseToDate);
 
@@ -970,12 +940,12 @@ public class FinanceService {
 
     /** Every active fund's opening balance/income/expense/balance in one batch — same math as
      *  fundSummary(), without an N+1 per-fund call. */
-    public List<FundOverviewRow> fundsOverview(UUID orgId) {
-        List<Fund> funds = fundRepo.findByOrgIdAndIsActiveOrderByFundName(orgId, true);
+    public List<FundOverviewRow> fundsOverview() {
+        List<Fund> funds = fundRepo.findByIsActiveOrderByFundName(true);
 
-        Map<UUID, BigDecimal> incomeByFund = journalLineRepo.sumByFundAndAccountType(orgId, "revenue")
+        Map<UUID, BigDecimal> incomeByFund = journalLineRepo.sumByFundAndAccountType("revenue")
                 .stream().collect(Collectors.toMap(FundAmount::getFundId, a -> a.getAmount().negate()));
-        Map<UUID, BigDecimal> expenseByFund = journalLineRepo.sumByFundAndAccountType(orgId, "expense")
+        Map<UUID, BigDecimal> expenseByFund = journalLineRepo.sumByFundAndAccountType("expense")
                 .stream().collect(Collectors.toMap(FundAmount::getFundId, FundAmount::getAmount));
 
         return funds.stream().map(fund -> {

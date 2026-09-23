@@ -15,6 +15,6 @@ public interface ProjectCommentRepository extends JpaRepository<ProjectComment, 
     // hits a LazyInitializationException walking project -> org / assignee.
     // Deliberately unpaginated — a project's comment thread is meant to be read in full, oldest
     // first, same as ActionItem's meeting-scoped list.
-    @EntityGraph(attributePaths = {"project", "project.org", "project.assignee"})
+    @EntityGraph(attributePaths = {"project", "project.assignee"})
     List<ProjectComment> findByProjectIdOrderByCreatedAt(UUID projectId);
 }

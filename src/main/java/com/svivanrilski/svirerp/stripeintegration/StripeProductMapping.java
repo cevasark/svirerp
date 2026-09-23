@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import com.svivanrilski.svirerp.finance.Account;
 import com.svivanrilski.svirerp.finance.Fund;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -21,8 +20,8 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "stripe_product_mapping",
-    uniqueConstraints = @UniqueConstraint(name = "uq_stripe_product_mapping_org_price",
-        columnNames = {"org_id", "stripe_price_id"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_stripe_product_mapping_price",
+        columnNames = "stripe_price_id")
 )
 @Getter
 @Setter
@@ -35,11 +34,6 @@ public class StripeProductMapping {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @NotBlank
     @Column(name = "stripe_price_id", nullable = false, length = 100)

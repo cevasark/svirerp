@@ -14,7 +14,6 @@ import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
 import com.svivanrilski.svirerp.membership.MemberPaymentRepository;
 import com.svivanrilski.svirerp.membership.MembershipService;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -50,7 +49,7 @@ public class StripeWebhookEventApplier {
      *  already inserted the row, or a concurrent duplicate delivery won the race on the DB's unique
      *  constraint on stripe_event_id. */
     @Transactional
-    public StripeWebhookEvent recordReceived(Organization org, String stripeEventId, String eventType,
+    public StripeWebhookEvent recordReceived(String stripeEventId, String eventType,
             String stripePriceId, BigDecimal amount, BigDecimal fee, String email, String firstName,
             String lastName, String payload) {
         if (eventRepo.existsByStripeEventId(stripeEventId)) {
@@ -58,7 +57,6 @@ public class StripeWebhookEventApplier {
         }
         try {
             return eventRepo.save(StripeWebhookEvent.builder()
-                    .org(org)
                     .stripeEventId(stripeEventId)
                     .eventType(eventType)
                     .stripePriceId(stripePriceId)
@@ -89,8 +87,6 @@ public class StripeWebhookEventApplier {
             return;
         }
 
-        UUID orgId = row.getOrg().getId();
-
         if (row.getStripePriceId() == null || row.getStripePriceId().isBlank()) {
             row.setStatus("needs_mapping");
             row.setErrorMessage("No Stripe Price ID could be resolved from this event");
@@ -99,7 +95,7 @@ public class StripeWebhookEventApplier {
         }
 
         Optional<StripeProductMapping> mappingOpt =
-                mappingRepo.findByOrgIdAndStripePriceId(orgId, row.getStripePriceId());
+                mappingRepo.findByStripePriceId(row.getStripePriceId());
         if (mappingOpt.isEmpty()) {
             row.setStatus("needs_mapping");
             row.setErrorMessage(null);
@@ -125,8 +121,8 @@ public class StripeWebhookEventApplier {
                 : personService.findByEmail(row.getEmail());
 
         LocalDate paymentDate = LocalDate.now(CHURCH_ZONE);
-        Account depositAccount = resolveDepositAccount(orgId);
-        Account categoryAccount = resolveCategoryAccount(mapping, orgId);
+        Account depositAccount = resolveDepositAccount();
+        Account categoryAccount = resolveCategoryAccount(mapping);
         UUID fundId = mapping.getFund() != null ? mapping.getFund().getId() : null;
 
         Member member = null;
@@ -135,7 +131,7 @@ public class StripeWebhookEventApplier {
 
         switch (mapping.getPurpose()) {
             case "membership_dues" -> {
-                member = membershipService.findOrCreateFollowerMember(person.getId(), orgId, paymentDate);
+                member = membershipService.findOrCreateFollowerMember(person.getId(), paymentDate);
                 payment = memberPaymentRepo.save(MemberPayment.builder()
                         .member(member)
                         .amount(row.getAmount())
@@ -148,7 +144,6 @@ public class StripeWebhookEventApplier {
                 member = membershipService.recomputeTier(member.getId());
             }
             case "service_request" -> serviceRequest = financeService.createServiceRequest(ServiceRequest.builder()
-                    .org(row.getOrg())
                     .requestorPerson(person)
                     .serviceType(mapping.getServiceType() != null ? mapping.getServiceType() : "other")
                     .agreedAmount(row.getAmount())
@@ -161,10 +156,9 @@ public class StripeWebhookEventApplier {
         }
 
         boolean hasFee = row.getFee() != null && row.getFee().signum() > 0;
-        UUID feeAccountId = hasFee ? resolveFeeAccount(orgId).getId() : null;
+        UUID feeAccountId = hasFee ? resolveFeeAccount().getId() : null;
 
         JournalEntry entry = financeService.recordIncome(new RecordIncomeRequest(
-                orgId,
                 paymentDate,
                 row.getAmount(),
                 buildDescription(mapping),
@@ -216,15 +210,15 @@ public class StripeWebhookEventApplier {
      *  only grows when the actual payout lands (see FinanceService#recordTransfer / DEFAULT_ACCOUNTS).
      *  findOrCreateAccountByNumber retrofits this org's already-established chart of accounts the
      *  same way resolveFeeAccount does for 5320. */
-    private Account resolveDepositAccount(UUID orgId) {
-        financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers the lazy chart-of-accounts seed
-        return financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset");
+    private Account resolveDepositAccount() {
+        financeService.findAccounts(PageRequest.of(0, 1)); // triggers the lazy chart-of-accounts seed
+        return financeService.findOrCreateAccountByNumber("1021", "Undeposited Funds – Stripe", "asset");
     }
 
     /** Falls back to a sensible default revenue account per purpose when the mapping doesn't
      *  specify one — an admin can always pick something more specific in the mapping's own Account
      *  field once they've created it via the existing Categories (Account) screen. */
-    private Account resolveCategoryAccount(StripeProductMapping mapping, UUID orgId) {
+    private Account resolveCategoryAccount(StripeProductMapping mapping) {
         if (mapping.getCategoryAccount() != null) {
             return mapping.getCategoryAccount();
         }
@@ -233,15 +227,15 @@ public class StripeWebhookEventApplier {
             case "service_request" -> "4030";
             default -> "4090";
         };
-        return financeService.findAccountByNumber(orgId, fallbackNumber);
+        return financeService.findAccountByNumber(fallbackNumber);
     }
 
     /** Lazily creates "Payment Processing Fees" (5320) for this org if it doesn't exist yet — this
      *  org may already have an established chart of accounts predating this account being added, so
      *  the normal DEFAULT_ACCOUNTS seed (which only runs once, on an org's very first accounts
      *  request) wouldn't otherwise pick it up. */
-    private Account resolveFeeAccount(UUID orgId) {
-        return financeService.findOrCreateAccountByNumber(orgId, "5320", "Payment Processing Fees", "expense");
+    private Account resolveFeeAccount() {
+        return financeService.findOrCreateAccountByNumber("5320", "Payment Processing Fees", "expense");
     }
 
     private String buildNotes(StripeProductMapping mapping) {

@@ -18,7 +18,6 @@ import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
 import com.svivanrilski.svirerp.membership.MemberPaymentRepository;
 import com.svivanrilski.svirerp.membership.MembershipService;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -52,20 +51,9 @@ class StripeWebhookEventApplierTest {
     @InjectMocks
     private StripeWebhookEventApplier applier;
 
-    private Organization org;
-    private UUID orgId;
-
-    @BeforeEach
-    void setUp() {
-        orgId = UUID.randomUUID();
-        org = new Organization();
-        org.setId(orgId);
-    }
-
     private StripeWebhookEvent baseEvent(String status) {
         StripeWebhookEvent event = new StripeWebhookEvent();
         event.setId(UUID.randomUUID());
-        event.setOrg(org);
         event.setStripeEventId("evt_" + UUID.randomUUID());
         event.setEventType("checkout.session.completed");
         event.setStripePriceId("price_123");
@@ -93,7 +81,7 @@ class StripeWebhookEventApplierTest {
     void applyEvent_priceNotMapped_marksNeedsMapping() {
         StripeWebhookEvent event = baseEvent("received");
         when(eventRepo.findById(event.getId())).thenReturn(Optional.of(event));
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.empty());
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.empty());
 
         applier.applyEvent(event.getId());
 
@@ -124,7 +112,7 @@ class StripeWebhookEventApplierTest {
 
         StripeProductMapping mapping = new StripeProductMapping();
         mapping.setPurpose("membership_dues");
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.of(mapping));
 
         when(personService.findByEmailIfExists("payer@example.com")).thenReturn(Optional.empty());
         Person person = new Person();
@@ -133,7 +121,7 @@ class StripeWebhookEventApplierTest {
 
         Member member = new Member();
         member.setId(UUID.randomUUID());
-        when(membershipService.findOrCreateFollowerMember(eq(person.getId()), eq(orgId), any(LocalDate.class)))
+        when(membershipService.findOrCreateFollowerMember(eq(person.getId()), any(LocalDate.class)))
                 .thenReturn(member);
 
         MemberPayment payment = MemberPayment.builder().member(member).amount(event.getAmount()).build();
@@ -143,14 +131,14 @@ class StripeWebhookEventApplierTest {
         recomputed.setId(member.getId());
         when(membershipService.recomputeTier(member.getId())).thenReturn(recomputed);
 
-        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        when(financeService.findAccounts(any(PageRequest.class))).thenReturn(Page.empty());
         Account depositAccount = new Account();
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+        when(financeService.findOrCreateAccountByNumber("1021", "Undeposited Funds – Stripe", "asset"))
                 .thenReturn(depositAccount);
-        when(financeService.findAccountByNumber(orgId, "4000")).thenReturn(categoryAccount);
+        when(financeService.findAccountByNumber("4000")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();
         entry.setId(UUID.randomUUID());
@@ -191,24 +179,24 @@ class StripeWebhookEventApplierTest {
 
         StripeProductMapping mapping = new StripeProductMapping();
         mapping.setPurpose("general_income");
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.of(mapping));
 
         Person person = new Person();
         person.setId(UUID.randomUUID());
         when(personService.findByEmailIfExists(anyString())).thenReturn(Optional.of(person));
         when(personService.findByEmail(anyString())).thenReturn(person);
 
-        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        when(financeService.findAccounts(any(PageRequest.class))).thenReturn(Page.empty());
         Account depositAccount = new Account();
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
         Account feeAccount = new Account();
         feeAccount.setId(UUID.randomUUID());
-        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+        when(financeService.findOrCreateAccountByNumber("1021", "Undeposited Funds – Stripe", "asset"))
                 .thenReturn(depositAccount);
-        when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
-        when(financeService.findOrCreateAccountByNumber(orgId, "5320", "Payment Processing Fees", "expense"))
+        when(financeService.findAccountByNumber("4090")).thenReturn(categoryAccount);
+        when(financeService.findOrCreateAccountByNumber("5320", "Payment Processing Fees", "expense"))
                 .thenReturn(feeAccount);
 
         JournalEntry entry = new JournalEntry();
@@ -230,21 +218,21 @@ class StripeWebhookEventApplierTest {
 
         StripeProductMapping mapping = new StripeProductMapping();
         mapping.setPurpose("general_income");
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.of(mapping));
 
         Person person = new Person();
         person.setId(UUID.randomUUID());
         when(personService.findByEmailIfExists(anyString())).thenReturn(Optional.of(person));
         when(personService.findByEmail(anyString())).thenReturn(person);
 
-        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        when(financeService.findAccounts(any(PageRequest.class))).thenReturn(Page.empty());
         Account depositAccount = new Account();
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+        when(financeService.findOrCreateAccountByNumber("1021", "Undeposited Funds – Stripe", "asset"))
                 .thenReturn(depositAccount);
-        when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
+        when(financeService.findAccountByNumber("4090")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();
         entry.setId(UUID.randomUUID());
@@ -256,7 +244,7 @@ class StripeWebhookEventApplierTest {
         // resolveDepositAccount) — assert the fee account specifically is never resolved, not that
         // the method is never called at all.
         verify(financeService, never())
-                .findOrCreateAccountByNumber(any(), eq("5320"), any(), any());
+                .findOrCreateAccountByNumber(eq("5320"), any(), any());
         ArgumentCaptor<RecordIncomeRequest> reqCaptor = ArgumentCaptor.forClass(RecordIncomeRequest.class);
         verify(financeService).recordIncome(reqCaptor.capture());
         assertThat(reqCaptor.getValue().feeAmount()).isNull();
@@ -271,7 +259,7 @@ class StripeWebhookEventApplierTest {
         StripeProductMapping mapping = new StripeProductMapping();
         mapping.setPurpose("service_request");
         mapping.setServiceType("wedding");
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.of(mapping));
 
         Person person = new Person();
         person.setId(UUID.randomUUID());
@@ -281,14 +269,14 @@ class StripeWebhookEventApplierTest {
         ServiceRequest serviceRequest = ServiceRequest.builder().id(UUID.randomUUID()).build();
         when(financeService.createServiceRequest(any(ServiceRequest.class))).thenReturn(serviceRequest);
 
-        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        when(financeService.findAccounts(any(PageRequest.class))).thenReturn(Page.empty());
         Account depositAccount = new Account();
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+        when(financeService.findOrCreateAccountByNumber("1021", "Undeposited Funds – Stripe", "asset"))
                 .thenReturn(depositAccount);
-        when(financeService.findAccountByNumber(orgId, "4030")).thenReturn(categoryAccount);
+        when(financeService.findAccountByNumber("4030")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();
         entry.setId(UUID.randomUUID());
@@ -316,7 +304,7 @@ class StripeWebhookEventApplierTest {
 
         StripeProductMapping mapping = new StripeProductMapping();
         mapping.setPurpose("general_income");
-        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+        when(mappingRepo.findByStripePriceId("price_123")).thenReturn(Optional.of(mapping));
 
         assertThrows(IllegalArgumentException.class, () -> applier.applyEvent(event.getId()));
 

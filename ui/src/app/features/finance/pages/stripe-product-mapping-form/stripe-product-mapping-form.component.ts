@@ -17,7 +17,6 @@ import { StripeProductMapping, Fund, Account } from '../../../../core/models/dom
 import { StripePriceInfo, StripeProductMappingRequest } from '../../../../core/models/api.model';
 
 interface StripeProductMappingDialogData {
-  orgId: string;
   mapping: StripeProductMapping | null;
 }
 
@@ -147,7 +146,6 @@ export class StripeProductMappingFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<StripeProductMappingDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private mapping = this.data.mapping;
   isEdit = !!this.mapping;
   saving = signal(false);
@@ -170,12 +168,12 @@ export class StripeProductMappingFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.fundService.getPageForOrg(this.orgId, { page: 0, size: 200 }).subscribe(page => this.funds.set(page.content));
-    this.accountService.getPageForOrg(this.orgId, { page: 0, size: 200 }).subscribe(page =>
+    this.fundService.getPage({ page: 0, size: 200 }).subscribe(page => this.funds.set(page.content));
+    this.accountService.getPage({ page: 0, size: 200 }).subscribe(page =>
       this.revenueAccounts.set(page.content.filter(a => a.accountType === 'revenue')));
 
     this.loadingPrices.set(true);
-    this.stripeIntegrationService.getStripePrices(this.orgId).pipe(
+    this.stripeIntegrationService.getStripePrices().pipe(
       catchError(() => of([] as StripePriceInfo[])),
     ).subscribe(prices => {
       this.loadingPrices.set(false);
@@ -223,7 +221,7 @@ export class StripeProductMappingFormComponent implements OnInit {
 
     const op = this.isEdit
       ? this.stripeIntegrationService.updateMapping(this.mapping!.id, payload)
-      : this.stripeIntegrationService.createMapping(this.orgId, payload);
+      : this.stripeIntegrationService.createMapping(payload);
 
     op.subscribe({
       next: () => {

@@ -9,8 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.svivanrilski.svirerp.event.EventService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
@@ -44,7 +42,6 @@ class FinanceServiceReclassifyTest {
     @Mock private ReconciliationItemRepository reconItemRepo;
     @Mock private VendorRepository vendorRepo;
     @Mock private ServiceRequestRepository serviceRequestRepo;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
     @Mock private EventService eventService;
     @Mock private EntityManager entityManager;
@@ -52,7 +49,6 @@ class FinanceServiceReclassifyTest {
     @InjectMocks
     private FinanceService financeService;
 
-    private UUID orgId;
     private UUID ticketAccountId;
     private UUID donationAccountId;
 
@@ -60,13 +56,8 @@ class FinanceServiceReclassifyTest {
 
     @BeforeEach
     void setUp() {
-        orgId = UUID.randomUUID();
         ticketAccountId = UUID.randomUUID();
         donationAccountId = UUID.randomUUID();
-
-        Organization org = new Organization();
-        org.setId(orgId);
-        when(orgService.findById(orgId)).thenReturn(org);
 
         lenient().when(journalEntryRepo.save(any(JournalEntry.class))).thenAnswer(inv -> {
             JournalEntry entry = inv.getArgument(0);
@@ -90,7 +81,7 @@ class FinanceServiceReclassifyTest {
         when(accountRepo.findById(ticketAccountId)).thenReturn(Optional.of(accountOf(ticketAccountId, "revenue")));
         when(accountRepo.findById(donationAccountId)).thenReturn(Optional.of(accountOf(donationAccountId, "revenue")));
 
-        JournalEntry entry = financeService.reclassifyIncome(orgId, LocalDate.now(), new BigDecimal("150.00"),
+        JournalEntry entry = financeService.reclassifyIncome(LocalDate.now(), new BigDecimal("150.00"),
                 "Reclassify Zeffy Ticket → membership", ticketAccountId, donationAccountId);
 
         assertThat(entry.getStatus()).isEqualTo("posted");
@@ -114,7 +105,7 @@ class FinanceServiceReclassifyTest {
     void reclassifyIncome_rejectsNonRevenueAccounts() {
         when(accountRepo.findById(ticketAccountId)).thenReturn(Optional.of(accountOf(ticketAccountId, "asset")));
 
-        assertThatThrownBy(() -> financeService.reclassifyIncome(orgId, LocalDate.now(), new BigDecimal("150.00"),
+        assertThatThrownBy(() -> financeService.reclassifyIncome(LocalDate.now(), new BigDecimal("150.00"),
                 "bad", ticketAccountId, donationAccountId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Source account");

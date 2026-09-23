@@ -9,7 +9,6 @@ import { FormsModule } from '@angular/forms';
 
 import { FinanceTransactionService } from '../../services/finance-transaction.service';
 import { FundService } from '../../services/fund.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Fund, JournalEntry } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -104,11 +103,9 @@ const PAYMENT_METHOD_OPTIONS: { value: string; label: string }[] = [
 export class TransactionListComponent implements OnInit {
   private transactionService = inject(FinanceTransactionService);
   private fundService = inject(FundService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<JournalEntry> | null>(null);
   loading = signal(false);
   // Latest transactions first by default — treasurers care most about what just happened.
@@ -158,23 +155,15 @@ export class TransactionListComponent implements OnInit {
   }
 
   openIncomeForm(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(IncomeFormComponent, { width: '560px', data: { orgId: this.orgId } })
+      .open(IncomeFormComponent, { width: '560px' })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
   openPayoutForm(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(PayoutFormComponent, { width: '480px', data: { orgId: this.orgId } })
+      .open(PayoutFormComponent, { width: '480px' })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
@@ -184,40 +173,27 @@ export class TransactionListComponent implements OnInit {
   }
 
   openExpenseForm(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(ExpenseFormComponent, { width: '560px', data: { orgId: this.orgId } })
+      .open(ExpenseFormComponent, { width: '560px' })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        if (!this.funds().length) {
-          this.fundService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
-            this.funds.set(page.content);
-          });
-        }
-        this.transactionService
-          .getPageForOrg(orgId, this.pageParams(), {
-            fundId: this.fundFilter ?? undefined,
-            paymentMethod: this.paymentMethodFilter ?? undefined,
-          })
-          .subscribe({
-            next: data => { this.page.set(data); this.loading.set(false); },
-            error: () => this.loading.set(false),
-          });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
-    });
+    if (!this.funds().length) {
+      this.fundService.getPage({ page: 0, size: 100 }).subscribe(page => {
+        this.funds.set(page.content);
+      });
+    }
+    this.transactionService
+      .getPage(this.pageParams(), {
+        fundId: this.fundFilter ?? undefined,
+        paymentMethod: this.paymentMethodFilter ?? undefined,
+      })
+      .subscribe({
+        next: data => { this.page.set(data); this.loading.set(false); },
+        error: () => this.loading.set(false),
+      });
   }
 }

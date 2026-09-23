@@ -14,7 +14,6 @@ import java.util.UUID;
  * (Zeffy, cash, check) — recordIncome falls back to the plain 2-line entry in that case.
  */
 public record RecordIncomeRequest(
-        UUID orgId,
         LocalDate entryDate,
         BigDecimal amount,
         String description,

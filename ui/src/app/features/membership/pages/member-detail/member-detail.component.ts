@@ -109,7 +109,7 @@ export class MemberDetailComponent implements OnInit {
     const m = this.member();
     if (!m) return;
     this.dialog
-      .open(MemberFormComponent, { width: '540px', data: { orgId: m.org.id, member: m } })
+      .open(MemberFormComponent, { width: '540px', data: { member: m } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadMember(); });
   }
@@ -118,7 +118,7 @@ export class MemberDetailComponent implements OnInit {
     const m = this.member();
     if (!m) return;
     this.dialog
-      .open(MemberPaymentFormComponent, { width: '480px', data: { orgId: m.org.id, member: m, entity: entity ?? null } })
+      .open(MemberPaymentFormComponent, { width: '480px', data: { member: m, entity: entity ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPayments(); });
   }

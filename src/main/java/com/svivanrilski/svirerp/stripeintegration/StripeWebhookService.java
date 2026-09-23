@@ -30,8 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
 import com.svivanrilski.svirerp.finance.FinanceService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.settings.AppSettingService;
 
 import java.math.BigDecimal;
@@ -77,7 +75,6 @@ public class StripeWebhookService {
             Set.of("wedding", "baptism", "funeral", "memorial", "blessing", "other");
 
     private final AppSettingService settingService;
-    private final OrganizationService orgService;
     private final FinanceService financeService;
     private final StripeWebhookEventApplier applier;
     private final StripeWebhookEventRepository eventRepo;
@@ -127,8 +124,7 @@ public class StripeWebhookService {
             return; // an event type this endpoint doesn't act on
         }
 
-        Organization org = orgService.getSingleOrganization();
-        StripeWebhookEvent row = applier.recordReceived(org, event.getId(), event.getType(),
+        StripeWebhookEvent row = applier.recordReceived(event.getId(), event.getType(),
                 parsed.priceId(), parsed.amount(), parsed.feeAmount(), parsed.email(), parsed.firstName(),
                 parsed.lastName(), payload);
         if (row == null) {
@@ -353,8 +349,8 @@ public class StripeWebhookService {
 
     // ── Admin: events ────────────────────────────────────────────────────────
 
-    public Page<StripeWebhookEvent> findEventsByOrg(UUID orgId, Pageable pageable) {
-        return eventRepo.findByOrgIdOrderByReceivedAtDesc(orgId, pageable);
+    public Page<StripeWebhookEvent> findEvents(Pageable pageable) {
+        return eventRepo.findAllByOrderByReceivedAtDesc(pageable);
     }
 
     /**
@@ -379,16 +375,14 @@ public class StripeWebhookService {
 
     // ── Admin: product mappings ──────────────────────────────────────────────
 
-    public List<StripeProductMapping> findMappingsByOrg(UUID orgId) {
-        return mappingRepo.findByOrgId(orgId);
+    public List<StripeProductMapping> findMappings() {
+        return mappingRepo.findAll();
     }
 
     @Transactional
-    public StripeProductMapping createMapping(UUID orgId, StripeProductMappingRequest req) {
+    public StripeProductMapping createMapping(StripeProductMappingRequest req) {
         validateMappingRequest(req);
-        Organization org = orgService.findById(orgId);
         StripeProductMapping mapping = new StripeProductMapping();
-        mapping.setOrg(org);
         applyMappingFields(mapping, req);
         return mappingRepo.save(mapping);
     }
@@ -434,7 +428,7 @@ public class StripeWebhookService {
 
     /** Lists active Prices from the connected Stripe account so an admin can pick one to map
      *  without needing to wait for a live payment to first surface it as a 'needs_mapping' event. */
-    public List<StripePriceInfo> listStripePrices(UUID orgId) {
+    public List<StripePriceInfo> listStripePrices() {
         try {
             PriceListParams params = PriceListParams.builder()
                     .setActive(true)
@@ -442,7 +436,7 @@ public class StripeWebhookService {
                     .addExpand("data.product")
                     .build();
             List<Price> prices = Price.list(params, stripeRequestOptions()).getData();
-            Set<String> mappedPriceIds = mappingRepo.findByOrgId(orgId).stream()
+            Set<String> mappedPriceIds = mappingRepo.findAll().stream()
                     .map(StripeProductMapping::getStripePriceId)
                     .collect(Collectors.toSet());
             return prices.stream()

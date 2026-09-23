@@ -12,14 +12,14 @@ import java.util.UUID;
 @Repository
 public interface EventRegistrationRepository extends JpaRepository<EventRegistration, UUID> {
 
-    @EntityGraph(attributePaths = {"event", "event.org", "event.createdBy", "person"})
+    @EntityGraph(attributePaths = {"event", "event.createdBy", "person"})
     @Override
     Optional<EventRegistration> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"event", "event.org", "event.createdBy", "person"})
+    @EntityGraph(attributePaths = {"event", "event.createdBy", "person"})
     Page<EventRegistration> findByEventId(UUID eventId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"event", "event.org", "event.createdBy", "person"})
+    @EntityGraph(attributePaths = {"event", "event.createdBy", "person"})
     Page<EventRegistration> findByPersonId(UUID personId, Pageable pageable);
 
     boolean existsByEventIdAndPersonId(UUID eventId, UUID personId);

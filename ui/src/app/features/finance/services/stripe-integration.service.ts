@@ -18,19 +18,19 @@ export class StripeIntegrationService {
 
   // ── Product mappings ─────────────────────────────────────────────────────
 
-  getMappingsForOrg(orgId: string): Observable<StripeProductMapping[]> {
+  getMappings(): Observable<StripeProductMapping[]> {
     return this.http.get<StripeProductMapping[]>(
-      `${this.env.apiUrl}/organizations/${orgId}/stripe-product-mappings`,
+      `${this.env.apiUrl}/stripe-product-mappings`,
     );
   }
 
-  getStripePrices(orgId: string): Observable<StripePriceInfo[]> {
-    return this.http.get<StripePriceInfo[]>(`${this.env.apiUrl}/organizations/${orgId}/stripe-prices`);
+  getStripePrices(): Observable<StripePriceInfo[]> {
+    return this.http.get<StripePriceInfo[]>(`${this.env.apiUrl}/stripe-prices`);
   }
 
-  createMapping(orgId: string, request: StripeProductMappingRequest): Observable<StripeProductMapping> {
+  createMapping(request: StripeProductMappingRequest): Observable<StripeProductMapping> {
     return this.http.post<StripeProductMapping>(
-      `${this.env.apiUrl}/organizations/${orgId}/stripe-product-mappings`,
+      `${this.env.apiUrl}/stripe-product-mappings`,
       request,
     );
   }
@@ -45,13 +45,13 @@ export class StripeIntegrationService {
 
   // ── Events ───────────────────────────────────────────────────────────────
 
-  getEventsForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<StripeWebhookEvent>> {
+  getEvents(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<StripeWebhookEvent>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<StripeWebhookEvent>>(
-      `${this.env.apiUrl}/organizations/${orgId}/stripe-events`,
+      `${this.env.apiUrl}/stripe-events`,
       { params: p },
     );
   }

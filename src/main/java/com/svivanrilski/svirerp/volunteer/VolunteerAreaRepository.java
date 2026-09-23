@@ -2,7 +2,6 @@ package com.svivanrilski.svirerp.volunteer;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -13,13 +12,11 @@ import java.util.UUID;
 @Repository
 public interface VolunteerAreaRepository extends JpaRepository<VolunteerArea, UUID> {
 
-    @EntityGraph(attributePaths = "org")
-    Page<VolunteerArea> findByOrgId(UUID orgId, Pageable pageable);
+    Page<VolunteerArea> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = "org")
-    List<VolunteerArea> findByOrgIdAndIsActiveTrue(UUID orgId);
+    List<VolunteerArea> findByIsActiveTrue();
 
-    Optional<VolunteerArea> findByOrgIdAndNameIgnoreCase(UUID orgId, String name);
+    Optional<VolunteerArea> findByNameIgnoreCase(String name);
 
-    boolean existsByOrgIdAndNameIgnoreCase(UUID orgId, String name);
+    boolean existsByNameIgnoreCase(String name);
 }

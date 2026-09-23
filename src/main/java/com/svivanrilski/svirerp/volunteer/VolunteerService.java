@@ -8,8 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
 import com.svivanrilski.svirerp.event.CalendarEvent;
 import com.svivanrilski.svirerp.event.CalendarEventRepository;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -34,17 +32,16 @@ public class VolunteerService {
     private final VolunteerRepository volunteerRepo;
     private final VolunteerHourRepository hourRepo;
     private final VolunteerAreaRepository areaRepo;
-    private final OrganizationService orgService;
     private final PersonService personService;
     private final CalendarEventRepository calendarEventRepo;
 
     // ── Volunteer ─────────────────────────────────────────────────────────────
 
-    public Page<Volunteer> findByOrg(UUID orgId, UUID areaId, Pageable pageable) {
+    public Page<Volunteer> findAll(UUID areaId, Pageable pageable) {
         if (areaId == null) {
-            return volunteerRepo.findByOrgId(orgId, pageable);
+            return volunteerRepo.findAll(pageable);
         }
-        return volunteerRepo.findByOrgIdAndAreasId(orgId, areaId, pageable);
+        return volunteerRepo.findByAreasId(areaId, pageable);
     }
 
     public Volunteer findById(UUID id) {
@@ -55,9 +52,7 @@ public class VolunteerService {
     @Transactional
     public Volunteer create(Volunteer volunteer) {
         Person person = personService.findById(volunteer.getPerson().getId());
-        Organization org = orgService.findById(volunteer.getOrg().getId());
         volunteer.setPerson(person);
-        volunteer.setOrg(org);
         volunteer.setContactPerson(resolveContactPerson(volunteer.getContactPerson()));
         volunteer.setAreas(resolveAreas(volunteer.getAreas()));
         return volunteerRepo.save(volunteer);
@@ -96,20 +91,19 @@ public class VolunteerService {
 
     /** Not read-only: may lazily seed starter areas on an org's first request, so it overrides the class-level readOnly default. */
     @Transactional
-    public Page<VolunteerArea> findAreasByOrg(UUID orgId, Pageable pageable) {
-        Page<VolunteerArea> page = areaRepo.findByOrgId(orgId, pageable);
+    public Page<VolunteerArea> findAreas(Pageable pageable) {
+        Page<VolunteerArea> page = areaRepo.findAll(pageable);
         if (page.isEmpty() && pageable.getPageNumber() == 0) {
-            seedStarterAreas(orgId);
-            page = areaRepo.findByOrgId(orgId, pageable);
+            seedStarterAreas();
+            page = areaRepo.findAll(pageable);
         }
         return page;
     }
 
-    private void seedStarterAreas(UUID orgId) {
-        Organization org = orgService.findById(orgId);
+    private void seedStarterAreas() {
         for (String name : STARTER_AREA_NAMES) {
-            if (!areaRepo.existsByOrgIdAndNameIgnoreCase(orgId, name)) {
-                areaRepo.save(VolunteerArea.builder().org(org).name(name).isActive(true).build());
+            if (!areaRepo.existsByNameIgnoreCase(name)) {
+                areaRepo.save(VolunteerArea.builder().name(name).isActive(true).build());
             }
         }
     }
@@ -121,16 +115,14 @@ public class VolunteerService {
 
     @Transactional
     public VolunteerArea createArea(VolunteerArea area) {
-        Organization org = orgService.findById(area.getOrg().getId());
-        validateUniqueAreaName(org.getId(), area.getName(), null);
-        area.setOrg(org);
+        validateUniqueAreaName(area.getName(), null);
         return areaRepo.save(area);
     }
 
     @Transactional
     public VolunteerArea updateArea(UUID id, VolunteerArea patch) {
         VolunteerArea existing = findAreaById(id);
-        validateUniqueAreaName(existing.getOrg().getId(), patch.getName(), id);
+        validateUniqueAreaName(patch.getName(), id);
         existing.setName(patch.getName());
         existing.setDescription(patch.getDescription());
         existing.setIsActive(patch.getIsActive());
@@ -143,9 +135,9 @@ public class VolunteerService {
         areaRepo.deleteById(id);
     }
 
-    private void validateUniqueAreaName(UUID orgId, String name, UUID excludeId) {
+    private void validateUniqueAreaName(String name, UUID excludeId) {
         if (name == null) return;
-        areaRepo.findByOrgIdAndNameIgnoreCase(orgId, name)
+        areaRepo.findByNameIgnoreCase(name)
                 .filter(a -> !a.getId().equals(excludeId))
                 .ifPresent(a -> {
                     throw new IllegalArgumentException("A volunteer area named '" + name + "' already exists.");

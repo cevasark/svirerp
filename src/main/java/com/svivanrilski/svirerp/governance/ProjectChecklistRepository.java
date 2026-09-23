@@ -16,10 +16,10 @@ public interface ProjectChecklistRepository extends JpaRepository<ProjectCheckli
     // must be listed explicitly — same idiom and depth as ProjectTaskRepository.
     // Deliberately unpaginated — matches ProjectTaskRepository#findByProjectIdOrderByCreatedAt: a
     // project's checklists are meant to be seen as one whole list, not paged through.
-    @EntityGraph(attributePaths = {"project", "project.org", "project.assignee"})
+    @EntityGraph(attributePaths = {"project", "project.assignee"})
     List<ProjectChecklist> findByProjectIdOrderByCreatedAt(UUID projectId);
 
-    @EntityGraph(attributePaths = {"project", "project.org", "project.assignee"})
+    @EntityGraph(attributePaths = {"project", "project.assignee"})
     @Override
     Optional<ProjectChecklist> findById(UUID id);
 }

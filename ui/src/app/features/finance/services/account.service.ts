@@ -16,13 +16,13 @@ export class AccountService extends ResourceService<Account> {
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). Lazily seeds a default
    *  chart of accounts on the org's first request — see FinanceService#seedDefaultChartOfAccounts. */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Account>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Account>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Account>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/accounts`,
+      `${this.orgScopedEnv.apiUrl}/accounts`,
       { params: p },
     );
   }

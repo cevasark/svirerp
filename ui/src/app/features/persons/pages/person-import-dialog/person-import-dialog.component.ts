@@ -1,5 +1,5 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -7,10 +7,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PersonService } from '../../services/person.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { PersonImportResult } from '../../../../core/models/api.model';
-
-interface PersonImportDialogData {
-  orgId: string;
-}
 
 @Component({
   selector: 'app-person-import-dialog',
@@ -94,7 +90,6 @@ export class PersonImportDialogComponent {
   private personService = inject(PersonService);
   private dialogRef = inject(MatDialogRef<PersonImportDialogComponent>);
   private notifications = inject(NotificationService);
-  private data = inject<PersonImportDialogData>(MAT_DIALOG_DATA);
 
   selectedFile = signal<File | null>(null);
   fileName = signal<string | null>(null);
@@ -115,7 +110,7 @@ export class PersonImportDialogComponent {
       return;
     }
     this.uploading.set(true);
-    this.personService.importPeople(this.data.orgId, file).subscribe({
+    this.personService.importPeople(file).subscribe({
       next: res => {
         this.uploading.set(false);
         this.result.set(res);

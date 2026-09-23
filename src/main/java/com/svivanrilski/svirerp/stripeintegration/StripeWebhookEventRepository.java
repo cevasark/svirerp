@@ -17,7 +17,7 @@ public interface StripeWebhookEventRepository extends JpaRepository<StripeWebhoo
     Optional<StripeWebhookEvent> findByStripeEventId(String stripeEventId);
 
     @EntityGraph(attributePaths = {
-        "org", "person",
+        "person",
         "member", "member.person", "member.membershipType",
         "memberPayment",
         "serviceRequest", "serviceRequest.requestorPerson",
@@ -27,11 +27,11 @@ public interface StripeWebhookEventRepository extends JpaRepository<StripeWebhoo
     Optional<StripeWebhookEvent> findById(UUID id);
 
     @EntityGraph(attributePaths = {
-        "org", "person",
+        "person",
         "member", "member.person", "member.membershipType",
         "memberPayment",
         "serviceRequest", "serviceRequest.requestorPerson",
         "journalEntry", "journalEntry.payer", "journalEntry.categoryAccount", "journalEntry.fund",
     })
-    Page<StripeWebhookEvent> findByOrgIdOrderByReceivedAtDesc(UUID orgId, Pageable pageable);
+    Page<StripeWebhookEvent> findAllByOrderByReceivedAtDesc(Pageable pageable);
 }

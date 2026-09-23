@@ -5,7 +5,6 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ServiceRequestService } from '../../services/service-request.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ServiceRequest } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -52,11 +51,9 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 })
 export class ServiceRequestListComponent implements OnInit {
   private serviceRequestService = inject(ServiceRequestService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<ServiceRequest> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -92,23 +89,18 @@ export class ServiceRequestListComponent implements OnInit {
   }
 
   openForm(request?: ServiceRequest): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(ServiceRequestFormComponent, { width: '560px', data: { orgId: this.orgId, request: request ?? null } })
+      .open(ServiceRequestFormComponent, { width: '560px', data: { request: request ?? null } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
   openRecordPayment(request: ServiceRequest): void {
-    if (!this.orgId) return;
     const balance = this.balances()[request.id] ?? request.agreedAmount;
     this.dialog
       .open(IncomeFormComponent, {
         width: '560px',
-        data: { orgId: this.orgId, prefill: { serviceRequestId: request.id, amount: balance, description: `Payment for ${SERVICE_TYPE_LABELS[request.serviceType] ?? request.serviceType}` } },
+        data: { prefill: { serviceRequestId: request.id, amount: balance, description: `Payment for ${SERVICE_TYPE_LABELS[request.serviceType] ?? request.serviceType}` } },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
@@ -129,22 +121,13 @@ export class ServiceRequestListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.serviceRequestService.getPageForOrg(orgId, this.pageParams()).subscribe({
-          next: data => {
-            this.page.set(data);
-            this.loading.set(false);
-            this.loadBalances(data.content);
-          },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
+    this.serviceRequestService.getPage(this.pageParams()).subscribe({
+      next: data => {
+        this.page.set(data);
         this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
+        this.loadBalances(data.content);
       },
+      error: () => this.loading.set(false),
     });
   }
 

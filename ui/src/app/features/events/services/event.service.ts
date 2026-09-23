@@ -15,7 +15,7 @@ export class EventService extends ResourceService<CalendarEvent> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS, from?: string | null, to?: string | null): Observable<Page<CalendarEvent>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS, from?: string | null, to?: string | null): Observable<Page<CalendarEvent>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
@@ -27,7 +27,7 @@ export class EventService extends ResourceService<CalendarEvent> {
       p = p.set('to', to);
     }
     return this.http.get<Page<CalendarEvent>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/events`,
+      `${this.orgScopedEnv.apiUrl}/events`,
       { params: p },
     );
   }

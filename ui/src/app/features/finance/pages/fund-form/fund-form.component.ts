@@ -13,7 +13,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { Fund } from '../../../../core/models/domain.model';
 
 interface FundDialogData {
-  orgId: string;
   fund: Fund | null;
 }
 
@@ -112,7 +111,6 @@ export class FundFormComponent {
   private notifications = inject(NotificationService);
   private data = inject<FundDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private fund = this.data.fund;
   isEdit = !!this.fund;
   saving = signal(false);
@@ -151,7 +149,6 @@ export class FundFormComponent {
     this.saving.set(true);
     const value = this.form.getRawValue();
     const payload = {
-      org: { id: this.orgId },
       fundName: value.fundName,
       fundCode: value.fundCode,
       fundType: value.fundType,

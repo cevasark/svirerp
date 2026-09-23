@@ -12,10 +12,10 @@ import java.util.UUID;
 @Repository
 public interface EventResourceRepository extends JpaRepository<EventResource, UUID> {
 
-    @EntityGraph(attributePaths = {"event", "event.org", "event.createdBy"})
+    @EntityGraph(attributePaths = {"event", "event.createdBy"})
     @Override
     Optional<EventResource> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"event", "event.org", "event.createdBy"})
+    @EntityGraph(attributePaths = {"event", "event.createdBy"})
     Page<EventResource> findByEventId(UUID eventId, Pageable pageable);
 }

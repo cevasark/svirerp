@@ -10,7 +10,6 @@ import java.util.UUID;
  * into a balanced, posted JournalEntry with two JournalLines.
  */
 public record RecordExpenseRequest(
-        UUID orgId,
         LocalDate entryDate,
         BigDecimal amount,
         String description,

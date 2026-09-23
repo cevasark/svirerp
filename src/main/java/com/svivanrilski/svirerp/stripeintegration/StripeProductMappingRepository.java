@@ -11,9 +11,9 @@ import java.util.UUID;
 @Repository
 public interface StripeProductMappingRepository extends JpaRepository<StripeProductMapping, UUID> {
 
-    @EntityGraph(attributePaths = {"org", "fund", "categoryAccount"})
-    List<StripeProductMapping> findByOrgId(UUID orgId);
+    @EntityGraph(attributePaths = {"fund", "categoryAccount"})
+    List<StripeProductMapping> findAll();
 
-    @EntityGraph(attributePaths = {"org", "fund", "categoryAccount"})
-    Optional<StripeProductMapping> findByOrgIdAndStripePriceId(UUID orgId, String stripePriceId);
+    @EntityGraph(attributePaths = {"fund", "categoryAccount"})
+    Optional<StripeProductMapping> findByStripePriceId(String stripePriceId);
 }

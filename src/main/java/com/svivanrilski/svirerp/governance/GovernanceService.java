@@ -6,8 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -48,13 +46,12 @@ public class GovernanceService {
     private final ProjectTaskCommentRepository projectTaskCommentRepo;
     private final ProjectChecklistRepository projectChecklistRepo;
     private final ProjectChecklistItemRepository projectChecklistItemRepo;
-    private final OrganizationService orgService;
     private final PersonService personService;
 
     // ── Trustee ──────────────────────────────────────────────────────────────
 
-    public Page<Trustee> findTrusteesByOrg(UUID orgId, Pageable pageable) {
-        return trusteeRepo.findByOrgId(orgId, pageable);
+    public Page<Trustee> findTrustees(Pageable pageable) {
+        return trusteeRepo.findAll(pageable);
     }
 
     public Trustee findTrusteeById(UUID id) {
@@ -65,9 +62,7 @@ public class GovernanceService {
     @Transactional
     public Trustee createTrustee(Trustee trustee) {
         Person person = personService.findById(trustee.getPerson().getId());
-        Organization org = orgService.findById(trustee.getOrg().getId());
         trustee.setPerson(person);
-        trustee.setOrg(org);
         return trusteeRepo.save(trustee);
     }
 
@@ -141,8 +136,8 @@ public class GovernanceService {
 
     // ── Committee ─────────────────────────────────────────────────────────────
 
-    public Page<Committee> findCommitteesByOrg(UUID orgId, Pageable pageable) {
-        return committeeRepo.findByOrgId(orgId, pageable);
+    public Page<Committee> findCommittees(Pageable pageable) {
+        return committeeRepo.findAll(pageable);
     }
 
     public Committee findCommitteeById(UUID id) {
@@ -152,8 +147,6 @@ public class GovernanceService {
 
     @Transactional
     public Committee createCommittee(Committee committee) {
-        Organization org = orgService.findById(committee.getOrg().getId());
-        committee.setOrg(org);
         return committeeRepo.save(committee);
     }
 
@@ -301,12 +294,12 @@ public class GovernanceService {
 
     // ── MeetingMinutes ───────────────────────────────────────────────────────
 
-    public Page<MeetingMinutes> findMeetingMinutesByOrg(UUID orgId, LocalDate fromDate,
+    public Page<MeetingMinutes> findMeetingMinutes(LocalDate fromDate,
             boolean openActionItemsOnly, Pageable pageable) {
         if (fromDate == null && !openActionItemsOnly) {
-            return meetingMinutesRepo.findByOrgId(orgId, pageable);
+            return meetingMinutesRepo.findAll(pageable);
         }
-        return meetingMinutesRepo.search(orgId, fromDate, openActionItemsOnly, pageable);
+        return meetingMinutesRepo.search(fromDate, openActionItemsOnly, pageable);
     }
 
     public MeetingMinutes findMeetingMinutesById(UUID id) {
@@ -316,8 +309,6 @@ public class GovernanceService {
 
     @Transactional
     public MeetingMinutes createMeetingMinutes(MeetingMinutes minutes) {
-        Organization org = orgService.findById(minutes.getOrg().getId());
-        minutes.setOrg(org);
         return meetingMinutesRepo.save(minutes);
     }
 
@@ -383,12 +374,12 @@ public class GovernanceService {
 
     // ── Project ──────────────────────────────────────────────────────────────
 
-    public Page<Project> findProjectsByOrg(UUID orgId, String status, Pageable pageable) {
+    public Page<Project> findProjects(String status, Pageable pageable) {
         if (status != null && !status.isBlank()) {
             validateProjectStatus(status);
-            return projectRepo.findByOrgIdAndStatus(orgId, status, pageable);
+            return projectRepo.findByStatus(status, pageable);
         }
-        return projectRepo.findByOrgId(orgId, pageable);
+        return projectRepo.findAll(pageable);
     }
 
     public Project findProjectById(UUID id) {
@@ -399,8 +390,6 @@ public class GovernanceService {
     @Transactional
     public Project createProject(Project project) {
         validateProjectStatus(project.getStatus());
-        Organization org = orgService.findById(project.getOrg().getId());
-        project.setOrg(org);
         project.setAssignee(resolveAssignee(project.getAssignee()));
         return projectRepo.save(project);
     }

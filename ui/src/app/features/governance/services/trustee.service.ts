@@ -15,13 +15,13 @@ export class TrusteeService extends ResourceService<Trustee> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Trustee>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Trustee>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Trustee>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/trustees`,
+      `${this.orgScopedEnv.apiUrl}/trustees`,
       { params: p },
     );
   }

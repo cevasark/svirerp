@@ -183,7 +183,6 @@ export class ZeffyImportDetailComponent implements OnInit {
   private notifications = inject(NotificationService);
 
   private batchId = this.route.snapshot.paramMap.get('batchId')!;
-  private orgId = computed(() => this.batch()?.org.id ?? null);
 
   batch = signal<ZeffyImportBatch | null>(null);
   summary = signal<ZeffyImportSummary | null>(null);
@@ -252,13 +251,11 @@ export class ZeffyImportDetailComponent implements OnInit {
   }
 
   saveMappings(): void {
-    const orgId = this.orgId();
-    if (!orgId) return;
     const requests = this.pendingMappingRequests();
     if (!requests.length) return;
 
     this.savingMappings.set(true);
-    this.zeffyImportService.upsertMappings(orgId, requests).subscribe({
+    this.zeffyImportService.upsertMappings(requests).subscribe({
       next: () => {
         this.savingMappings.set(false);
         this.notifications.success('Fund mappings saved.');
@@ -272,8 +269,6 @@ export class ZeffyImportDetailComponent implements OnInit {
   }
 
   commit(): void {
-    const orgId = this.orgId();
-    if (!orgId) return;
     this.committing.set(true);
 
     const requests = this.pendingMappingRequests();
@@ -281,20 +276,20 @@ export class ZeffyImportDetailComponent implements OnInit {
       // Commit is reachable as soon as every unmapped campaign has a selection, whether or not
       // "Save Fund Mappings" was clicked separately — persist any pending ones first so the
       // backend's commit-time mapping lookup actually finds them.
-      this.zeffyImportService.upsertMappings(orgId, requests).subscribe({
-        next: () => this.doCommit(orgId),
+      this.zeffyImportService.upsertMappings(requests).subscribe({
+        next: () => this.doCommit(),
         error: () => {
           this.committing.set(false);
           this.notifications.error('Could not save fund mappings.');
         },
       });
     } else {
-      this.doCommit(orgId);
+      this.doCommit();
     }
   }
 
-  private doCommit(orgId: string): void {
-    this.zeffyImportService.commit(orgId, this.batchId).subscribe({
+  private doCommit(): void {
+    this.zeffyImportService.commit(this.batchId).subscribe({
       next: result => {
         this.committing.set(false);
         this.commitResult.set(result);
@@ -321,7 +316,7 @@ export class ZeffyImportDetailComponent implements OnInit {
   private load(): void {
     this.zeffyImportService.getBatch(this.batchId).subscribe(batch => {
       this.batch.set(batch);
-      this.fundService.getPageForOrg(batch.org.id, { page: 0, size: 200 }).subscribe(page => {
+      this.fundService.getPage({ page: 0, size: 200 }).subscribe(page => {
         this.funds.set(page.content);
       });
     });

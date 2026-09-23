@@ -7,7 +7,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 
 import { ProjectService } from '../../services/project.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Project } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -68,12 +67,10 @@ const STATUS_LABELS: Record<string, string> = {
 })
 export class ProjectListComponent implements OnInit {
   private projectService = inject(ProjectService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
   private router = inject(Router);
 
-  private orgId: string | null = null;
   page = signal<Page<Project> | null>(null);
   loading = signal(false);
   // Due Date ascending by default — soonest-due projects surface first.
@@ -120,14 +117,10 @@ export class ProjectListComponent implements OnInit {
   }
 
   openForm(project?: Project): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
       .open(ProjectFormComponent, {
         width: '540px',
-        data: { orgId: this.orgId, project: project ?? null },
+        data: { project: project ?? null },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
@@ -148,18 +141,9 @@ export class ProjectListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.projectService.getPageForOrg(orgId, this.pageParams(), this.statusFilter).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.projectService.getPage(this.pageParams(), this.statusFilter).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

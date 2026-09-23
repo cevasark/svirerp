@@ -7,7 +7,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { FinanceReportService } from '../../services/finance-report.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { StatementOfFinancialPosition } from '../../../../core/models/domain.model';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
@@ -140,10 +139,8 @@ function toIsoDate(date: Date): string {
 })
 export class StatementOfFinancialPositionComponent implements OnInit {
   private reportService = inject(FinanceReportService);
-  private orgContext = inject(OrgContextService);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   readonly columns = ['label', 'amount'];
 
   asOf = toIsoDate(new Date());
@@ -156,19 +153,12 @@ export class StatementOfFinancialPositionComponent implements OnInit {
   equityRows = signal<DisplayRow[]>([]);
 
   ngOnInit(): void {
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.load();
-      },
-      error: () => this.notifications.error('No organization found — create one first, under Organizations.'),
-    });
+    this.load();
   }
 
   load(): void {
-    if (!this.orgId) return;
     this.loading.set(true);
-    this.reportService.statementOfFinancialPosition(this.orgId, this.asOf).subscribe({
+    this.reportService.statementOfFinancialPosition(this.asOf).subscribe({
       next: r => {
         this.report.set(r);
         this.assetRows.set(r.assets.map(l => ({ label: `${l.accountNumber} — ${l.accountName}`, amount: l.balance })));

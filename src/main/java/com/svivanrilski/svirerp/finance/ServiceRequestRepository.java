@@ -12,10 +12,10 @@ import java.util.UUID;
 @Repository
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, UUID> {
 
-    @EntityGraph(attributePaths = {"org", "requestorPerson", "churchEvent", "churchEvent.calendarEvent"})
+    @EntityGraph(attributePaths = {"requestorPerson", "churchEvent", "churchEvent.calendarEvent"})
     @Override
     Optional<ServiceRequest> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "requestorPerson", "churchEvent", "churchEvent.calendarEvent"})
-    Page<ServiceRequest> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"requestorPerson", "churchEvent", "churchEvent.calendarEvent"})
+    Page<ServiceRequest> findAll(Pageable pageable);
 }

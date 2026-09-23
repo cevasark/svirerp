@@ -15,13 +15,13 @@ export class VendorService extends ResourceService<Vendor> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Vendor>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Vendor>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
     }
     return this.http.get<Page<Vendor>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/vendors`,
+      `${this.orgScopedEnv.apiUrl}/vendors`,
       { params: p },
     );
   }

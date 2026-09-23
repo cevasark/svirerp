@@ -18,21 +18,21 @@ public interface MemberPaymentRepository extends JpaRepository<MemberPayment, UU
     // controller layer serializes the response, so the lazy `member` association
     // (and everything nested under it) must be eagerly fetched here or Jackson
     // hits a LazyInitializationException.
-    @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
+    @EntityGraph(attributePaths = {"member", "member.person", "member.membershipType"})
     @Override
     Optional<MemberPayment> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
+    @EntityGraph(attributePaths = {"member", "member.person", "member.membershipType"})
     Page<MemberPayment> findByMemberId(UUID memberId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
+    @EntityGraph(attributePaths = {"member", "member.person", "member.membershipType"})
     Page<MemberPayment> findByMemberIdAndStatus(UUID memberId, String status, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
-    Page<MemberPayment> findByMemberOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"member", "member.person", "member.membershipType"})
+    Page<MemberPayment> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
-    Page<MemberPayment> findByMemberOrgIdAndPaymentDateGreaterThanEqual(UUID orgId, LocalDate fromDate, Pageable pageable);
+    @EntityGraph(attributePaths = {"member", "member.person", "member.membershipType"})
+    Page<MemberPayment> findByPaymentDateGreaterThanEqual(LocalDate fromDate, Pageable pageable);
 
     /** Internal use only (tier computation reads amount/paymentDate directly) — never serialized, no EntityGraph needed. */
     List<MemberPayment> findByMemberIdAndStatus(UUID memberId, String status);

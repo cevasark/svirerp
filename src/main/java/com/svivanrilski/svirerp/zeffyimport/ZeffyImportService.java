@@ -25,8 +25,6 @@ import com.svivanrilski.svirerp.finance.Account;
 import com.svivanrilski.svirerp.finance.FinanceService;
 import com.svivanrilski.svirerp.finance.Fund;
 import com.svivanrilski.svirerp.membership.MembershipService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
@@ -97,7 +95,6 @@ public class ZeffyImportService {
     private final ZeffyImportRowRepository rowRepo;
     private final ZeffyCampaignMappingRepository mappingRepo;
     private final ZeffyImportRowApplier rowApplier;
-    private final OrganizationService orgService;
     private final PersonService personService;
     private final MembershipService membershipService;
     private final FinanceService financeService;
@@ -129,11 +126,11 @@ public class ZeffyImportService {
     // ── Batches ──────────────────────────────────────────────────────────────
 
     /** Defaults to newest-first only when the caller didn't ask for a specific column sort. */
-    public Page<ZeffyImportBatch> findBatchesByOrg(UUID orgId, Pageable pageable) {
+    public Page<ZeffyImportBatch> findBatches(Pageable pageable) {
         Pageable effective = pageable.getSort().isUnsorted()
                 ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "uploadedAt"))
                 : pageable;
-        return batchRepo.findByOrgId(orgId, effective);
+        return batchRepo.findAll(effective);
     }
 
     public ZeffyImportBatch findBatchById(UUID id) {
@@ -148,10 +145,8 @@ public class ZeffyImportService {
     // ── Preview ──────────────────────────────────────────────────────────────
 
     @Transactional
-    public ZeffyImportBatch previewImport(UUID orgId, MultipartFile file) {
-        Organization org = orgService.findById(orgId);
+    public ZeffyImportBatch previewImport(MultipartFile file) {
         ZeffyImportBatch batch = batchRepo.save(ZeffyImportBatch.builder()
-                .org(org)
                 .fileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload")
                 .status("previewed")
                 .rowCount(0)
@@ -170,7 +165,6 @@ public class ZeffyImportService {
             int rowNumber = rowCount + 2; // header is row 1; first data row is row 2
             ZeffyImportRow row = ZeffyImportRow.builder()
                     .batch(batch)
-                    .org(org)
                     .rowNumber(rowNumber)
                     .outcome("pending_preview")
                     .isNewPerson(false)
@@ -178,7 +172,7 @@ public class ZeffyImportService {
                     .build();
             try {
                 populateRawFields(row, raw);
-                computeOutcome(row, orgId, seenDedupeKeysInBatch);
+                computeOutcome(row, seenDedupeKeysInBatch);
             } catch (Exception ex) {
                 row.setOutcome("error");
                 row.setOutcomeDetail(truncate(ex.getMessage()));
@@ -320,7 +314,7 @@ public class ZeffyImportService {
      * both a duplicate and unmapped is reported as a duplicate (it won't be applied either way,
      * and duplicate is the more informative reason).
      */
-    private void computeOutcome(ZeffyImportRow row, UUID orgId, Set<String> seenDedupeKeysInBatch) {
+    private void computeOutcome(ZeffyImportRow row, Set<String> seenDedupeKeysInBatch) {
         if (row.getEmail() == null || row.getEmail().isBlank()) {
             row.setOutcome("error");
             row.setOutcomeDetail("Missing email");
@@ -335,7 +329,7 @@ public class ZeffyImportService {
         Optional<Person> existingPerson = personService.findByEmailIfExists(row.getEmail());
         row.setIsNewPerson(existingPerson.isEmpty());
         row.setIsNewMember(existingPerson.isEmpty()
-                || !membershipService.hasMembership(existingPerson.get().getId(), orgId));
+                || !membershipService.hasMembership(existingPerson.get().getId()));
 
         // Zeffy's transaction Id is always present, unlike the old Payments export's Tax Receipt #
         // (blank for non-tax-deductible rows) — no composite-key fallback needed anymore.
@@ -343,7 +337,7 @@ public class ZeffyImportService {
         row.setDedupeKey(dedupeKey);
 
         if (seenDedupeKeysInBatch.contains(dedupeKey)
-                || rowRepo.existsByOrgIdAndDedupeKeyAndOutcome(orgId, dedupeKey, "committed")) {
+                || rowRepo.existsByDedupeKeyAndOutcome(dedupeKey, "committed")) {
             row.setOutcome("duplicate");
             return;
         }
@@ -363,7 +357,7 @@ public class ZeffyImportService {
 
         if (row.getCampaignTitle() != null && !row.getCampaignTitle().isBlank()) {
             Optional<ZeffyCampaignMapping> mapping =
-                    mappingRepo.findByOrgIdAndCampaignTitleIgnoreCase(orgId, row.getCampaignTitle());
+                    mappingRepo.findByCampaignTitleIgnoreCase(row.getCampaignTitle());
             if (mapping.isEmpty()) {
                 row.setOutcome("unmapped_campaign");
                 row.setOutcomeDetail(row.getCampaignTitle());
@@ -415,20 +409,18 @@ public class ZeffyImportService {
 
     // ── Campaign mappings ────────────────────────────────────────────────────
 
-    public List<ZeffyCampaignMapping> findMappingsByOrg(UUID orgId) {
-        return mappingRepo.findByOrgId(orgId);
+    public List<ZeffyCampaignMapping> findMappings() {
+        return mappingRepo.findAll();
     }
 
     @Transactional
-    public List<ZeffyCampaignMapping> upsertCampaignMappings(UUID orgId, List<CampaignMappingRequest> requests) {
-        Organization org = orgService.findById(orgId);
+    public List<ZeffyCampaignMapping> upsertCampaignMappings(List<CampaignMappingRequest> requests) {
         List<ZeffyCampaignMapping> saved = new ArrayList<>();
         for (CampaignMappingRequest req : requests) {
             Fund fund = financeService.findFundById(req.fundId());
             ZeffyCampaignMapping mapping = mappingRepo
-                    .findByOrgIdAndCampaignTitleIgnoreCase(orgId, req.campaignTitle())
+                    .findByCampaignTitleIgnoreCase(req.campaignTitle())
                     .orElseGet(() -> ZeffyCampaignMapping.builder()
-                            .org(org)
                             .campaignTitle(req.campaignTitle())
                             .build());
             mapping.setFund(fund);
@@ -456,28 +448,25 @@ public class ZeffyImportService {
      * UnexpectedRollbackException instead of isolating the failure to that row.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ZeffyImportCommitResult commitImport(UUID orgId, UUID batchId) {
+    public ZeffyImportCommitResult commitImport(UUID batchId) {
         ZeffyImportBatch batch = findBatchById(batchId);
-        if (!batch.getOrg().getId().equals(orgId)) {
-            throw new IllegalArgumentException("Batch does not belong to this organization");
-        }
         if ("committed".equals(batch.getStatus())) {
             throw new IllegalArgumentException("This import batch has already been committed");
         }
 
-        membershipService.ensureZeffyTierTypesSeeded(orgId);
-        financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
+        membershipService.ensureZeffyTierTypesSeeded();
+        financeService.findAccounts(PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
         // Donation rows earn membership tier credit and post to Donation Income; Ticket rows (event/
         // service ticket purchases, not membership contributions) post to Service Fees Income instead
         // and skip the Member/MemberPayment/tier pipeline entirely — see ZeffyImportRowApplier.
-        Account donationAccount = financeService.findAccountByNumber(orgId, "4010");
-        Account ticketAccount = financeService.findAccountByNumber(orgId, "4030");
+        Account donationAccount = financeService.findAccountByNumber("4010");
+        Account ticketAccount = financeService.findAccountByNumber("4030");
         // Zeffy holds donations and pays out to the real bank in periodic lump sums — post to its
         // clearing account rather than Checking directly, so Checking only grows when the actual
         // payout lands (see FinanceService#recordTransfer / DEFAULT_ACCOUNTS). findOrCreateAccountByNumber
         // retrofits this org's already-established chart of accounts the same way the Stripe
         // integration's fee account (5320) is retrofitted.
-        Account depositAccount = financeService.findOrCreateAccountByNumber(orgId, "1020", "Undeposited Funds – Zeffy", "asset");
+        Account depositAccount = financeService.findOrCreateAccountByNumber("1020", "Undeposited Funds – Zeffy", "asset");
 
         List<ZeffyImportRow> rows = rowRepo.findByBatchIdOrderByRowNumber(batchId);
         int committed = 0;
@@ -518,17 +507,17 @@ public class ZeffyImportService {
      * own transaction so one bad row can't poison the rest.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ReprocessMembershipResult reprocessMembershipRows(UUID orgId) {
-        financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
-        Account donationAccount = financeService.findAccountByNumber(orgId, "4010");
-        Account ticketAccount = financeService.findAccountByNumber(orgId, "4030");
+    public ReprocessMembershipResult reprocessMembershipRows() {
+        financeService.findAccounts(PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
+        Account donationAccount = financeService.findAccountByNumber("4010");
+        Account ticketAccount = financeService.findAccountByNumber("4030");
 
-        List<ZeffyImportRow> rows = rowRepo.findCommittedTicketRowsNeedingMembershipReprocess(orgId);
+        List<ZeffyImportRow> rows = rowRepo.findCommittedTicketRowsNeedingMembershipReprocess();
         int rowsProcessed = 0;
         int membersCreated = 0;
         for (ZeffyImportRow row : rows) {
             boolean hadMembershipBefore = row.getPerson() != null
-                    && membershipService.hasMembership(row.getPerson().getId(), orgId);
+                    && membershipService.hasMembership(row.getPerson().getId());
             rowApplier.reprocessAsMembership(row.getId(), donationAccount.getId(), ticketAccount.getId());
             rowsProcessed++;
             if (!hadMembershipBefore) membersCreated++;

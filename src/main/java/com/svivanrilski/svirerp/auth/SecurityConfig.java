@@ -89,7 +89,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/settings/**").hasRole("ADMIN")
+                        .requestMatchers("/api/settings/**", "/api/organization/**").hasRole("ADMIN")
                         // Stripe calls this server-to-server with no session — authenticated
                         // instead by the payload signature (see StripeWebhookController). Must be
                         // matched before the blanket /api/** authenticated() rule below.

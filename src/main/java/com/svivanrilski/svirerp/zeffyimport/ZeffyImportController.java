@@ -20,15 +20,14 @@ public class ZeffyImportController {
 
     // ── Batches ──────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/zeffy-imports")
-    public Page<ZeffyImportBatch> listBatches(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findBatchesByOrg(orgId, pageable);
+    @GetMapping("/api/zeffy-imports")
+    public Page<ZeffyImportBatch> listBatches(Pageable pageable) {
+        return service.findBatches(pageable);
     }
 
-    @PostMapping("/api/organizations/{orgId}/zeffy-imports/preview")
-    public ResponseEntity<ZeffyImportBatch> preview(
-            @PathVariable UUID orgId, @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.previewImport(orgId, file));
+    @PostMapping("/api/zeffy-imports/preview")
+    public ResponseEntity<ZeffyImportBatch> preview(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.previewImport(file));
     }
 
     @GetMapping("/api/zeffy-imports/{batchId}")
@@ -46,30 +45,29 @@ public class ZeffyImportController {
         return service.findRows(batchId, pageable);
     }
 
-    @PostMapping("/api/organizations/{orgId}/zeffy-imports/{batchId}/commit")
-    public ZeffyImportService.ZeffyImportCommitResult commit(
-            @PathVariable UUID orgId, @PathVariable UUID batchId) {
-        return service.commitImport(orgId, batchId);
+    @PostMapping("/api/zeffy-imports/{batchId}/commit")
+    public ZeffyImportService.ZeffyImportCommitResult commit(@PathVariable UUID batchId) {
+        return service.commitImport(batchId);
     }
 
     /** One-time backfill for already-committed Ticket rows whose campaign has since been flagged
      *  as a membership payment — see ZeffyImportService#reprocessMembershipRows. Idempotent. */
-    @PostMapping("/api/organizations/{orgId}/zeffy-imports/reprocess-membership-rows")
-    public ZeffyImportService.ReprocessMembershipResult reprocessMembershipRows(@PathVariable UUID orgId) {
-        return service.reprocessMembershipRows(orgId);
+    @PostMapping("/api/zeffy-imports/reprocess-membership-rows")
+    public ZeffyImportService.ReprocessMembershipResult reprocessMembershipRows() {
+        return service.reprocessMembershipRows();
     }
 
     // ── Campaign mappings ────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/zeffy-campaign-mappings")
-    public List<ZeffyCampaignMapping> listMappings(@PathVariable UUID orgId) {
-        return service.findMappingsByOrg(orgId);
+    @GetMapping("/api/zeffy-campaign-mappings")
+    public List<ZeffyCampaignMapping> listMappings() {
+        return service.findMappings();
     }
 
-    @PostMapping("/api/organizations/{orgId}/zeffy-campaign-mappings/bulk")
-    public List<ZeffyCampaignMapping> upsertMappings(@PathVariable UUID orgId,
+    @PostMapping("/api/zeffy-campaign-mappings/bulk")
+    public List<ZeffyCampaignMapping> upsertMappings(
             @Valid @RequestBody List<ZeffyImportService.CampaignMappingRequest> requests) {
-        return service.upsertCampaignMappings(orgId, requests);
+        return service.upsertCampaignMappings(requests);
     }
 
     @DeleteMapping("/api/zeffy-campaign-mappings/{id}")

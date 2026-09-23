@@ -18,13 +18,13 @@ public interface ProjectChecklistItemRepository extends JpaRepository<ProjectChe
     // ProjectTaskCommentRepository's proven-working "projectTask.project.org" — the declarative
     // dotted-string form is reliable at this depth (unlike the 4-hop chain this feature had before
     // moving the checklist off ProjectTask, which needed an explicit JOIN FETCH @Query instead).
-    @EntityGraph(attributePaths = {"checklist", "checklist.project", "checklist.project.org", "checklist.project.assignee"})
+    @EntityGraph(attributePaths = {"checklist", "checklist.project", "checklist.project.assignee"})
     List<ProjectChecklistItem> findByChecklistIdOrderByCreatedAt(UUID checklistId);
 
     // Needed so the Done/Skip/Re-open status-transition methods in GovernanceService can return
     // the updated item without a LazyInitializationException once the transaction (and its
     // Hibernate session) has closed by the time the controller layer serializes the response.
-    @EntityGraph(attributePaths = {"checklist", "checklist.project", "checklist.project.org", "checklist.project.assignee"})
+    @EntityGraph(attributePaths = {"checklist", "checklist.project", "checklist.project.assignee"})
     @Override
     Optional<ProjectChecklistItem> findById(UUID id);
 }

@@ -10,8 +10,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Root anchor for the entire ERP.  Every domain table (membership, finance, events, etc.)
- * references org_id so data is always scoped to one organisation.
+ * Installation-wide organization profile. The database permits at most one row. Domain records
+ * implicitly belong to this organization and do not carry organization keys.
  */
 @Entity
 @Table(name = "organization")

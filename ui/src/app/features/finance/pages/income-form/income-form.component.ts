@@ -29,7 +29,6 @@ interface IncomeFormPrefill {
 }
 
 interface IncomeDialogData {
-  orgId: string;
   prefill?: IncomeFormPrefill;
 }
 
@@ -182,7 +181,6 @@ export class IncomeFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<IncomeDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private serviceRequestId = this.data.prefill?.serviceRequestId ?? null;
   saving = signal(false);
 
@@ -205,10 +203,10 @@ export class IncomeFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.accountService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.accountService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.accounts.set(page.content);
     });
-    this.fundService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+    this.fundService.getPage({ page: 0, size: 100 }).subscribe(page => {
       this.funds.set(page.content);
     });
     // No search/autocomplete endpoint exists on the backend yet; a plain
@@ -250,7 +248,7 @@ export class IncomeFormComponent implements OnInit {
       checkNumber: value.paymentMethod === 'check' ? (value.checkNumber || undefined) : undefined,
     };
 
-    this.transactionService.recordIncome(this.orgId, request).subscribe({
+    this.transactionService.recordIncome(request).subscribe({
       next: () => {
         this.notifications.success('Income recorded.');
         this.dialogRef.close(true);

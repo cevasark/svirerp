@@ -3,7 +3,6 @@ package com.svivanrilski.svirerp.volunteer;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.person.Person;
 
 import java.time.LocalDate;
@@ -35,11 +34,6 @@ public class Volunteer {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_person_id")
     private Person contactPerson;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "volunteer_area_assignment",

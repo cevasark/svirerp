@@ -15,7 +15,7 @@ export class ProjectService extends ResourceService<Project> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS, status?: string | null): Observable<Page<Project>> {
+  override getPage(params: PageParams = DEFAULT_PAGE_PARAMS, status?: string | null): Observable<Page<Project>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
@@ -24,7 +24,7 @@ export class ProjectService extends ResourceService<Project> {
       p = p.set('status', status);
     }
     return this.http.get<Page<Project>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/projects`,
+      `${this.orgScopedEnv.apiUrl}/projects`,
       { params: p },
     );
   }

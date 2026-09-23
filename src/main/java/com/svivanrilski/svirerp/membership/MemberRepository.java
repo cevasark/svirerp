@@ -17,36 +17,34 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     // spring.jpa.open-in-view=false closes the Hibernate session before the
     // controller layer serializes the response, so these LAZY associations
     // must be eagerly fetched here or Jackson hits a LazyInitializationException.
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
+    @EntityGraph(attributePaths = {"person", "membershipType"})
     @Override
     Optional<Member> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
-    Page<Member> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    Page<Member> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
-    Page<Member> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    Page<Member> findByStatus(String status, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
-    Page<Member> findByOrgIdAndMembershipTypeId(UUID orgId, UUID membershipTypeId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    Page<Member> findByMembershipTypeId(UUID membershipTypeId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
-    Page<Member> findByOrgIdAndStatusAndMembershipTypeId(
-            UUID orgId, String status, UUID membershipTypeId, Pageable pageable);
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    Page<Member> findByStatusAndMembershipTypeId(
+            String status, UUID membershipTypeId, Pageable pageable);
 
     List<Member> findByExpiryDateBefore(LocalDate date);
 
-    boolean existsByPersonIdAndOrgIdAndStatus(UUID personId, UUID orgId, String status);
+    boolean existsByPersonIdAndStatus(UUID personId, String status);
 
     /** A person may hold at most one membership per organisation, regardless of status. */
-    boolean existsByPersonIdAndOrgId(UUID personId, UUID orgId);
+    boolean existsByPersonId(UUID personId);
 
-    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
-    Optional<Member> findByPersonIdAndOrgId(UUID personId, UUID orgId);
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    Optional<Member> findByPersonId(UUID personId);
 
-    long countByOrgIdAndStatusAndMembershipType_NameIgnoreCase(UUID orgId, String status, String membershipTypeName);
+    long countByStatusAndMembershipType_NameIgnoreCase(String status, String membershipTypeName);
 
-    long countByOrgIdAndMembershipType_NameIgnoreCase(UUID orgId, String membershipTypeName);
-
-    long countByOrgId(UUID orgId);
+    long countByMembershipType_NameIgnoreCase(String membershipTypeName);
 }

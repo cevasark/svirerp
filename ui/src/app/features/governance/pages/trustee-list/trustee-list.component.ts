@@ -3,7 +3,6 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrusteeService } from '../../services/trustee.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Trustee } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -51,11 +50,9 @@ function trusteeStatus(t: Trustee): 'Active' | 'Inactive' | 'Expired' {
 })
 export class TrusteeListComponent implements OnInit {
   private trusteeService = inject(TrusteeService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<Trustee> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -95,14 +92,10 @@ export class TrusteeListComponent implements OnInit {
   }
 
   openForm(trustee?: Trustee): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
       .open(TrusteeFormComponent, {
         width: '540px',
-        data: { orgId: this.orgId, trustee: trustee ?? null },
+        data: { trustee: trustee ?? null },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
@@ -136,18 +129,9 @@ export class TrusteeListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.trusteeService.getPageForOrg(orgId, this.pageParams()).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.trusteeService.getPage(this.pageParams()).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 

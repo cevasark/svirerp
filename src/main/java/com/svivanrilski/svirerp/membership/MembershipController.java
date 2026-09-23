@@ -26,9 +26,9 @@ public class MembershipController {
 
     // ── MembershipType ──────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/membership-types")
-    public Page<MembershipType> listTypes(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findAllTypes(orgId, pageable);
+    @GetMapping("/api/membership-types")
+    public Page<MembershipType> listTypes(Pageable pageable) {
+        return service.findAllTypes(pageable);
     }
 
     @GetMapping("/api/membership-types/{id}")
@@ -54,21 +54,21 @@ public class MembershipController {
 
     // ── Member ───────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/members")
-    public Page<Member> listMembers(@PathVariable UUID orgId,
+    @GetMapping("/api/members")
+    public Page<Member> listMembers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID membershipTypeId,
             Pageable pageable) {
-        return service.findAllMembers(orgId, status, membershipTypeId, pageable);
+        return service.findAllMembers(status, membershipTypeId, pageable);
     }
 
-    @GetMapping("/api/organizations/{orgId}/members/summary")
-    public MembershipService.MemberSummary getMemberSummary(@PathVariable UUID orgId) {
-        return service.getMemberSummary(orgId);
+    @GetMapping("/api/members/summary")
+    public MembershipService.MemberSummary getMemberSummary() {
+        return service.getMemberSummary();
     }
 
-    @GetMapping("/api/organizations/{orgId}/members/import-template")
-    public ResponseEntity<byte[]> importTemplate(@PathVariable UUID orgId) {
+    @GetMapping("/api/members/import-template")
+    public ResponseEntity<byte[]> importTemplate() {
         byte[] csv = importService.buildImportTemplateCsv();
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/csv"))
@@ -79,10 +79,9 @@ public class MembershipController {
                 .body(csv);
     }
 
-    @PostMapping("/api/organizations/{orgId}/members/import")
-    public MemberImportService.MemberImportResult importMembers(
-            @PathVariable UUID orgId, @RequestParam("file") MultipartFile file) {
-        return importService.importMembers(orgId, file);
+    @PostMapping("/api/members/import")
+    public MemberImportService.MemberImportResult importMembers(@RequestParam("file") MultipartFile file) {
+        return importService.importMembers(file);
     }
 
     @GetMapping("/api/members/{id}")
@@ -98,9 +97,9 @@ public class MembershipController {
     /** Manual re-run of tier computation for every member in the org — tier can go stale purely
      *  from time passing (a qualifying payment ages past its 1-year window with no new payment
      *  event), so this doesn't require a new Zeffy import to catch up. */
-    @PostMapping("/api/organizations/{orgId}/members/recompute-tiers")
-    public RecomputeTiersResult recomputeTiers(@PathVariable UUID orgId) {
-        return new RecomputeTiersResult(service.recomputeAllTiersForOrg(orgId));
+    @PostMapping("/api/members/recompute-tiers")
+    public RecomputeTiersResult recomputeTiers() {
+        return new RecomputeTiersResult(service.recomputeAllTiers());
     }
 
     public record RecomputeTiersResult(int membersProcessed) {
@@ -124,11 +123,11 @@ public class MembershipController {
 
     // ── MemberPayment ────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/member-payments")
-    public Page<MemberPayment> listPaymentsForOrg(@PathVariable UUID orgId,
+    @GetMapping("/api/member-payments")
+    public Page<MemberPayment> listPayments(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             Pageable pageable) {
-        return service.findPaymentsByOrg(orgId, fromDate, pageable);
+        return service.findPayments(fromDate, pageable);
     }
 
     @GetMapping("/api/members/{memberId}/payments")

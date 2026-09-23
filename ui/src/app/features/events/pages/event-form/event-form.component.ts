@@ -20,7 +20,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { CalendarEvent, Person } from '../../../../core/models/domain.model';
 
 interface EventDialogData {
-  orgId: string;
   entity: CalendarEvent | null;
 }
 
@@ -193,7 +192,6 @@ export class EventFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<EventDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   entity = this.data.entity;
   isEdit = !!this.entity;
   saving = signal(false);
@@ -268,7 +266,6 @@ export class EventFormComponent implements OnInit {
     const value = this.form.getRawValue();
     // Backend only reads .getId() off nested org/createdBy references on write.
     const payload = {
-      org: { id: this.orgId },
       createdBy: value.createdById ? { id: value.createdById } : null,
       title: value.title,
       description: value.description || null,

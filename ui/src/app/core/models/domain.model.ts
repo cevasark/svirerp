@@ -38,11 +38,9 @@ export interface Organization {
 }
 
 // ─── Membership ─────────────────────────────────────────────────────────────
-// Entities have no DTO layer and serialize directly, so relations come back
-// as full nested objects (not flat *Id strings) — e.g. `org: {...}`, not `orgId`.
+// Entities have no DTO layer and serialize relations as full nested objects.
 export interface MembershipType {
   id: string;
-  org: Organization;
   name: string;
   description?: string;
   annualFee: number;
@@ -57,7 +55,6 @@ export interface MembershipType {
 export interface Member {
   id: string;
   person: Person;
-  org: Organization;
   membershipType: MembershipType;
   memberNumber?: string;
   joinDate: string;
@@ -85,7 +82,6 @@ export interface MemberPayment {
 export interface Trustee {
   id: string;
   person: Person;
-  org: Organization;
   title?: string;
   role: string;
   termStart: string;
@@ -107,7 +103,6 @@ export interface TrusteeDocument {
 
 export interface Committee {
   id: string;
-  orgId: string;
   name: string;
   description?: string;
   isActive?: boolean;
@@ -136,7 +131,6 @@ export interface CommitteeResolution {
 // General board/trustee meeting record — org-level, not tied to a committee.
 export interface MeetingMinutes {
   id: string;
-  org: Organization;
   meetingDate: string;
   title: string;
   summary?: string;
@@ -162,7 +156,6 @@ export interface ActionItem {
 
 export interface Project {
   id: string;
-  org: Organization;
   name: string;
   description?: string;
   status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
@@ -228,7 +221,6 @@ export interface ProjectChecklistItem {
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;
-  org: Organization;
   createdBy?: Person;
   title: string;
   description?: string;
@@ -289,7 +281,6 @@ export interface EventResource {
 // ─── Volunteers ──────────────────────────────────────────────────────────────
 export interface VolunteerArea {
   id: string;
-  org: Organization;
   name: string;
   description?: string;
   isActive?: boolean;
@@ -298,7 +289,6 @@ export interface VolunteerArea {
 export interface Volunteer {
   id: string;
   person: Person;
-  org: Organization;
   contactPerson?: Person;
   onboardDate: string;
   isActive?: boolean;
@@ -321,7 +311,6 @@ export interface VolunteerHour {
 // ─── Finance ─────────────────────────────────────────────────────────────────
 export interface Fund {
   id: string;
-  org: Organization;
   fundName: string;
   fundCode: string;
   fundType: 'unrestricted' | 'temporarily_restricted' | 'permanently_restricted';
@@ -394,7 +383,6 @@ export interface FundOverviewRow {
 
 export interface Account {
   id: string;
-  org: Organization;
   parentAccount?: Account;
   accountNumber: string;
   accountName: string;
@@ -409,7 +397,6 @@ export interface Account {
 
 export interface Vendor {
   id: string;
-  org: Organization;
   name: string;
   category?: string;
   contactName?: string;
@@ -426,7 +413,6 @@ export interface Vendor {
 
 export interface ServiceRequest {
   id: string;
-  org: Organization;
   requestorPerson?: Person;
   serviceType: 'wedding' | 'baptism' | 'funeral' | 'memorial' | 'blessing' | 'other';
   requestedDate?: string;
@@ -439,7 +425,6 @@ export interface ServiceRequest {
 
 export interface JournalEntry {
   id: string;
-  org: Organization;
   createdBy?: Person;
   approvedBy?: Person;
   entryNumber?: string;
@@ -515,7 +500,6 @@ export interface JournalLine {
 
 export interface BankAccount {
   id: string;
-  org: Organization;
   glAccount: Account;
   institutionName: string;
   accountName: string;
@@ -575,7 +559,6 @@ export interface ReconciliationItem {
 // ─── Zeffy Import ────────────────────────────────────────────────────────────
 export interface ZeffyCampaignMapping {
   id: string;
-  org: Organization;
   campaignTitle: string;
   fund: Fund;
   /** Overrides the Ticket-category-skips-membership default — Zeffy implements fixed-price
@@ -586,7 +569,6 @@ export interface ZeffyCampaignMapping {
 
 export interface ZeffyImportBatch {
   id: string;
-  org: Organization;
   fileName: string;
   uploadedAt?: string;
   status: 'previewed' | 'committed';
@@ -599,7 +581,6 @@ export interface ZeffyImportBatch {
 export interface ZeffyImportRow {
   id: string;
   batch: ZeffyImportBatch;
-  org: Organization;
   rowNumber: number;
   transactionId?: string;
   amount?: number;
@@ -630,7 +611,6 @@ export interface ZeffyImportRow {
 /** Routes a Stripe Price to what a completed payment against it means, and where it posts. */
 export interface StripeProductMapping {
   id: string;
-  org: Organization;
   stripePriceId: string;
   displayName?: string;
   purpose: 'membership_dues' | 'service_request' | 'event_ticket' | 'general_income';
@@ -645,7 +625,6 @@ export interface StripeProductMapping {
 /** One row per Stripe webhook delivery — the audit trail linking back to whatever it produced. */
 export interface StripeWebhookEvent {
   id: string;
-  org: Organization;
   stripeEventId: string;
   eventType: string;
   stripePriceId?: string;

@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
 
     Optional<Organization> findByTaxIdEin(String taxIdEin);
+
+    Optional<Organization> findFirstByOrderByCreatedAtAsc();
 }

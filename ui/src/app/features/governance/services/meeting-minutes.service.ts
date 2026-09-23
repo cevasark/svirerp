@@ -15,8 +15,7 @@ export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(
-    orgId: string,
+  override getPage(
     params: PageParams = DEFAULT_PAGE_PARAMS,
     fromDate?: string | null,
     openActionItemsOnly = false,
@@ -32,7 +31,7 @@ export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
       p = p.set('openActionItemsOnly', 'true');
     }
     return this.http.get<Page<MeetingMinutes>>(
-      `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/meeting-minutes`,
+      `${this.orgScopedEnv.apiUrl}/meeting-minutes`,
       { params: p },
     );
   }

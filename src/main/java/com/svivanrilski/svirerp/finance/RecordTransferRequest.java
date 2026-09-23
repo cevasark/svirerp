@@ -11,7 +11,6 @@ import java.util.UUID;
  * JournalEntry with two JournalLines and no revenue/expense account involved.
  */
 public record RecordTransferRequest(
-        UUID orgId,
         LocalDate entryDate,
         BigDecimal amount,
         String description,

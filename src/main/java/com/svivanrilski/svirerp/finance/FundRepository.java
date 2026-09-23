@@ -15,17 +15,10 @@ public interface FundRepository extends JpaRepository<Fund, UUID> {
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the controller layer
     // serializes the response, so lazy associations must be eagerly fetched here.
-    @EntityGraph(attributePaths = {"org"})
-    @Override
-    Optional<Fund> findById(UUID id);
+    Page<Fund> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org"})
-    Page<Fund> findByOrgId(UUID orgId, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"org"})
-    Page<Fund> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+    Page<Fund> findByIsActive(boolean isActive, Pageable pageable);
 
     /** Unpaginated — Funds Overview needs every active fund at once, not a page of them. */
-    @EntityGraph(attributePaths = {"org"})
-    List<Fund> findByOrgIdAndIsActiveOrderByFundName(UUID orgId, boolean isActive);
+    List<Fund> findByIsActiveOrderByFundName(boolean isActive);
 }

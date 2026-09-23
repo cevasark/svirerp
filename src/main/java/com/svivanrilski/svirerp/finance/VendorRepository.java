@@ -12,12 +12,7 @@ import java.util.UUID;
 @Repository
 public interface VendorRepository extends JpaRepository<Vendor, UUID> {
 
-    @EntityGraph(attributePaths = {"org"})
-    @Override
-    Optional<Vendor> findById(UUID id);
+    Page<Vendor> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org"})
-    Page<Vendor> findByOrgId(UUID orgId, Pageable pageable);
-
-    boolean existsByOrgIdAndNameIgnoreCase(UUID orgId, String name);
+    boolean existsByNameIgnoreCase(String name);
 }

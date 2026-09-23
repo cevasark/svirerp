@@ -20,15 +20,15 @@ public class EventController {
 
     // ── CalendarEvent ─────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/events")
-    public Page<CalendarEvent> listEvents(@PathVariable UUID orgId,
+    @GetMapping("/api/events")
+    public Page<CalendarEvent> listEvents(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
             Pageable pageable) {
         if (from != null && to != null) {
-            return service.findEventsByOrgAndDateRange(orgId, from, to, pageable);
+            return service.findEventsByDateRange(from, to, pageable);
         }
-        return service.findEventsByOrg(orgId, pageable);
+        return service.findEvents(pageable);
     }
 
     @GetMapping("/api/events/{id}")

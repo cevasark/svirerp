@@ -29,7 +29,7 @@ public class PersonImportRowApplier {
      *  existed in the system before this import (even if they currently have no Member record at
      *  all). */
     @Transactional
-    public ApplyOutcome applyRow(UUID orgId, PersonImportRow row) {
+    public ApplyOutcome applyRow(PersonImportRow row) {
         if (personService.findByEmailIfExists(row.email()).isPresent()) {
             return ApplyOutcome.SKIPPED_EXISTING;
         }
@@ -42,7 +42,7 @@ public class PersonImportRowApplier {
                 .city(row.city())
                 .zip(row.zip())
                 .build());
-        membershipService.createFollowerMember(person.getId(), orgId, !row.unsubscribed());
+        membershipService.createFollowerMember(person.getId(), !row.unsubscribed());
         return ApplyOutcome.CREATED;
     }
 }

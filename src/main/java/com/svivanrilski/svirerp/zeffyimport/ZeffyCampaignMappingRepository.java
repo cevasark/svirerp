@@ -11,9 +11,9 @@ import java.util.UUID;
 @Repository
 public interface ZeffyCampaignMappingRepository extends JpaRepository<ZeffyCampaignMapping, UUID> {
 
-    @EntityGraph(attributePaths = {"org", "fund"})
-    List<ZeffyCampaignMapping> findByOrgId(UUID orgId);
+    @EntityGraph(attributePaths = {"fund"})
+    List<ZeffyCampaignMapping> findAll();
 
-    @EntityGraph(attributePaths = {"org", "fund"})
-    Optional<ZeffyCampaignMapping> findByOrgIdAndCampaignTitleIgnoreCase(UUID orgId, String campaignTitle);
+    @EntityGraph(attributePaths = {"fund"})
+    Optional<ZeffyCampaignMapping> findByCampaignTitleIgnoreCase(String campaignTitle);
 }

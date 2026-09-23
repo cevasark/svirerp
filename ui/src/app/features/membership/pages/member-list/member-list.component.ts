@@ -10,7 +10,6 @@ import { FormsModule } from '@angular/forms';
 
 import { MemberService } from '../../services/member.service';
 import { MembershipTypeService } from '../../services/membership-type.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Member, MembershipType } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberSummary } from '../../../../core/models/api.model';
@@ -132,12 +131,10 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
 export class MemberListComponent implements OnInit {
   private memberService = inject(MemberService);
   private membershipTypeService = inject(MembershipTypeService);
-  private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
   private router = inject(Router);
 
-  private orgId: string | null = null;
   page = signal<Page<Member> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
@@ -167,10 +164,8 @@ export class MemberListComponent implements OnInit {
   ngOnInit(): void {
     this.loadPage();
     this.loadSummary();
-    this.orgContext.ensureOrgId().subscribe(orgId => {
-      this.membershipTypeService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
-        this.membershipTypes.set(page.content);
-      });
+    this.membershipTypeService.getPage({ page: 0, size: 100 }).subscribe(page => {
+      this.membershipTypes.set(page.content);
     });
   }
 
@@ -207,25 +202,17 @@ export class MemberListComponent implements OnInit {
   }
 
   openForm(member?: Member): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
       .open(MemberFormComponent, {
         width: '540px',
-        data: { orgId: this.orgId, member: member ?? null },
+        data: { member: member ?? null },
       })
       .afterClosed()
       .subscribe(saved => { if (saved) { this.loadPage(); this.loadSummary(); } });
   }
 
   downloadTemplate(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
-    this.memberService.downloadImportTemplate(this.orgId).subscribe({
+    this.memberService.downloadImportTemplate().subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -238,23 +225,15 @@ export class MemberListComponent implements OnInit {
   }
 
   openImportDialog(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.dialog
-      .open(MemberImportDialogComponent, { width: '600px', data: { orgId: this.orgId } })
+      .open(MemberImportDialogComponent, { width: '600px' })
       .afterClosed()
       .subscribe(imported => { if (imported) { this.loadPage(); this.loadSummary(); } });
   }
 
   recomputeTiers(): void {
-    if (!this.orgId) {
-      this.notifications.error('No organization found — create one first, under Organizations.');
-      return;
-    }
     this.recomputingTiers.set(true);
-    this.memberService.recomputeTiers(this.orgId).subscribe({
+    this.memberService.recomputeTiers().subscribe({
       next: result => {
         this.recomputingTiers.set(false);
         this.notifications.success(`Recomputed tiers for ${result.membersProcessed} member(s).`);
@@ -283,18 +262,9 @@ export class MemberListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.memberService.getPageForOrg(orgId, this.pageParams(), this.statusFilter, this.membershipTypeFilter).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.memberService.getPage(this.pageParams(), this.statusFilter, this.membershipTypeFilter).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 
@@ -309,8 +279,6 @@ export class MemberListComponent implements OnInit {
   }
 
   private loadSummary(): void {
-    this.orgContext.ensureOrgId().subscribe(orgId => {
-      this.memberService.getSummary(orgId).subscribe(summary => this.summary.set(summary));
-    });
+    this.memberService.getSummary().subscribe(summary => this.summary.set(summary));
   }
 }

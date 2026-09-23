@@ -2,7 +2,6 @@ import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@ang
 import { PageEvent } from '@angular/material/paginator';
 
 import { StripeIntegrationService } from '../../services/stripe-integration.service';
-import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { StripeWebhookEvent } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
@@ -45,10 +44,8 @@ const STATUS_LABELS: Record<string, string> = {
 })
 export class StripeEventsListComponent implements OnInit {
   private stripeIntegrationService = inject(StripeIntegrationService);
-  private orgContext = inject(OrgContextService);
   private notifications = inject(NotificationService);
 
-  private orgId: string | null = null;
   page = signal<Page<StripeWebhookEvent> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, sort: 'receivedAt,desc' });
@@ -106,18 +103,9 @@ export class StripeEventsListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.orgContext.ensureOrgId().subscribe({
-      next: orgId => {
-        this.orgId = orgId;
-        this.stripeIntegrationService.getEventsForOrg(orgId, this.pageParams()).subscribe({
-          next: data => { this.page.set(data); this.loading.set(false); },
-          error: () => this.loading.set(false),
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notifications.error('No organization found — create one first, under Organizations.');
-      },
+    this.stripeIntegrationService.getEvents(this.pageParams()).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
   }
 }

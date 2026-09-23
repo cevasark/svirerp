@@ -20,22 +20,22 @@ public class StripeIntegrationController {
 
     // ── Product mappings ─────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/stripe-product-mappings")
-    public List<StripeProductMapping> listMappings(@PathVariable UUID orgId) {
-        return service.findMappingsByOrg(orgId);
+    @GetMapping("/api/stripe-product-mappings")
+    public List<StripeProductMapping> listMappings() {
+        return service.findMappings();
     }
 
     /** Prices pulled live from the connected Stripe account, so an admin can create a mapping
      *  before that product has ever actually been paid for through svirerp. */
-    @GetMapping("/api/organizations/{orgId}/stripe-prices")
-    public List<StripeWebhookService.StripePriceInfo> listStripePrices(@PathVariable UUID orgId) {
-        return service.listStripePrices(orgId);
+    @GetMapping("/api/stripe-prices")
+    public List<StripeWebhookService.StripePriceInfo> listStripePrices() {
+        return service.listStripePrices();
     }
 
-    @PostMapping("/api/organizations/{orgId}/stripe-product-mappings")
-    public ResponseEntity<StripeProductMapping> createMapping(@PathVariable UUID orgId,
+    @PostMapping("/api/stripe-product-mappings")
+    public ResponseEntity<StripeProductMapping> createMapping(
             @RequestBody StripeWebhookService.StripeProductMappingRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.createMapping(orgId, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createMapping(request));
     }
 
     @PutMapping("/api/stripe-product-mappings/{id}")
@@ -52,9 +52,9 @@ public class StripeIntegrationController {
 
     // ── Events ───────────────────────────────────────────────────────────────
 
-    @GetMapping("/api/organizations/{orgId}/stripe-events")
-    public Page<StripeWebhookEvent> listEvents(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findEventsByOrg(orgId, pageable);
+    @GetMapping("/api/stripe-events")
+    public Page<StripeWebhookEvent> listEvents(Pageable pageable) {
+        return service.findEvents(pageable);
     }
 
     @PostMapping("/api/stripe-events/{id}/reprocess")

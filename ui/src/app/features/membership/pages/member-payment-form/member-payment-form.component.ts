@@ -16,7 +16,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { Member, MemberPayment } from '../../../../core/models/domain.model';
 
 interface MemberPaymentDialogData {
-  orgId: string;
   member: Member | null;
   entity: MemberPayment | null;
 }
@@ -109,7 +108,6 @@ export class MemberPaymentFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private data = inject<MemberPaymentDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   fixedMember = this.data.member;
   private entity = this.data.entity;
   isEdit = !!this.entity;
@@ -128,7 +126,7 @@ export class MemberPaymentFormComponent implements OnInit {
     if (!this.fixedMember) {
       // No search/autocomplete endpoint exists on the backend yet; a plain
       // dropdown over a reasonably-sized page is fine at this org's scale.
-      this.memberService.getPageForOrg(this.orgId, { page: 0, size: 500 })
+      this.memberService.getPage({ page: 0, size: 500 })
         .subscribe(page => this.members.set(page.content));
     }
 

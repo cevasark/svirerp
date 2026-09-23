@@ -85,7 +85,7 @@ public class PersonImportService {
         return out.toByteArray();
     }
 
-    public PersonImportResult importPeople(UUID orgId, MultipartFile file) {
+    public PersonImportResult importPeople(MultipartFile file) {
         int created = 0;
         int skippedExisting = 0;
         List<PersonImportRowError> failed = new ArrayList<>();
@@ -103,7 +103,7 @@ public class PersonImportService {
             String email = raw.get(COL_EMAIL);
             try {
                 PersonImportRow row = parseRow(raw);
-                PersonImportRowApplier.ApplyOutcome outcome = rowApplier.applyRow(orgId, row);
+                PersonImportRowApplier.ApplyOutcome outcome = rowApplier.applyRow(row);
                 if (outcome == PersonImportRowApplier.ApplyOutcome.CREATED) {
                     created++;
                 } else {

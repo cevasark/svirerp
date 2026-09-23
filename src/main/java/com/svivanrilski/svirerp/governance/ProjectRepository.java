@@ -15,13 +15,13 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     // spring.jpa.open-in-view=false closes the Hibernate session before the
     // controller layer serializes the response, so these LAZY associations
     // must be eagerly fetched here or Jackson hits a LazyInitializationException.
-    @EntityGraph(attributePaths = {"org", "assignee"})
+    @EntityGraph(attributePaths = {"assignee"})
     @Override
     Optional<Project> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "assignee"})
-    Page<Project> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"assignee"})
+    Page<Project> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "assignee"})
-    Page<Project> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
+    @EntityGraph(attributePaths = {"assignee"})
+    Page<Project> findByStatus(String status, Pageable pageable);
 }

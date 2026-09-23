@@ -9,8 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.svivanrilski.svirerp.event.EventService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
@@ -44,7 +42,6 @@ class FinanceServiceRecordTransferTest {
     @Mock private ReconciliationItemRepository reconItemRepo;
     @Mock private VendorRepository vendorRepo;
     @Mock private ServiceRequestRepository serviceRequestRepo;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
     @Mock private EventService eventService;
     @Mock private EntityManager entityManager;
@@ -52,7 +49,6 @@ class FinanceServiceRecordTransferTest {
     @InjectMocks
     private FinanceService financeService;
 
-    private UUID orgId;
     private UUID clearingAccountId;
     private UUID checkingAccountId;
 
@@ -60,13 +56,8 @@ class FinanceServiceRecordTransferTest {
 
     @BeforeEach
     void setUp() {
-        orgId = UUID.randomUUID();
         clearingAccountId = UUID.randomUUID();
         checkingAccountId = UUID.randomUUID();
-
-        Organization org = new Organization();
-        org.setId(orgId);
-        when(orgService.findById(orgId)).thenReturn(org);
 
         // Only the happy-path test reaches these — the rejection test throws before posting.
         lenient().when(journalEntryRepo.save(any(JournalEntry.class))).thenAnswer(inv -> {
@@ -91,7 +82,7 @@ class FinanceServiceRecordTransferTest {
         when(accountRepo.findById(clearingAccountId)).thenReturn(Optional.of(accountOf(clearingAccountId, "asset")));
         when(accountRepo.findById(checkingAccountId)).thenReturn(Optional.of(accountOf(checkingAccountId, "asset")));
 
-        RecordTransferRequest req = new RecordTransferRequest(orgId, LocalDate.now(), new BigDecimal("250.00"),
+        RecordTransferRequest req = new RecordTransferRequest(LocalDate.now(), new BigDecimal("250.00"),
                 "Zeffy payout", clearingAccountId, checkingAccountId);
         JournalEntry entry = financeService.recordTransfer(req);
 
@@ -120,7 +111,7 @@ class FinanceServiceRecordTransferTest {
         when(accountRepo.findById(clearingAccountId)).thenReturn(Optional.of(accountOf(clearingAccountId, "asset")));
         when(accountRepo.findById(checkingAccountId)).thenReturn(Optional.of(accountOf(checkingAccountId, "revenue")));
 
-        RecordTransferRequest req = new RecordTransferRequest(orgId, LocalDate.now(), new BigDecimal("100.00"),
+        RecordTransferRequest req = new RecordTransferRequest(LocalDate.now(), new BigDecimal("100.00"),
                 "Bad transfer", clearingAccountId, checkingAccountId);
 
         assertThatThrownBy(() -> financeService.recordTransfer(req))

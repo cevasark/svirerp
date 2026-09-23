@@ -9,8 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.svivanrilski.svirerp.event.EventService;
-import com.svivanrilski.svirerp.organization.Organization;
-import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
@@ -44,7 +42,6 @@ class FinanceServiceRecordIncomeTest {
     @Mock private ReconciliationItemRepository reconItemRepo;
     @Mock private VendorRepository vendorRepo;
     @Mock private ServiceRequestRepository serviceRequestRepo;
-    @Mock private OrganizationService orgService;
     @Mock private PersonService personService;
     @Mock private EventService eventService;
     @Mock private EntityManager entityManager;
@@ -52,7 +49,6 @@ class FinanceServiceRecordIncomeTest {
     @InjectMocks
     private FinanceService financeService;
 
-    private UUID orgId;
     private UUID categoryAccountId;
     private UUID depositAccountId;
     private UUID feeAccountId;
@@ -65,14 +61,9 @@ class FinanceServiceRecordIncomeTest {
 
     @BeforeEach
     void setUp() {
-        orgId = UUID.randomUUID();
         categoryAccountId = UUID.randomUUID();
         depositAccountId = UUID.randomUUID();
         feeAccountId = UUID.randomUUID();
-
-        Organization org = new Organization();
-        org.setId(orgId);
-        when(orgService.findById(orgId)).thenReturn(org);
 
         when(accountRepo.findById(categoryAccountId)).thenReturn(Optional.of(accountOf(categoryAccountId, "revenue")));
         when(accountRepo.findById(depositAccountId)).thenReturn(Optional.of(accountOf(depositAccountId, "asset")));
@@ -97,7 +88,7 @@ class FinanceServiceRecordIncomeTest {
     }
 
     private RecordIncomeRequest requestWithFee(BigDecimal amount, BigDecimal feeAmount) {
-        return new RecordIncomeRequest(orgId, LocalDate.now(), amount, "Stripe payment",
+        return new RecordIncomeRequest(LocalDate.now(), amount, "Stripe payment",
                 categoryAccountId, depositAccountId, null, null, null, "stripe", null,
                 feeAmount, feeAccountId);
     }

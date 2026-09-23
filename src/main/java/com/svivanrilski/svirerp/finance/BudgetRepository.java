@@ -14,13 +14,13 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the controller layer
     // serializes the response, so lazy associations must be eagerly fetched here.
-    @EntityGraph(attributePaths = {"org", "account", "account.parentAccount", "fund"})
+    @EntityGraph(attributePaths = {"account", "account.parentAccount", "fund"})
     @Override
     Optional<Budget> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "account", "account.parentAccount", "fund"})
-    Page<Budget> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"account", "account.parentAccount", "fund"})
+    Page<Budget> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "account", "account.parentAccount", "fund"})
-    Page<Budget> findByOrgIdAndFiscalYear(UUID orgId, int fiscalYear, Pageable pageable);
+    @EntityGraph(attributePaths = {"account", "account.parentAccount", "fund"})
+    Page<Budget> findByFiscalYear(int fiscalYear, Pageable pageable);
 }

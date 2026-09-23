@@ -11,7 +11,6 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { MeetingMinutes } from '../../../../core/models/domain.model';
 
 interface MeetingMinutesDialogData {
-  orgId: string;
   minutes: MeetingMinutes | null;
 }
 
@@ -84,7 +83,6 @@ export class MeetingMinutesFormComponent {
   private notifications = inject(NotificationService);
   private data = inject<MeetingMinutesDialogData>(MAT_DIALOG_DATA);
 
-  private orgId = this.data.orgId;
   private minutes = this.data.minutes;
   isEdit = !!this.minutes;
   saving = signal(false);
@@ -105,7 +103,6 @@ export class MeetingMinutesFormComponent {
     // The backend only reads `.getId()` off the nested org reference, so an
     // { id } stub is all that's needed here.
     const payload = {
-      org: { id: this.orgId },
       meetingDate: value.meetingDate,
       title: value.title,
       summary: value.summary || null,

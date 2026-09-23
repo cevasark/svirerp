@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.svivanrilski.svirerp.organization.Organization;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,11 +24,6 @@ public class BankAccount {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization org;
 
     /** The corresponding GL account in the chart of accounts (must be an asset account). */
     @NotNull

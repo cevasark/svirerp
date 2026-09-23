@@ -25,7 +25,7 @@ export interface ApiError {
   fields?: Record<string, string>; // populated on validation failures
 }
 
-/** Response shape of POST /api/organizations/{orgId}/members/import — a synthesized
+/** Response shape of POST /api/members/import — a synthesized
  * batch-operation summary, not a persisted entity, so it lives here rather than
  * in domain.model.ts. */
 export interface MemberImportResult {
@@ -40,7 +40,7 @@ export interface MemberImportRowError {
   message: string;
 }
 
-/** Response shape of POST /api/organizations/{orgId}/persons/import — imports a Zeffy contacts
+/** Response shape of POST /api/persons/import — imports a Zeffy contacts
  * export, enrolling anyone not already in the system as an active/inactive Follower. Rows whose
  * email already matches an existing Person are skipped, not updated. */
 export interface PersonImportResult {
@@ -83,7 +83,7 @@ export interface ZeffyImportSummary {
   unmappedCampaignTitles: string[];
 }
 
-/** Response shape of POST /api/organizations/{orgId}/zeffy-imports/{batchId}/commit. */
+/** Response shape of POST /api/zeffy-imports/{batchId}/commit. */
 export interface ZeffyImportCommitResult {
   batchId: string;
   committed: number;
@@ -91,14 +91,14 @@ export interface ZeffyImportCommitResult {
   stillUnmappedCampaign: number;
 }
 
-/** Request body for POST /api/organizations/{orgId}/zeffy-campaign-mappings/bulk. */
+/** Request body for POST /api/zeffy-campaign-mappings/bulk. */
 export interface ZeffyCampaignMappingRequest {
   campaignTitle: string;
   fundId: string;
   isMembershipPayment: boolean;
 }
 
-/** Response shape of POST /api/organizations/{orgId}/zeffy-imports/reprocess-membership-rows —
+/** Response shape of POST /api/zeffy-imports/reprocess-membership-rows —
  *  the one-time backfill for Ticket rows whose campaign was flagged as a membership payment
  *  after they'd already committed. */
 export interface ReprocessMembershipResult {
@@ -106,12 +106,12 @@ export interface ReprocessMembershipResult {
   membersCreated: number;
 }
 
-/** Response shape of POST /api/organizations/{orgId}/members/recompute-tiers. */
+/** Response shape of POST /api/members/recompute-tiers. */
 export interface RecomputeTiersResult {
   membersProcessed: number;
 }
 
-/** Response shape of GET /api/organizations/{orgId}/members/summary. Followers have no
+/** Response shape of GET /api/members/summary. Followers have no
  *  active/inactive split — they never expire (see TierCalculator on the backend). */
 export interface MemberSummary {
   activeMembers: number;
@@ -122,7 +122,7 @@ export interface MemberSummary {
   totalMembers: number;
 }
 
-/** Request body for POST /api/organizations/{orgId}/stripe-product-mappings and
+/** Request body for POST /api/stripe-product-mappings and
  * PUT /api/stripe-product-mappings/{id}. */
 export interface StripeProductMappingRequest {
   stripePriceId: string;
@@ -133,7 +133,7 @@ export interface StripeProductMappingRequest {
   serviceType?: string;
 }
 
-/** Response shape of GET /api/organizations/{orgId}/stripe-prices — Prices pulled live from the
+/** Response shape of GET /api/stripe-prices — Prices pulled live from the
  * connected Stripe account, so a mapping can be created before anything has ever been paid for
  * through svirerp yet. amount/unitAmount is in the smallest currency unit (cents), as Stripe returns it. */
 export interface StripePriceInfo {

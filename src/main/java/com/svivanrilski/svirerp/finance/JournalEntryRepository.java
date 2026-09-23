@@ -18,34 +18,33 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the controller layer
     // serializes the response, so lazy associations must be eagerly fetched here.
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
+    @EntityGraph(attributePaths = {"createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
     @Override
     Optional<JournalEntry> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
+    @EntityGraph(attributePaths = {"createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    Page<JournalEntry> findByOrgId(UUID orgId, Pageable pageable);
+    Page<JournalEntry> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
+    @EntityGraph(attributePaths = {"createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    Page<JournalEntry> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
+    Page<JournalEntry> findByStatus(String status, Pageable pageable);
 
     /** Backs the transaction list's filter bar (fund / payment method / date range), each filter
      *  optional — a single flexible query instead of a combinatorial method per filter combination,
      *  so adding a future filter doesn't double the method count again. */
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
+    @EntityGraph(attributePaths = {"createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    @Query("SELECT e FROM JournalEntry e WHERE e.org.id = :orgId "
-            + "AND (:fundId IS NULL OR e.fund.id = :fundId) "
+    @Query("SELECT e FROM JournalEntry e WHERE (:fundId IS NULL OR e.fund.id = :fundId) "
             + "AND (:paymentMethod IS NULL OR e.paymentMethod = :paymentMethod) "
             + "AND (:entryDateFrom IS NULL OR e.entryDate >= :entryDateFrom) "
             + "AND (:entryDateTo IS NULL OR e.entryDate <= :entryDateTo)")
-    Page<JournalEntry> findByOrgIdAndFilters(UUID orgId, UUID fundId, String paymentMethod,
+    Page<JournalEntry> findByFilters(UUID fundId, String paymentMethod,
             LocalDate entryDateFrom, LocalDate entryDateTo, Pageable pageable);
 
     /** Payment history for a service request — used to compute the balance still owed. */
-    @EntityGraph(attributePaths = {"org", "payer", "categoryAccount", "fund"})
+    @EntityGraph(attributePaths = {"payer", "categoryAccount", "fund"})
     List<JournalEntry> findByServiceRequestId(UUID serviceRequestId);
 
     /** Sums totalDebit for a service request's posted income entries — the amount paid so far. */

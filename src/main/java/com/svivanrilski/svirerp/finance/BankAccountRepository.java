@@ -14,13 +14,13 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the controller layer
     // serializes the response, so lazy associations must be eagerly fetched here.
-    @EntityGraph(attributePaths = {"org", "glAccount", "glAccount.parentAccount"})
+    @EntityGraph(attributePaths = {"glAccount", "glAccount.parentAccount"})
     @Override
     Optional<BankAccount> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"org", "glAccount", "glAccount.parentAccount"})
-    Page<BankAccount> findByOrgId(UUID orgId, Pageable pageable);
+    @EntityGraph(attributePaths = {"glAccount", "glAccount.parentAccount"})
+    Page<BankAccount> findAll(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"org", "glAccount", "glAccount.parentAccount"})
-    Page<BankAccount> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+    @EntityGraph(attributePaths = {"glAccount", "glAccount.parentAccount"})
+    Page<BankAccount> findByIsActive(boolean isActive, Pageable pageable);
 }
