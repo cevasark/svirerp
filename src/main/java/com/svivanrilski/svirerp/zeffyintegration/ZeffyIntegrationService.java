@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
@@ -25,6 +26,7 @@ public class ZeffyIntegrationService {
     private static final String WEBHOOK_SECRET = "zeffy.webhook-signing-secret";
     private static final String MODE = "zeffy.integration-mode";
     private static final String CAMPAIGNS = "CAMPAIGNS";
+    private static final String PAYMENTS = "PAYMENTS";
     private static final String WEBHOOK_PATH = "/api/webhooks/zeffy";
 
     private final AppSettingService settingService;
@@ -32,6 +34,8 @@ public class ZeffyIntegrationService {
     private final ZeffyCampaignSyncWriter syncWriter;
     private final ZeffyCampaignRepository campaignRepository;
     private final ZeffySyncRunService syncRunService;
+    private final ZeffyPaymentSyncService paymentSyncService;
+    private final ZeffySyncPaymentResultService paymentResultService;
     private final FinanceService financeService;
     private final AtomicBoolean campaignSyncRunning = new AtomicBoolean(false);
 
@@ -49,10 +53,33 @@ public class ZeffyIntegrationService {
             String webhookPath,
             long campaignCount,
             long confirmedMappingCount,
-            SyncRunResponse latestCampaignSync) {
+            SyncRunResponse latestCampaignSync,
+            SyncRunResponse latestPaymentPreview,
+            SyncRunResponse latestPaymentSync) {
     }
 
     public record CampaignSyncResponse(SyncRunResponse run) {
+    }
+
+    public record PaymentSyncRequest(String mode, LocalDate createdFrom, LocalDate createdThrough,
+                                     UUID previewRunId) {
+    }
+
+    public record PaymentSyncResponse(SyncRunResponse run) {
+    }
+
+    public record PaymentSyncResultResponse(
+            UUID id,
+            String zeffyPaymentId,
+            UUID zeffyPaymentRecordId,
+            String outcome,
+            String detail,
+            String payloadSha256,
+            String observedAt,
+            java.math.BigDecimal amount,
+            String currency,
+            String campaignTitle,
+            String buyerEmail) {
     }
 
     public record CampaignMappingRequest(
@@ -102,11 +129,18 @@ public class ZeffyIntegrationService {
             String requestedTo,
             String startingCursor,
             String endingCursor,
+            String executionMode,
+            UUID previewRunId,
             int fetchedCount,
             int insertedCount,
             int updatedCount,
             int ignoredCount,
             int failedCount,
+            int alreadyAppliedCount,
+            int eligibleCount,
+            int needsMappingCount,
+            int needsReviewCount,
+            int processedCount,
             String errorSummary) {
     }
 
@@ -118,7 +152,9 @@ public class ZeffyIntegrationService {
                 WEBHOOK_PATH,
                 campaignRepository.count(),
                 campaignRepository.countByMappingConfirmedTrue(),
-                toResponse(syncRunService.latest(CAMPAIGNS)));
+                toResponse(syncRunService.latest(CAMPAIGNS)),
+                toResponse(syncRunService.latest(PAYMENTS, "PREVIEW")),
+                toResponse(syncRunService.latest(PAYMENTS)));
     }
 
     public StatusResponse saveConfiguration(ConfigurationRequest request) {
@@ -195,6 +231,24 @@ public class ZeffyIntegrationService {
         }
     }
 
+    public PaymentSyncResponse synchronizePayments(PaymentSyncRequest request, String initiatedBy) {
+        if (request == null || request.mode() == null) {
+            throw new IllegalArgumentException("Payment synchronization mode is required");
+        }
+        ZeffySyncRun run = switch (request.mode().trim().toUpperCase(Locale.ROOT)) {
+            case "PREVIEW" -> paymentSyncService.preview(
+                    request.createdFrom(), request.createdThrough(), initiatedBy);
+            case "APPLY" -> paymentSyncService.apply(request.previewRunId(), initiatedBy);
+            default -> throw new IllegalArgumentException("Payment synchronization mode must be PREVIEW or APPLY");
+        };
+        return new PaymentSyncResponse(toResponse(run));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PaymentSyncResultResponse> findPaymentSyncResults(UUID runId, Pageable pageable) {
+        return paymentResultService.find(runId, pageable).map(this::toResponse);
+    }
+
     @Transactional(readOnly = true)
     public Page<CampaignResponse> findCampaigns(Pageable pageable) {
         return campaignRepository.findAll(pageable).map(this::toResponse);
@@ -258,8 +312,20 @@ public class ZeffyIntegrationService {
                 run.getId(), run.getSyncType(), run.getStatus(), run.getTriggerType(), run.getInitiatedBy(),
                 text(run.getStartedAt()), text(run.getCompletedAt()), text(run.getRequestedFrom()),
                 text(run.getRequestedTo()), run.getStartingCursor(), run.getEndingCursor(),
+                run.getExecutionMode(), run.getPreviewRun() == null ? null : run.getPreviewRun().getId(),
                 run.getFetchedCount(), run.getInsertedCount(), run.getUpdatedCount(),
-                run.getIgnoredCount(), run.getFailedCount(), run.getErrorSummary());
+                run.getIgnoredCount(), run.getFailedCount(), run.getAlreadyAppliedCount(),
+                run.getEligibleCount(), run.getNeedsMappingCount(), run.getNeedsReviewCount(),
+                run.getProcessedCount(), run.getErrorSummary());
+    }
+
+    private PaymentSyncResultResponse toResponse(ZeffySyncPaymentResult result) {
+        ZeffyPayment payment = result.getZeffyPayment();
+        return new PaymentSyncResultResponse(
+                result.getId(), result.getZeffyPaymentId(), payment == null ? null : payment.getId(),
+                result.getOutcome(), result.getDetail(), result.getPayloadSha256(), text(result.getObservedAt()),
+                payment == null ? null : payment.getAmount(), payment == null ? null : payment.getCurrency(),
+                payment == null ? null : payment.getCampaignTitle(), payment == null ? null : payment.getBuyerEmail());
     }
 
     private ReferenceResponse fundRef(Fund fund) {

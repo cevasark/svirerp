@@ -50,6 +50,13 @@ public class ZeffySyncRun {
     @Column(name = "ending_cursor", length = 500)
     private String endingCursor;
 
+    @Column(name = "execution_mode", length = 10)
+    private String executionMode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "preview_run_id")
+    private ZeffySyncRun previewRun;
+
     @Column(name = "fetched_count", nullable = false)
     @Builder.Default
     private Integer fetchedCount = 0;
@@ -69,6 +76,26 @@ public class ZeffySyncRun {
     @Column(name = "failed_count", nullable = false)
     @Builder.Default
     private Integer failedCount = 0;
+
+    @Column(name = "already_applied_count", nullable = false)
+    @Builder.Default
+    private Integer alreadyAppliedCount = 0;
+
+    @Column(name = "eligible_count", nullable = false)
+    @Builder.Default
+    private Integer eligibleCount = 0;
+
+    @Column(name = "needs_mapping_count", nullable = false)
+    @Builder.Default
+    private Integer needsMappingCount = 0;
+
+    @Column(name = "needs_review_count", nullable = false)
+    @Builder.Default
+    private Integer needsReviewCount = 0;
+
+    @Column(name = "processed_count", nullable = false)
+    @Builder.Default
+    private Integer processedCount = 0;
 
     @Column(name = "error_summary", length = 1000)
     private String errorSummary;

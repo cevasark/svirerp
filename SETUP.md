@@ -188,15 +188,17 @@ Full details, including the separate production client and the org's Workspace-d
 
 ## Step 12 (optional) — Connect Zeffy
 
-Phases 1 and 2 synchronize the campaign catalog and receive signed events in record-only mode:
+Phases 1–4 synchronize campaigns, receive signed events, apply live completed payments, and load
+historical payments through the API:
 
 1. Generate an API key in Zeffy under **Settings → Integrations**.
 2. In SVIR ERP, open **Settings → Zeffy**, enter the API key, and leave validation enabled when saving.
 3. Use **Test Connection**, then **Sync Campaigns**. Every outbound request is paced at one request per second, and each synchronization attempt is retained in the history table.
 4. Open **Finance → Zeffy** and confirm an APPLY or IGNORE policy for each campaign. APPLY requires a Fund and revenue Account.
-5. In Zeffy, configure the production webhook URL `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and subscribe to the payment and contact events needed by the integration.
-6. Copy Zeffy's `whsec_...` signing secret into **Settings → Zeffy**, select **Record only**, and save.
-7. Confirm signed deliveries under **Finance → Zeffy → Webhook Events**. Record-only mode creates no Person, membership, contribution, or accounting records.
+5. For a clean installation, use **Historical payments** to preview a date range, review its per-payment outcomes, and then apply that completed preview. A new, missing, or changed payment is held for a fresh preview.
+6. In Zeffy, configure the production webhook URL `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and subscribe to the payment and contact events needed by the integration.
+7. Copy Zeffy's `whsec_...` signing secret into **Settings → Zeffy**, select **Record only**, and save.
+8. Confirm signed deliveries under **Finance → Zeffy → Webhook Events**. Record-only mode creates no Person, membership, contribution, or accounting records.
 
 Use a publicly reachable HTTPS origin for non-production installations. `localhost` cannot receive Zeffy's server-to-server deliveries.
 

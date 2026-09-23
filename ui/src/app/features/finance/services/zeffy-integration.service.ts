@@ -11,6 +11,9 @@ import {
   ZeffyConfigurationRequest,
   ZeffyConnectionTestResult,
   ZeffyIntegrationStatus,
+  ZeffyPaymentSyncItem,
+  ZeffyPaymentSyncRequest,
+  ZeffyPaymentSyncResult,
   ZeffySyncRun,
   ZeffyWebhookEventFilters,
 } from '../../../core/models/api.model';
@@ -39,6 +42,20 @@ export class ZeffyIntegrationService {
   syncCampaigns(): Observable<ZeffyCampaignSyncResult> {
     return this.http.post<ZeffyCampaignSyncResult>(
       `${this.env.apiUrl}/settings/zeffy/sync-campaigns`, {},
+    );
+  }
+
+  syncPayments(request: ZeffyPaymentSyncRequest): Observable<ZeffyPaymentSyncResult> {
+    return this.http.post<ZeffyPaymentSyncResult>(
+      `${this.env.apiUrl}/settings/zeffy/sync-payments`, request,
+    );
+  }
+
+  getPaymentSyncResults(runId: string, params: PageParams): Observable<Page<ZeffyPaymentSyncItem>> {
+    let query = new HttpParams().set('page', params.page).set('size', params.size);
+    if (params.sort) query = query.set('sort', params.sort);
+    return this.http.get<Page<ZeffyPaymentSyncItem>>(
+      `${this.env.apiUrl}/settings/zeffy/sync-runs/${runId}/payment-results`, { params: query },
     );
   }
 

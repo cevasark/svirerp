@@ -26,7 +26,8 @@ class ZeffyIntegrationServiceTest {
         campaigns = mock(ZeffyCampaignRepository.class);
         runs = mock(ZeffySyncRunService.class);
         service = new ZeffyIntegrationService(settings, apiClient, mock(ZeffyCampaignSyncWriter.class),
-                campaigns, runs, mock(FinanceService.class));
+                campaigns, runs, mock(ZeffyPaymentSyncService.class),
+                mock(ZeffySyncPaymentResultService.class), mock(FinanceService.class));
         when(settings.getDecryptedValue("zeffy.integration-mode"))
                 .thenReturn(java.util.Optional.of("DISABLED"));
     }

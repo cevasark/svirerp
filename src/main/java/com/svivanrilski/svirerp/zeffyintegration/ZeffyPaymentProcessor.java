@@ -3,6 +3,7 @@ package com.svivanrilski.svirerp.zeffyintegration;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.svivanrilski.svirerp.finance.Account;
 import com.svivanrilski.svirerp.finance.FinanceService;
 import com.svivanrilski.svirerp.finance.JournalEntry;
@@ -19,22 +20,22 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/**
- * Applies one durably recorded payment.completed event. Receipt is committed before this service
- * is called, while all Person, membership, accounting, payment-audit, and event-link changes made
- * here share one transaction.
- */
+/** Applies the same payment rules to live webhooks and historical API synchronization. */
 @Service
 @RequiredArgsConstructor
 public class ZeffyPaymentProcessor {
@@ -69,37 +70,58 @@ public class ZeffyPaymentProcessor {
         event.setProcessingAttemptCount(event.getProcessingAttemptCount() + 1);
         event.setLastAttemptedAt(attemptedAt);
         event.setErrorSummary(null);
+        process(parseEvent(event.getRawPayload()), event, "WEBHOOK", true,
+                event.getDispatchedAt(), attemptedAt);
+    }
 
-        ParsedPayment parsed = parse(event.getRawPayload());
-        ZeffyPayment payment = paymentRepository.findByZeffyPaymentIdForUpdate(parsed.id())
-                .orElseGet(() -> paymentRepository.saveAndFlush(ZeffyPayment.builder()
-                        .zeffyPaymentId(parsed.id())
-                        .latestPayload(parsed.payload())
-                        .processingStatus("RECEIVED")
-                        .firstSeenSource("WEBHOOK")
-                        .firstSeenAt(attemptedAt)
-                        .lastEventAt(event.getDispatchedAt())
-                        .build()));
-        event.setZeffyPayment(payment);
-        updateSnapshot(payment, parsed, event.getDispatchedAt());
+    @Transactional
+    public ProcessingResult previewApiPayment(JsonNode payment, OffsetDateTime observedAt) {
+        return process(parsePayment(payment), null, "API_SYNC", false, observedAt, observedAt);
+    }
+
+    @Transactional
+    public ProcessingResult applyApiPayment(JsonNode payment, OffsetDateTime observedAt) {
+        return process(parsePayment(payment), null, "API_SYNC", true, observedAt, observedAt);
+    }
+
+    private ProcessingResult process(ParsedPayment parsed, ZeffyWebhookEvent event, String source,
+                                     boolean apply, OffsetDateTime observedAt,
+                                     OffsetDateTime processingAt) {
+        if (parsed.id() == null) throw new IllegalArgumentException("Payment ID is missing");
+        String payloadHash = fingerprint(parsed.payloadNode());
+        Optional<ZeffyPayment> existing = paymentRepository.findByZeffyPaymentIdForUpdate(parsed.id());
+        boolean inserted = existing.isEmpty();
+        ZeffyPayment payment = existing.orElseGet(() -> {
+            ZeffyPayment created = ZeffyPayment.builder()
+                    .zeffyPaymentId(parsed.id())
+                    .latestPayload(parsed.payload())
+                    .processingStatus("RECEIVED")
+                    .firstSeenSource(source)
+                    .firstSeenAt(processingAt)
+                    .build();
+            if ("WEBHOOK".equals(source)) created.setLastEventAt(observedAt);
+            return paymentRepository.saveAndFlush(created);
+        });
+        if (event != null) event.setZeffyPayment(payment);
+        updateSnapshot(payment, parsed, source, observedAt);
 
         if (payment.getAppliedAt() != null || "PROCESSED".equals(payment.getProcessingStatus())) {
             finish(event, payment, "PROCESSED", null, payment.getAppliedAt());
-            return;
+            return result(payment, "ALREADY_APPLIED", null, payloadHash, inserted);
         }
 
         String invalid = validatePayment(parsed);
         if (invalid != null) {
-            block(event, payment, "NEEDS_REVIEW", invalid);
-            return;
+            finish(event, payment, "NEEDS_REVIEW", invalid, null);
+            return result(payment, "NEEDS_REVIEW", invalid, payloadHash, inserted);
         }
 
         Optional<ZeffyCampaign> mappingResult =
                 campaignRepository.findWithMappingByZeffyCampaignId(parsed.campaignId());
         if (mappingResult.isEmpty() || !Boolean.TRUE.equals(mappingResult.get().getMappingConfirmed())) {
-            block(event, payment, "NEEDS_MAPPING",
-                    "Campaign " + parsed.campaignId() + " does not have a confirmed mapping");
-            return;
+            String reason = "Campaign " + parsed.campaignId() + " does not have a confirmed mapping";
+            finish(event, payment, "NEEDS_MAPPING", reason, null);
+            return result(payment, "NEEDS_MAPPING", reason, payloadHash, inserted);
         }
         ZeffyCampaign campaign = mappingResult.get();
         if (payment.getCampaignTitle() == null) payment.setCampaignTitle(campaign.getTitle());
@@ -108,23 +130,29 @@ public class ZeffyPaymentProcessor {
         payment.setMappedAccount(campaign.getCategoryAccount());
         payment.setMembershipCredit(Boolean.TRUE.equals(campaign.getGrantsMembershipCredit()));
         if ("IGNORE".equals(campaign.getProcessingAction())) {
-            finish(event, payment, "IGNORED", "Campaign mapping is configured to ignore payments", attemptedAt);
-            return;
+            String reason = "Campaign mapping is configured to ignore payments";
+            finish(event, payment, "IGNORED", reason, apply ? processingAt : null);
+            return result(payment, "IGNORED", reason, payloadHash, inserted);
         }
         if (!"APPLY".equals(campaign.getProcessingAction())
                 || campaign.getFund() == null || campaign.getCategoryAccount() == null) {
-            block(event, payment, "NEEDS_MAPPING", "Campaign APPLY mapping is incomplete");
-            return;
+            String reason = "Campaign APPLY mapping is incomplete";
+            finish(event, payment, "NEEDS_MAPPING", reason, null);
+            return result(payment, "NEEDS_MAPPING", reason, payloadHash, inserted);
         }
 
-        PersonResolution identity = resolvePerson(parsed);
+        PersonAssessment identity = assessPerson(parsed);
         if (identity.reason() != null) {
-            block(event, payment, "NEEDS_REVIEW", identity.reason());
-            return;
+            finish(event, payment, "NEEDS_REVIEW", identity.reason(), null);
+            return result(payment, "NEEDS_REVIEW", identity.reason(), payloadHash, inserted);
         }
-        Person person = identity.person();
-        LocalDate paymentDate = parsed.createdAt().atZoneSameInstant(CHURCH_ZONE).toLocalDate();
+        if (!apply) {
+            finish(event, payment, "RECEIVED", null, null);
+            return result(payment, "ELIGIBLE", null, payloadHash, inserted);
+        }
 
+        Person person = resolvePerson(parsed, identity);
+        LocalDate paymentDate = parsed.createdAt().atZoneSameInstant(CHURCH_ZONE).toLocalDate();
         Member member = null;
         MemberPayment memberPayment = null;
         if (Boolean.TRUE.equals(campaign.getGrantsMembershipCredit())) {
@@ -146,29 +174,22 @@ public class ZeffyPaymentProcessor {
             Account depositAccount = financeService.findOrCreateAccountByNumber(
                     "1020", "Undeposited Funds – Zeffy", "asset");
             journalEntry = financeService.recordIncome(new RecordIncomeRequest(
-                    paymentDate,
-                    parsed.amount(),
+                    paymentDate, parsed.amount(),
                     "Zeffy payment " + parsed.id() + " — " + campaign.getTitle(),
-                    campaign.getCategoryAccount().getId(),
-                    depositAccount.getId(),
-                    campaign.getFund().getId(),
-                    person.getId(),
-                    null,
-                    "zeffy",
-                    null,
-                    null,
-                    null));
+                    campaign.getCategoryAccount().getId(), depositAccount.getId(), campaign.getFund().getId(),
+                    person.getId(), null, "zeffy", null, null, null));
         }
 
         payment.setPerson(person);
         payment.setMember(member);
         payment.setMemberPayment(memberPayment);
         payment.setJournalEntry(journalEntry);
-        payment.setAppliedAt(attemptedAt);
-        finish(event, payment, "PROCESSED", null, attemptedAt);
+        payment.setAppliedAt(processingAt);
+        finish(event, payment, "PROCESSED", null, processingAt);
+        return result(payment, "PROCESSED", null, payloadHash, inserted);
     }
 
-    /** Records an unexpected failure independently after applyEvent has rolled its transaction back. */
+    /** Records an unexpected webhook failure independently after applyEvent rolls back. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markError(UUID eventId, String reason) {
         ZeffyWebhookEvent event = eventRepository.findByIdForUpdate(eventId)
@@ -180,7 +201,20 @@ public class ZeffyPaymentProcessor {
         eventRepository.save(event);
     }
 
-    private ParsedPayment parse(String rawPayload) {
+    public String fingerprint(JsonNode payment) {
+        if (payment == null) throw new IllegalArgumentException("Payment payload is missing");
+        try {
+            Object value = objectMapper.convertValue(payment, Object.class);
+            String canonical = objectMapper.writer()
+                    .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                    .writeValueAsString(value);
+            return sha256(canonical);
+        } catch (IllegalArgumentException | JsonProcessingException ex) {
+            throw new IllegalArgumentException("Payment payload could not be fingerprinted", ex);
+        }
+    }
+
+    private ParsedPayment parseEvent(String rawPayload) {
         final JsonNode data;
         try {
             JsonNode root = objectMapper.readTree(rawPayload);
@@ -191,36 +225,23 @@ public class ZeffyPaymentProcessor {
         if (data == null || !data.isObject()) {
             throw new IllegalArgumentException("Stored Zeffy event has no payment data object");
         }
+        return parsePayment(data);
+    }
 
-        String id = text(data, "id");
-        BigDecimal amount = cents(data.get("amount"));
-        BigDecimal eligibleAmount = cents(data.get("eligible_amount"));
-        OffsetDateTime createdAt = unixTime(data.get("created"));
+    private ParsedPayment parsePayment(JsonNode data) {
+        if (data == null || !data.isObject()) throw new IllegalArgumentException("Payment data must be an object");
         JsonNode buyer = data.path("buyer");
         JsonNode address = buyer.path("address");
         JsonNode dispute = data.path("dispute");
-
         return new ParsedPayment(
-                id,
-                text(data, "status"),
-                text(data, "refund_status"),
+                text(data, "id"), text(data, "status"), text(data, "refund_status"),
                 dispute.isObject() ? text(dispute, "status") : null,
-                amount,
-                eligibleAmount,
-                text(data, "currency"),
-                text(data, "type"),
-                createdAt,
-                text(data, "campaign_id"),
-                text(data, "description"),
-                text(data, "contact"),
-                text(buyer, "email"),
-                text(buyer, "first_name"),
-                text(buyer, "last_name"),
-                text(address, "line1"),
-                text(address, "city"),
-                text(address, "state"),
-                text(address, "postal_code"),
-                data.toString());
+                cents(data.get("amount")), cents(data.get("eligible_amount")), text(data, "currency"),
+                text(data, "type"), unixTime(data.get("created")), text(data, "campaign_id"),
+                text(data, "description"), text(data, "contact"), text(buyer, "email"),
+                text(buyer, "first_name"), text(buyer, "last_name"), text(address, "line1"),
+                text(address, "city"), text(address, "state"), text(address, "postal_code"),
+                data.toString(), data);
     }
 
     private String validatePayment(ParsedPayment payment) {
@@ -241,35 +262,32 @@ public class ZeffyPaymentProcessor {
         return null;
     }
 
-    private PersonResolution resolvePerson(ParsedPayment payment) {
+    private PersonAssessment assessPerson(ParsedPayment payment) {
         String email = normalizedEmail(payment.email());
         if (email == null || !EMAIL.matcher(email).matches()) {
-            return new PersonResolution(null, "Buyer email is missing or invalid");
+            return new PersonAssessment(null, null, "Buyer email is missing or invalid");
         }
         List<Person> matches = personService.findByNormalizedEmail(email);
         if (matches.size() > 1) {
-            return new PersonResolution(null, "Buyer email matches more than one local person");
+            return new PersonAssessment(email, null, "Buyer email matches more than one local person");
         }
-
-        Person incoming = Person.builder()
-                .firstName(trim(payment.firstName()))
-                .lastName(trim(payment.lastName()))
-                .email(email)
-                .addressLine1(trim(payment.addressLine1()))
-                .city(trim(payment.city()))
-                .state(trim(payment.state()))
-                .zip(trim(payment.postalCode()))
-                .build();
-        if (matches.size() == 1) {
-            return new PersonResolution(personService.fillBlankFields(matches.get(0).getId(), incoming), null);
+        if (matches.isEmpty() && (trim(payment.firstName()) == null || trim(payment.lastName()) == null)) {
+            return new PersonAssessment(email, null, "Buyer name is required to create a local person");
         }
-        if (incoming.getFirstName() == null || incoming.getLastName() == null) {
-            return new PersonResolution(null, "Buyer name is required to create a local person");
-        }
-        return new PersonResolution(personService.create(incoming), null);
+        return new PersonAssessment(email, matches.isEmpty() ? null : matches.getFirst(), null);
     }
 
-    private void updateSnapshot(ZeffyPayment target, ParsedPayment source, OffsetDateTime eventAt) {
+    private Person resolvePerson(ParsedPayment payment, PersonAssessment assessment) {
+        Person incoming = Person.builder()
+                .firstName(trim(payment.firstName())).lastName(trim(payment.lastName())).email(assessment.email())
+                .addressLine1(trim(payment.addressLine1())).city(trim(payment.city()))
+                .state(trim(payment.state())).zip(trim(payment.postalCode())).build();
+        return assessment.existing() == null
+                ? personService.create(incoming)
+                : personService.fillBlankFields(assessment.existing().getId(), incoming);
+    }
+
+    private void updateSnapshot(ZeffyPayment target, ParsedPayment source, String origin, OffsetDateTime observedAt) {
         target.setStatus(source.status());
         target.setRefundStatus(source.refundStatus());
         target.setDisputeStatus(source.disputeStatus());
@@ -285,13 +303,13 @@ public class ZeffyPaymentProcessor {
         target.setBuyerFirstName(trim(source.firstName()));
         target.setBuyerLastName(trim(source.lastName()));
         target.setLatestPayload(source.payload());
-        if (target.getLastEventAt() == null || eventAt.isAfter(target.getLastEventAt())) {
-            target.setLastEventAt(eventAt);
+        if ("WEBHOOK".equals(origin)) {
+            if (target.getLastEventAt() == null || observedAt.isAfter(target.getLastEventAt())) {
+                target.setLastEventAt(observedAt);
+            }
+        } else {
+            target.setLastSyncedAt(observedAt);
         }
-    }
-
-    private void block(ZeffyWebhookEvent event, ZeffyPayment payment, String status, String reason) {
-        finish(event, payment, status, reason, null);
     }
 
     private void finish(ZeffyWebhookEvent event, ZeffyPayment payment, String status,
@@ -299,11 +317,28 @@ public class ZeffyPaymentProcessor {
         payment.setProcessingStatus(status);
         payment.setOutcomeReason(truncate(reason));
         paymentRepository.save(payment);
-        event.setZeffyPayment(payment);
-        event.setStatus(status);
-        event.setErrorSummary(truncate(reason));
-        event.setProcessedAt(processedAt);
-        eventRepository.save(event);
+        if (event != null) {
+            event.setZeffyPayment(payment);
+            event.setStatus(status);
+            event.setErrorSummary(truncate(reason));
+            event.setProcessedAt(processedAt);
+            eventRepository.save(event);
+        }
+    }
+
+    private ProcessingResult result(ZeffyPayment payment, String outcome, String detail,
+                                    String payloadHash, boolean inserted) {
+        return new ProcessingResult(payment.getZeffyPaymentId(), payment.getId(), outcome,
+                truncate(detail), payloadHash, inserted);
+    }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 
     private BigDecimal cents(JsonNode value) {
@@ -350,29 +385,18 @@ public class ZeffyPaymentProcessor {
         return value.length() <= REASON_MAX_LENGTH ? value : value.substring(0, REASON_MAX_LENGTH);
     }
 
-    private record PersonResolution(Person person, String reason) {
+    public record ProcessingResult(String paymentId, UUID paymentRecordId, String outcome,
+                                   String detail, String payloadSha256, boolean inserted) {
+    }
+
+    private record PersonAssessment(String email, Person existing, String reason) {
     }
 
     private record ParsedPayment(
-            String id,
-            String status,
-            String refundStatus,
-            String disputeStatus,
-            BigDecimal amount,
-            BigDecimal eligibleAmount,
-            String currency,
-            String paymentType,
-            OffsetDateTime createdAt,
-            String campaignId,
-            String campaignTitle,
-            String contactId,
-            String email,
-            String firstName,
-            String lastName,
-            String addressLine1,
-            String city,
-            String state,
-            String postalCode,
-            String payload) {
+            String id, String status, String refundStatus, String disputeStatus, BigDecimal amount,
+            BigDecimal eligibleAmount, String currency, String paymentType, OffsetDateTime createdAt,
+            String campaignId, String campaignTitle, String contactId, String email, String firstName,
+            String lastName, String addressLine1, String city, String state, String postalCode,
+            String payload, JsonNode payloadNode) {
     }
 }

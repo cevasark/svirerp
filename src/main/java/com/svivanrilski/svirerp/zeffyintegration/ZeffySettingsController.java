@@ -7,6 +7,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/settings/zeffy")
 @RequiredArgsConstructor
@@ -33,6 +35,21 @@ public class ZeffySettingsController {
     @PostMapping("/sync-campaigns")
     public ZeffyIntegrationService.CampaignSyncResponse synchronizeCampaigns(Authentication authentication) {
         return service.synchronizeCampaigns(authentication != null ? authentication.getName() : null);
+    }
+
+    @PostMapping("/sync-payments")
+    public ZeffyIntegrationService.PaymentSyncResponse synchronizePayments(
+            @RequestBody ZeffyIntegrationService.PaymentSyncRequest request,
+            Authentication authentication) {
+        return service.synchronizePayments(request, authentication != null ? authentication.getName() : null);
+    }
+
+    @GetMapping("/sync-runs/{runId}/payment-results")
+    public Page<ZeffyIntegrationService.PaymentSyncResultResponse> paymentSyncResults(
+            @PathVariable UUID runId,
+            @PageableDefault(sort = "observedAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
+            Pageable pageable) {
+        return service.findPaymentSyncResults(runId, pageable);
     }
 
     @GetMapping("/sync-runs")

@@ -103,8 +103,11 @@ public class ZeffyPayment {
     @Column(name = "first_seen_at", nullable = false, updatable = false)
     private OffsetDateTime firstSeenAt;
 
-    @Column(name = "last_event_at", nullable = false)
+    @Column(name = "last_event_at")
     private OffsetDateTime lastEventAt;
+
+    @Column(name = "last_synced_at")
+    private OffsetDateTime lastSyncedAt;
 
     @Column(name = "applied_at")
     private OffsetDateTime appliedAt;
@@ -135,7 +138,6 @@ public class ZeffyPayment {
     private void prePersist() {
         OffsetDateTime now = OffsetDateTime.now();
         if (firstSeenAt == null) firstSeenAt = now;
-        if (lastEventAt == null) lastEventAt = firstSeenAt;
         if (createdAt == null) createdAt = now;
         if (updatedAt == null) updatedAt = now;
     }

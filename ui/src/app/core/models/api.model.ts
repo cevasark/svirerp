@@ -63,11 +63,18 @@ export interface ZeffySyncRun {
   requestedTo?: string;
   startingCursor?: string;
   endingCursor?: string;
+  executionMode?: 'PREVIEW' | 'APPLY';
+  previewRunId?: string;
   fetchedCount: number;
   insertedCount: number;
   updatedCount: number;
   ignoredCount: number;
   failedCount: number;
+  alreadyAppliedCount: number;
+  eligibleCount: number;
+  needsMappingCount: number;
+  needsReviewCount: number;
+  processedCount: number;
   errorSummary?: string;
 }
 
@@ -79,6 +86,8 @@ export interface ZeffyIntegrationStatus {
   campaignCount: number;
   confirmedMappingCount: number;
   latestCampaignSync?: ZeffySyncRun;
+  latestPaymentPreview?: ZeffySyncRun;
+  latestPaymentSync?: ZeffySyncRun;
 }
 
 export interface ZeffyConfigurationRequest {
@@ -103,6 +112,32 @@ export interface ZeffyConnectionTestResult {
 
 export interface ZeffyCampaignSyncResult {
   run: ZeffySyncRun;
+}
+
+export interface ZeffyPaymentSyncRequest {
+  mode: 'PREVIEW' | 'APPLY';
+  createdFrom?: string;
+  createdThrough?: string;
+  previewRunId?: string;
+}
+
+export interface ZeffyPaymentSyncResult {
+  run: ZeffySyncRun;
+}
+
+export interface ZeffyPaymentSyncItem {
+  id: string;
+  zeffyPaymentId: string;
+  zeffyPaymentRecordId?: string;
+  outcome: 'ELIGIBLE' | 'ALREADY_APPLIED' | 'PROCESSED' | 'IGNORED' | 'NEEDS_MAPPING'
+    | 'NEEDS_REVIEW' | 'CHANGED_AFTER_PREVIEW' | 'ERROR';
+  detail?: string;
+  payloadSha256: string;
+  observedAt: string;
+  amount?: number;
+  currency?: string;
+  campaignTitle?: string;
+  buyerEmail?: string;
 }
 
 export interface ZeffyCampaignMappingRequest {

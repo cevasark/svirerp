@@ -182,6 +182,37 @@ class ZeffyPaymentProcessorTest {
         verifyNoInteractions(memberships, memberPayments, finance);
     }
 
+    @Test
+    void previewEvaluatesEligibilityWithoutCreatingBusinessRecords() throws Exception {
+        var data = new ObjectMapper().readTree(paymentPayload(5000)).get("data");
+        ZeffyCampaign campaign = ZeffyCampaign.builder()
+                .zeffyCampaignId("campaign-1").title("Donation")
+                .mappingConfirmed(true).processingAction("APPLY")
+                .fund(Fund.builder().id(UUID.randomUUID()).build())
+                .categoryAccount(Account.builder().id(UUID.randomUUID()).build())
+                .build();
+        when(payments.findByZeffyPaymentIdForUpdate("pay-1")).thenReturn(Optional.empty());
+        when(campaigns.findWithMappingByZeffyCampaignId("campaign-1")).thenReturn(Optional.of(campaign));
+        when(people.findByNormalizedEmail("jane@example.com")).thenReturn(List.of());
+
+        ZeffyPaymentProcessor.ProcessingResult result = processor.previewApiPayment(
+                data, OffsetDateTime.parse("2026-01-02T00:00:00Z"));
+
+        assertThat(result.outcome()).isEqualTo("ELIGIBLE");
+        assertThat(result.payloadSha256()).hasSize(64);
+        verify(people, never()).create(any());
+        verify(people, never()).fillBlankFields(any(), any());
+        verifyNoInteractions(memberships, memberPayments, finance);
+    }
+
+    @Test
+    void paymentFingerprintDoesNotDependOnJsonObjectFieldOrder() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+
+        assertThat(processor.fingerprint(mapper.readTree("{\"id\":\"pay-1\",\"amount\":500}")))
+                .isEqualTo(processor.fingerprint(mapper.readTree("{\"amount\":500,\"id\":\"pay-1\"}")));
+    }
+
     private ZeffyWebhookEvent event(String payload) {
         return ZeffyWebhookEvent.builder()
                 .id(UUID.randomUUID())

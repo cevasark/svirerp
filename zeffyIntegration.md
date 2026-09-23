@@ -539,6 +539,11 @@ An operator can view the payment, mapping decision, linked local records, error/
 
 ## 12. Phase 4 — Historical API synchronization
 
+Implementation: migration V57 and the admin historical-payment workflow implement this phase. The
+workflow uses the same API key, global one-request-per-second pacer, campaign mappings, identity
+rules, and payment application transaction as live webhook processing. It introduces no CSV or
+spreadsheet fallback and no additional secret or application setting.
+
 ### 12.1 Functional behavior
 
 An admin can start a historical sync with a required created-from date and optional created-through date. The sync requests:
@@ -563,6 +568,30 @@ Before application, the first production historical run should support a preview
 - eligible to apply
 
 Execution can then apply eligible records. A partial failure records the cursor and per-payment outcomes. Re-running the same date range is safe because payment IDs are unique.
+
+The admin workflow is exposed under Settings > Zeffy and through these admin endpoints:
+
+- `POST /api/settings/zeffy/sync-payments` with `mode: PREVIEW`, required `createdFrom`, and optional
+  inclusive `createdThrough`
+- `POST /api/settings/zeffy/sync-payments` with `mode: APPLY` and the approved `previewRunId`
+- `GET /api/settings/zeffy/sync-runs/{runId}/payment-results` for paginated per-payment outcomes
+
+Calendar boundaries are interpreted in `America/Chicago`. A through date includes its final whole
+second. If it is omitted, Zeffy's request has no upper date filter. Apply refetches the preview's
+same range and compares each payload hash with the stored preview. A new, missing, or changed
+payment is recorded as `CHANGED_AFTER_PREVIEW` and is not applied; the admin must run a fresh
+preview. Only a successfully completed preview can be applied.
+
+Preview may insert or refresh `zeffy_payment` integration snapshots, but it cannot create or alter a
+Person, Member, MemberPayment, JournalEntry, or membership tier. Apply re-evaluates current campaign
+mappings and person identity before creating domain records. `zeffy_payment.zeffy_payment_id` remains
+the idempotency boundary shared with webhooks, so an already applied payment is reported as
+`ALREADY_APPLIED`.
+
+Each API page is fetched with `limit=100` and the shared request pacer. Run counts and the ending
+cursor are checkpointed after every page. Each fetched payment has a durable result containing its
+outcome and preview hash. An interrupted or failed run remains in history; recovery is a new preview
+of the same range, which is safe because applied payment IDs are unique.
 
 ### 12.3 API-only ingestion
 

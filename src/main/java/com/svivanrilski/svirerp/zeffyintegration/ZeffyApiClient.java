@@ -1,5 +1,6 @@
 package com.svivanrilski.svirerp.zeffyintegration;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.svivanrilski.svirerp.settings.AppSettingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +27,10 @@ public class ZeffyApiClient {
     private final RestClient restClient;
 
     public record CampaignFetch(List<ZeffyApiModels.Campaign> campaigns, String endingCursor) {
+    }
+
+    public record PaymentPageFetch(List<JsonNode> payments,
+                                   boolean hasMore, String nextCursor) {
     }
 
     @Autowired
@@ -79,6 +84,18 @@ public class ZeffyApiClient {
         return new CampaignFetch(List.copyOf(campaigns), endingCursor);
     }
 
+    public PaymentPageFetch fetchPaymentPage(long createdFrom, Long createdThrough, String cursor) {
+        String apiKey = requireConfiguredApiKey();
+        ZeffyApiModels.PaymentPage page = getPaymentPage(apiKey, createdFrom, createdThrough, cursor, 100);
+        List<JsonNode> payments = page.data() == null
+                ? List.of() : List.copyOf(page.data());
+        String nextCursor = page.cursorText();
+        if (page.hasMore() && (nextCursor == null || nextCursor.isBlank())) {
+            throw new ZeffyApiException(502, "Zeffy returned an invalid payment pagination cursor");
+        }
+        return new PaymentPageFetch(payments, page.hasMore(), nextCursor);
+    }
+
     private ZeffyApiModels.CampaignPage getCampaignPage(String apiKey, String cursor, int limit) {
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -102,6 +119,58 @@ public class ZeffyApiClient {
                 if (status == 401) {
                     throw new ZeffyApiException(401, "Zeffy rejected the API key");
                 }
+                if (status == 429) {
+                    Duration delay = retryAfter(ex.getResponseHeaders());
+                    pacer.defer(delay);
+                    if (attempt == MAX_ATTEMPTS) {
+                        throw new ZeffyApiException(429,
+                                "Zeffy rate limit reached; retry after " + delay.toSeconds() + " seconds", delay);
+                    }
+                    lastFailure = ex;
+                    continue;
+                }
+                if (status < 500 || attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Zeffy API request failed", null, ex);
+                }
+                lastFailure = ex;
+            } catch (ResourceAccessException ex) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Could not reach the Zeffy API", null, ex);
+                }
+                lastFailure = ex;
+            }
+        }
+        throw new ZeffyApiException(502, "Zeffy API request failed", null, lastFailure);
+    }
+
+    private ZeffyApiModels.PaymentPage getPaymentPage(String apiKey, long createdFrom,
+                                                       Long createdThrough, String cursor, int limit) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            pacer.awaitPermit();
+            try {
+                ZeffyApiModels.PaymentPage page = restClient.get()
+                        .uri(uriBuilder -> {
+                            var builder = uriBuilder.path("/api/v1/payments")
+                                    .queryParam("status", "succeeded")
+                                    .queryParam("created[gte]", createdFrom)
+                                    .queryParam("limit", limit);
+                            if (createdThrough != null) {
+                                builder.queryParam("created[lte]", createdThrough);
+                            }
+                            if (cursor != null) builder.queryParam("starting_after", cursor);
+                            return builder.build();
+                        })
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                        .retrieve()
+                        .body(ZeffyApiModels.PaymentPage.class);
+                if (page == null) {
+                    throw new ZeffyApiException(502, "Zeffy returned an empty payment response");
+                }
+                return page;
+            } catch (HttpStatusCodeException ex) {
+                int status = ex.getStatusCode().value();
+                if (status == 401) throw new ZeffyApiException(401, "Zeffy rejected the API key");
                 if (status == 429) {
                     Duration delay = retryAfter(ex.getResponseHeaders());
                     pacer.defer(delay);
