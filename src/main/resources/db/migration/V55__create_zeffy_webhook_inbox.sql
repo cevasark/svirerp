@@ -12,7 +12,7 @@ CREATE TABLE zeffy_webhook_event (
     dispatched_at            DATETIME       NOT NULL,
     signature_timestamp      DATETIME       NOT NULL,
     raw_payload              LONGTEXT       NOT NULL,
-    payload_sha256           CHAR(64)       NOT NULL,
+    payload_sha256           VARCHAR(64)       NOT NULL,
     status                   VARCHAR(20)    NOT NULL
                                  CHECK (status IN ('RECEIVED', 'PROCESSING', 'PROCESSED',
                                                    'NEEDS_MAPPING', 'NEEDS_REVIEW', 'ERROR',
