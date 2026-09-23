@@ -1,6 +1,7 @@
 package com.svivanrilski.svirerp.zeffyintegration;
 
 import com.svivanrilski.svirerp.settings.AppSettingService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,7 @@ public class ZeffyApiClient {
     public record CampaignFetch(List<ZeffyApiModels.Campaign> campaigns, String endingCursor) {
     }
 
+    @Autowired
     public ZeffyApiClient(AppSettingService settingService, ZeffyRequestPacer pacer,
                           RestClient.Builder builder) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

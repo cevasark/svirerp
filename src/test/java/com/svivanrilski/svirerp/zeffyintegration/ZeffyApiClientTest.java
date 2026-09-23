@@ -2,6 +2,7 @@ package com.svivanrilski.svirerp.zeffyintegration;
 
 import com.svivanrilski.svirerp.settings.AppSettingService;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,6 +21,16 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 class ZeffyApiClientTest {
+
+    @Test
+    void springCreatesClientUsingItsProductionConstructor() {
+        new ApplicationContextRunner()
+                .withBean(AppSettingService.class, () -> mock(AppSettingService.class))
+                .withBean(ZeffyRequestPacer.class, () -> mock(ZeffyRequestPacer.class))
+                .withBean(RestClient.Builder.class, RestClient::builder)
+                .withBean(ZeffyApiClient.class)
+                .run(context -> assertThat(context).hasSingleBean(ZeffyApiClient.class));
+    }
 
     @Test
     void fetchesEveryCampaignPageWithBearerAuthAndPacing() {
