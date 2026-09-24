@@ -1,6 +1,6 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Living specification; Phases 1–4 and Phase 5A implemented
+**Status:** Living specification; Phases 1–4, Phase 5A, and Zeffy membership rebuilding implemented
 **Date:** September 23, 2026
 **Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
@@ -374,14 +374,16 @@ One Payment can contain multiple line items. The initial rule is:
 - Non-membership payments do not create Member or MemberPayment records.
 - MemberPayment amount and date use the Zeffy payment amount and original date.
 - `transactionRef` contains the Zeffy payment ID; the integration payment record remains the stronger uniqueness guarantee.
-- Existing tier rules remain:
+- Membership period rules are:
   - each individual payment of at least $150 creates one membership year;
   - at least $1,000 selects Benefactor, otherwise Member;
-  - on-time renewals chain from the existing expiry;
+  - a same-tier renewal received during an active period chains from the existing paid-through date;
   - renewals after lapse start from the new payment date;
-  - the latest qualifying payment determines the tier;
+  - a lower-tier payment made while a higher tier is active is queued after the active tier expires and cannot downgrade it early;
+  - a higher-tier payment takes effect immediately and expires one year after the prior paid-through date;
+  - payment periods are stored on the integration-owned `MemberPayment` rows so a queued lower tier can take effect after a higher tier expires;
   - lapsed Members/Benefactors retain tier and become inactive;
-  - sub-$150 payment history yields active, nonexpiring Follower.
+  - sub-$150 payment history yields an active, nonexpiring Follower and never shortens an unexpired paid tier.
 - Free Followers created without a payment remain active until explicitly changed. Recompute All must preserve this confirmed rule.
 - A later phase must explicitly decide whether automated recomputation preserves a manually suspended status.
 - Manual MemberPayment changes intentionally do not synchronize accounting or trigger automatic tier recomputation.
@@ -668,13 +670,31 @@ Membership-chain consequences can be significant: reducing or removing an old qu
 - Stable contact ID is stored in `zeffy_contact_link`.
 - Initial match uses existing link, then unique normalized email.
 - New Zeffy contacts may create Person plus active free Follower, preserving the confirmed free-Follower rule.
-- A newly created contact/Follower defaults `emailOptIn` to false because the Zeffy Contact contract does not provide explicit communication consent.
+- A newly created contact/Follower defaults `emailOptIn` to true under the organization's confirmed contact policy.
 - Existing Persons should initially be enriched only in blank fields.
 - Email changes that conflict with another Person require review.
 - The supplied Contact schema does not expose an explicit unsubscribe/communication-preference field. The integration must not infer opt-out status from absent fields.
 - Bidirectional ERP-to-Zeffy contact writes require a separate approved specification.
 
-### 13.5 Acceptance criteria
+### 13.5 Membership rebuild from synchronized payments
+
+The Members page provides **Rebuild from Zeffy** for a clean installation, recovery, and explicit reconciliation. It operates only on local `zeffy_payment` rows and does not make API calls, consume Zeffy quota, or create accounting entries.
+
+The rebuild:
+
+- selects nondeleted succeeded payments whose current confirmed campaign mapping is `APPLY` with membership credit enabled;
+- processes payments by original Zeffy timestamp ascending, with Zeffy payment ID as the deterministic tie-breaker;
+- matches an existing linked Person first, then a unique normalized email, and creates a Person only when email and name are sufficient and unambiguous;
+- creates a missing active Follower Member with `emailOptIn=true`;
+- creates or repairs exactly one completed `MemberPayment` identified by payment method `zeffy` and the Zeffy payment ID;
+- recomputes every affected member from their complete completed-payment history and persists each payment's assigned membership period;
+- is idempotent when run repeatedly;
+- reports scanned, created, updated, recomputed, and needs-review counts;
+- leaves ambiguous identity, duplicate contribution, invalid amount/date, and refund-lifecycle cases for review.
+
+The endpoint is `POST /api/members/rebuild-from-zeffy`. A confirmation dialog explains the scope before the operation begins.
+
+### 13.6 Acceptance criteria
 
 - Updated/deleted ID references are fetched or tombstoned correctly.
 - Fetch `401`, `404`, `429`, network, and 5xx outcomes are distinguishable and retryable where appropriate.
@@ -840,7 +860,7 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 - Refund and lost-dispute corrections use the original payment date.
 - Partial refunds reduce an integration-owned membership contribution to the net retained amount and trigger tier recomputation.
 - Lost disputes create automatic corrections; opened disputes only create review work, and won disputes require no correction.
-- Valid new Zeffy contacts create a Person and active free Follower. Email opt-in defaults to false because Zeffy supplies no explicit consent field.
+- Valid new Zeffy contacts create a Person and active free Follower. Email opt-in defaults to true under the organization's confirmed policy.
 - Manual membership contributions, accounting records, and membership recalculation are deliberately maintained separately by staff.
 - Zeffy Contacts and Transactions spreadsheet imports are removed; the generic Member CSV import remains.
 - Synchronization history belongs in `zeffy_sync_run`, not `app_setting`.

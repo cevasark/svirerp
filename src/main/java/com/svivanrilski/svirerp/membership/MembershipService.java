@@ -11,10 +11,15 @@ import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -92,6 +97,10 @@ public class MembershipService {
     public Member findMemberById(UUID id) {
         return memberRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Member", id));
+    }
+
+    public Optional<Member> findMemberByPersonIdIfExists(UUID personId) {
+        return memberRepo.findByPersonId(personId);
     }
 
     public record MemberSummary(
@@ -228,6 +237,34 @@ public class MembershipService {
                 .orElseThrow(() -> new ResourceNotFoundException("MemberPayment", id));
     }
 
+    public record ExternalPaymentUpsert(MemberPayment payment, boolean created) {
+    }
+
+    /** Creates or repairs the one membership contribution owned by a Zeffy payment. */
+    @Transactional
+    public ExternalPaymentUpsert upsertZeffyPayment(
+            UUID memberId, BigDecimal amount, LocalDate paymentDate,
+            OffsetDateTime sourceCreatedAt, String zeffyPaymentId, String campaignTitle) {
+        List<MemberPayment> matches = paymentRepo.findAllByPaymentMethodAndTransactionRef(
+                "zeffy", zeffyPaymentId);
+        if (matches.size() > 1) {
+            throw new IllegalStateException(
+                    "More than one membership payment references Zeffy payment " + zeffyPaymentId);
+        }
+
+        boolean created = matches.isEmpty();
+        MemberPayment payment = created ? new MemberPayment() : matches.getFirst();
+        payment.setMember(findMemberById(memberId));
+        payment.setAmount(amount);
+        payment.setPaymentDate(paymentDate);
+        payment.setSourceCreatedAt(sourceCreatedAt);
+        payment.setPaymentMethod("zeffy");
+        payment.setTransactionRef(zeffyPaymentId);
+        payment.setStatus("completed");
+        payment.setNotes("Paid via Zeffy — " + campaignTitle);
+        return new ExternalPaymentUpsert(paymentRepo.save(payment), created);
+    }
+
     @Transactional
     public MemberPayment createPayment(MemberPayment payment) {
         validatePaymentMethod(payment.getPaymentMethod());
@@ -302,11 +339,35 @@ public class MembershipService {
         Member member = findMemberById(memberId);
         ensureZeffyTierTypesSeeded();
 
-        List<TierCalculator.PaymentSnapshot> snapshots = paymentRepo
-                .findByMemberIdAndStatus(memberId, "completed").stream()
-                .map(p -> new TierCalculator.PaymentSnapshot(p.getAmount(), p.getPaymentDate()))
+        List<MemberPayment> allPayments = paymentRepo.findAllByMemberId(memberId);
+        List<MemberPayment> completedPayments = allPayments.stream()
+                .filter(payment -> "completed".equals(payment.getStatus()))
+                .sorted(Comparator.comparing(MemberPayment::getPaymentDate)
+                        .thenComparing(MemberPayment::getSourceCreatedAt,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(payment -> Optional.ofNullable(payment.getTransactionRef()).orElse(""))
+                        .thenComparing(payment -> payment.getId().toString()))
                 .toList();
-        TierCalculator.TierResult result = TierCalculator.compute(snapshots);
+        List<TierCalculator.PaymentSnapshot> snapshots = completedPayments.stream()
+                .map(payment -> new TierCalculator.PaymentSnapshot(
+                        payment.getId().toString(), payment.getAmount(), payment.getPaymentDate()))
+                .toList();
+        TierCalculator.Calculation calculation = TierCalculator.calculate(
+                snapshots, LocalDate.now(java.time.ZoneId.of("America/Chicago")));
+        TierCalculator.TierResult result = calculation.result();
+
+        Map<String, TierCalculator.PaymentPeriod> periodsByPaymentId = calculation.periods().stream()
+                .filter(period -> period.paymentKey() != null)
+                .collect(Collectors.toMap(
+                        TierCalculator.PaymentPeriod::paymentKey,
+                        Function.identity(),
+                        (first, ignored) -> first));
+        for (MemberPayment payment : allPayments) {
+            TierCalculator.PaymentPeriod period = periodsByPaymentId.get(payment.getId().toString());
+            payment.setPeriodStart(period == null ? null : period.periodStart());
+            payment.setPeriodEnd(period == null ? null : period.periodEnd());
+        }
+        paymentRepo.saveAll(allPayments);
 
         if (result == null) {
             if (!TierCalculator.FOLLOWER.equalsIgnoreCase(member.getMembershipType().getName())) {

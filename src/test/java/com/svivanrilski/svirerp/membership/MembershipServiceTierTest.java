@@ -56,8 +56,9 @@ class MembershipServiceTierTest {
 
         LocalDate longAgo = LocalDate.now(java.time.ZoneId.of("America/Chicago")).minusMonths(20);
         MemberPayment payment = MemberPayment.builder()
-                .amount(new BigDecimal("1000.00")).paymentDate(longAgo).status("completed").build();
-        when(paymentRepo.findByMemberIdAndStatus(memberId, "completed")).thenReturn(List.of(payment));
+                .id(UUID.randomUUID()).amount(new BigDecimal("1000.00"))
+                .paymentDate(longAgo).status("completed").build();
+        when(paymentRepo.findAllByMemberId(memberId)).thenReturn(List.of(payment));
 
         MembershipType benefactorType = typeOf(TierCalculator.BENEFACTOR);
         when(typeRepo.findByNameIgnoreCase(TierCalculator.BENEFACTOR))
@@ -69,6 +70,8 @@ class MembershipServiceTierTest {
         assertThat(result.getMembershipType()).isEqualTo(benefactorType);
         assertThat(result.getStatus()).isEqualTo("inactive");
         assertThat(result.getExpiryDate()).isEqualTo(longAgo.plusYears(1));
+        assertThat(payment.getPeriodStart()).isEqualTo(longAgo);
+        assertThat(payment.getPeriodEnd()).isEqualTo(longAgo.plusYears(1));
     }
 
     @Test
@@ -78,7 +81,7 @@ class MembershipServiceTierTest {
                 .membershipType(existingType).build();
         when(memberRepo.findById(memberId)).thenReturn(Optional.of(member));
         when(typeRepo.existsByNameIgnoreCase(anyString())).thenReturn(true);
-        when(paymentRepo.findByMemberIdAndStatus(memberId, "completed")).thenReturn(List.of());
+        when(paymentRepo.findAllByMemberId(memberId)).thenReturn(List.of());
         when(memberRepo.save(any(Member.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Member result = service.recomputeTier(memberId);
@@ -114,5 +117,23 @@ class MembershipServiceTierTest {
 
         assertThat(result.getJoinDate()).isEqualTo(recordedJoin); // unchanged
         verify(memberRepo, never()).save(any());
+    }
+
+    @Test
+    void findOrCreateFollowerMember_defaultsEmailOptInToTrue() {
+        UUID personId = UUID.randomUUID();
+        Person person = Person.builder().id(personId).firstName("Jane").lastName("Doe").build();
+        MembershipType follower = typeOf(TierCalculator.FOLLOWER);
+        when(memberRepo.findByPersonId(personId)).thenReturn(Optional.empty());
+        when(typeRepo.existsByNameIgnoreCase(anyString())).thenReturn(true);
+        when(typeRepo.findByNameIgnoreCase(TierCalculator.FOLLOWER)).thenReturn(Optional.of(follower));
+        when(personService.findById(personId)).thenReturn(person);
+        when(memberRepo.save(any(Member.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Member result = service.findOrCreateFollowerMember(personId, LocalDate.of(2026, 1, 2));
+
+        assertThat(result.getEmailOptIn()).isTrue();
+        assertThat(result.getStatus()).isEqualTo("active");
+        assertThat(result.getMembershipType()).isSameAs(follower);
     }
 }

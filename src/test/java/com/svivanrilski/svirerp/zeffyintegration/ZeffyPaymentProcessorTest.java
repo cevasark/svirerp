@@ -6,7 +6,6 @@ import com.svivanrilski.svirerp.finance.FinanceService;
 import com.svivanrilski.svirerp.finance.Fund;
 import com.svivanrilski.svirerp.finance.JournalEntry;
 import com.svivanrilski.svirerp.finance.RecordIncomeRequest;
-import com.svivanrilski.svirerp.membership.MemberPaymentRepository;
 import com.svivanrilski.svirerp.membership.MemberPayment;
 import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MembershipService;
@@ -34,7 +33,6 @@ class ZeffyPaymentProcessorTest {
     private ZeffyCampaignRepository campaigns;
     private PersonService people;
     private MembershipService memberships;
-    private MemberPaymentRepository memberPayments;
     private FinanceService finance;
     private ZeffyPaymentProcessor processor;
 
@@ -45,10 +43,9 @@ class ZeffyPaymentProcessorTest {
         campaigns = mock(ZeffyCampaignRepository.class);
         people = mock(PersonService.class);
         memberships = mock(MembershipService.class);
-        memberPayments = mock(MemberPaymentRepository.class);
         finance = mock(FinanceService.class);
         processor = new ZeffyPaymentProcessor(events, payments, campaigns, people,
-                memberships, memberPayments, finance, new ZeffyPaymentPayload(new ObjectMapper()));
+                memberships, finance, new ZeffyPaymentPayload(new ObjectMapper()));
         when(payments.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(payments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(events.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -65,7 +62,7 @@ class ZeffyPaymentProcessorTest {
 
         assertThat(event.getStatus()).isEqualTo("NEEDS_MAPPING");
         assertThat(event.getZeffyPayment().getProcessingStatus()).isEqualTo("NEEDS_MAPPING");
-        verifyNoInteractions(people, memberships, memberPayments, finance);
+        verifyNoInteractions(people, memberships, finance);
     }
 
     @Test
@@ -124,7 +121,7 @@ class ZeffyPaymentProcessorTest {
         processor.applyEvent(event.getId());
 
         assertThat(event.getStatus()).isEqualTo("PROCESSED");
-        verifyNoInteractions(campaigns, people, memberships, memberPayments, finance);
+        verifyNoInteractions(campaigns, people, memberships, finance);
     }
 
     @Test
@@ -146,14 +143,16 @@ class ZeffyPaymentProcessorTest {
         when(people.findByNormalizedEmail("jane@example.com")).thenReturn(List.of(person));
         when(people.fillBlankFields(eq(person.getId()), any())).thenReturn(person);
         when(memberships.findOrCreateFollowerMember(eq(person.getId()), any())).thenReturn(member);
-        when(memberPayments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        MemberPayment contribution = MemberPayment.builder().id(UUID.randomUUID()).member(member)
+                .amount(BigDecimal.ZERO).paymentDate(LocalDate.of(2025, 12, 31)).build();
+        when(memberships.upsertZeffyPayment(eq(member.getId()), any(BigDecimal.class), any(), any(),
+                eq("pay-1"), eq("Free membership")))
+                .thenReturn(new MembershipService.ExternalPaymentUpsert(contribution, true));
         when(memberships.recomputeTier(member.getId())).thenReturn(member);
 
         processor.applyEvent(event.getId());
 
-        ArgumentCaptor<MemberPayment> contribution = ArgumentCaptor.forClass(MemberPayment.class);
-        verify(memberPayments).save(contribution.capture());
-        assertThat(contribution.getValue().getAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(event.getZeffyPayment().getMemberPayment()).isSameAs(contribution);
         verify(finance, never()).recordIncome(any());
         assertThat(event.getStatus()).isEqualTo("PROCESSED");
     }
@@ -179,7 +178,7 @@ class ZeffyPaymentProcessorTest {
         assertThat(event.getStatus()).isEqualTo("NEEDS_REVIEW");
         assertThat(event.getErrorSummary()).contains("more than one");
         verify(people, never()).create(any());
-        verifyNoInteractions(memberships, memberPayments, finance);
+        verifyNoInteractions(memberships, finance);
     }
 
     @Test
@@ -202,7 +201,7 @@ class ZeffyPaymentProcessorTest {
         assertThat(result.payloadSha256()).hasSize(64);
         verify(people, never()).create(any());
         verify(people, never()).fillBlankFields(any(), any());
-        verifyNoInteractions(memberships, memberPayments, finance);
+        verifyNoInteractions(memberships, finance);
     }
 
     @Test

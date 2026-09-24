@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { ResourceService } from '../../../core/services/resource.service';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
 import { Member } from '../../../core/models/domain.model';
-import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTiersResult, MemberSummary } from '../../../core/models/api.model';
+import { Page, PageParams, DEFAULT_PAGE_PARAMS, MemberImportResult, RecomputeTiersResult, MemberSummary, ZeffyMembershipRebuildResult } from '../../../core/models/api.model';
 
 @Injectable({ providedIn: 'root' })
 export class MemberService extends ResourceService<Member> {
@@ -63,6 +63,13 @@ export class MemberService extends ResourceService<Member> {
   recomputeTiers(): Observable<RecomputeTiersResult> {
     return this.http.post<RecomputeTiersResult>(
       `${this.apiEnv.apiUrl}/members/recompute-tiers`,
+      {},
+    );
+  }
+
+  rebuildFromZeffy(): Observable<ZeffyMembershipRebuildResult> {
+    return this.http.post<ZeffyMembershipRebuildResult>(
+      `${this.apiEnv.apiUrl}/members/rebuild-from-zeffy`,
       {},
     );
   }

@@ -36,4 +36,10 @@ public interface MemberPaymentRepository extends JpaRepository<MemberPayment, UU
 
     /** Internal use only (tier computation reads amount/paymentDate directly) — never serialized, no EntityGraph needed. */
     List<MemberPayment> findByMemberIdAndStatus(UUID memberId, String status);
+
+    /** Internal use by membership reconciliation and period recomputation. */
+    List<MemberPayment> findAllByMemberId(UUID memberId);
+
+    List<MemberPayment> findAllByPaymentMethodAndTransactionRef(
+            String paymentMethod, String transactionRef);
 }

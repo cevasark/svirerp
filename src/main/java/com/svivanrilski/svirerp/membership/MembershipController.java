@@ -1,5 +1,6 @@
 package com.svivanrilski.svirerp.membership;
 
+import com.svivanrilski.svirerp.zeffyintegration.ZeffyMembershipReconciliationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,7 @@ public class MembershipController {
 
     private final MembershipService service;
     private final MemberImportService importService;
+    private final ZeffyMembershipReconciliationService zeffyMembershipReconciliationService;
 
     // ── MembershipType ──────────────────────────────────────────────────────
 
@@ -100,6 +102,11 @@ public class MembershipController {
     @PostMapping("/api/members/recompute-tiers")
     public RecomputeTiersResult recomputeTiers() {
         return new RecomputeTiersResult(service.recomputeAllTiers());
+    }
+
+    @PostMapping("/api/members/rebuild-from-zeffy")
+    public ZeffyMembershipReconciliationService.RebuildResult rebuildFromZeffy() {
+        return zeffyMembershipReconciliationService.rebuild();
     }
 
     public record RecomputeTiersResult(int membersProcessed) {

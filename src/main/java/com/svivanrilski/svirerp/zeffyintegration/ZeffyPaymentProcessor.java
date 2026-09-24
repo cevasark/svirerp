@@ -7,7 +7,6 @@ import com.svivanrilski.svirerp.finance.JournalEntry;
 import com.svivanrilski.svirerp.finance.RecordIncomeRequest;
 import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberPayment;
-import com.svivanrilski.svirerp.membership.MemberPaymentRepository;
 import com.svivanrilski.svirerp.membership.MembershipService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
@@ -41,7 +40,6 @@ public class ZeffyPaymentProcessor {
     private final ZeffyCampaignRepository campaignRepository;
     private final PersonService personService;
     private final MembershipService membershipService;
-    private final MemberPaymentRepository memberPaymentRepository;
     private final FinanceService financeService;
     private final ZeffyPaymentPayload payload;
 
@@ -149,15 +147,9 @@ public class ZeffyPaymentProcessor {
         MemberPayment memberPayment = null;
         if (Boolean.TRUE.equals(campaign.getGrantsMembershipCredit())) {
             member = membershipService.findOrCreateFollowerMember(person.getId(), paymentDate);
-            memberPayment = memberPaymentRepository.save(MemberPayment.builder()
-                    .member(member)
-                    .amount(parsed.amount())
-                    .paymentDate(paymentDate)
-                    .paymentMethod("zeffy")
-                    .transactionRef(parsed.id())
-                    .status("completed")
-                    .notes("Paid via Zeffy — " + campaign.getTitle())
-                    .build());
+            memberPayment = membershipService.upsertZeffyPayment(
+                    member.getId(), parsed.amount(), paymentDate, parsed.createdAt(),
+                    parsed.id(), campaign.getTitle()).payment();
             member = membershipService.recomputeTier(member.getId());
         }
 

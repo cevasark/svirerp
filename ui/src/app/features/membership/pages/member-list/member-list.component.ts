@@ -41,7 +41,11 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
             <mat-icon>upload</mat-icon>
             Import Members
           </button>
-          <button mat-stroked-button [disabled]="recomputingTiers()" (click)="recomputeTiers()">
+          <button mat-stroked-button [disabled]="rebuildingFromZeffy() || recomputingTiers()" (click)="confirmZeffyRebuild()">
+            <mat-icon>sync</mat-icon>
+            Rebuild from Zeffy
+          </button>
+          <button mat-stroked-button [disabled]="recomputingTiers() || rebuildingFromZeffy()" (click)="recomputeTiers()">
             <mat-icon>refresh</mat-icon>
             Recompute Tiers
           </button>
@@ -139,6 +143,7 @@ export class MemberListComponent implements OnInit {
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
   recomputingTiers = signal(false);
+  rebuildingFromZeffy = signal(false);
   membershipTypes = signal<MembershipType[]>([]);
   summary = signal<MemberSummary | null>(null);
 
@@ -243,6 +248,40 @@ export class MemberListComponent implements OnInit {
       error: () => {
         this.recomputingTiers.set(false);
         this.notifications.error('Could not recompute tiers.');
+      },
+    });
+  }
+
+  confirmZeffyRebuild(): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Rebuild Memberships from Zeffy',
+          message: 'Scan all locally synchronized, successful payments from campaigns that grant membership credit? This creates or repairs people, memberships, contribution records, periods, and tiers. It does not contact Zeffy or create accounting entries.',
+          confirmLabel: 'Rebuild',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => { if (confirmed) this.rebuildFromZeffy(); });
+  }
+
+  private rebuildFromZeffy(): void {
+    this.rebuildingFromZeffy.set(true);
+    this.memberService.rebuildFromZeffy().subscribe({
+      next: result => {
+        this.rebuildingFromZeffy.set(false);
+        const message = `Scanned ${result.paymentsScanned} payment(s), created ${result.membersCreated} membership(s), and recomputed ${result.membersRecomputed} member(s).`;
+        if (result.needsReview > 0) {
+          this.notifications.info(`${message} ${result.needsReview} payment(s) need review.`);
+        } else {
+          this.notifications.success(message);
+        }
+        this.loadPage();
+        this.loadSummary();
+      },
+      error: () => {
+        this.rebuildingFromZeffy.set(false);
+        this.notifications.error('Could not rebuild memberships from Zeffy payments.');
       },
     });
   }

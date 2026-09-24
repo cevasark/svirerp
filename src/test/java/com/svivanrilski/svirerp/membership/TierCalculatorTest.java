@@ -113,16 +113,42 @@ class TierCalculatorTest {
     }
 
     @Test
-    void tier_reflects_the_most_recent_periods_amount_not_cumulative_highest() {
+    void lower_tier_payment_during_benefactor_period_is_queued_after_expiry() {
         LocalDate benefactorPayment = TODAY.minusMonths(10); // still active
-        LocalDate followUp150 = TODAY.minusMonths(1); // arrives while still active -> chains, but only $150
+        LocalDate benefactorExpiry = benefactorPayment.plusYears(1);
+        LocalDate followUp150 = TODAY.minusMonths(1);
         TierResult result = TierCalculator.compute(List.of(
                 payment("1000.00", benefactorPayment),
                 payment("150.00", followUp150)));
 
-        // Downgraded to Member for the new chained period — not "sticky" at Benefactor.
-        assertThat(result.tierName()).isEqualTo(TierCalculator.MEMBER);
-        assertThat(result.expiryDate()).isEqualTo(benefactorPayment.plusYears(1).plusYears(1));
+        assertThat(result.tierName()).isEqualTo(TierCalculator.BENEFACTOR);
+        assertThat(result.expiryDate()).isEqualTo(benefactorExpiry);
+
+        TierResult afterBenefactorExpires = TierCalculator.compute(
+                List.of(payment("1000.00", benefactorPayment), payment("150.00", followUp150)),
+                benefactorExpiry.plusDays(1));
+        assertThat(afterBenefactorExpires.tierName()).isEqualTo(TierCalculator.MEMBER);
+        assertThat(afterBenefactorExpires.expiryDate()).isEqualTo(benefactorExpiry.plusYears(1));
+        assertThat(afterBenefactorExpires.status()).isEqualTo("active");
+    }
+
+    @Test
+    void benefactor_upgrade_is_immediate_and_extends_one_year_after_member_expiry() {
+        LocalDate memberPayment = TODAY.minusMonths(10);
+        LocalDate memberExpiry = memberPayment.plusYears(1);
+        LocalDate benefactorPayment = TODAY.minusMonths(1);
+
+        TierCalculator.Calculation calculation = TierCalculator.calculate(List.of(
+                new PaymentSnapshot("member", new BigDecimal("150.00"), memberPayment),
+                new PaymentSnapshot("benefactor", new BigDecimal("1000.00"), benefactorPayment)), TODAY);
+
+        assertThat(calculation.result().tierName()).isEqualTo(TierCalculator.BENEFACTOR);
+        assertThat(calculation.result().expiryDate()).isEqualTo(memberExpiry.plusYears(1));
+        assertThat(calculation.periods()).anySatisfy(period -> {
+            assertThat(period.paymentKey()).isEqualTo("benefactor");
+            assertThat(period.periodStart()).isEqualTo(benefactorPayment);
+            assertThat(period.periodEnd()).isEqualTo(memberExpiry.plusYears(1));
+        });
     }
 
     @Test
@@ -135,6 +161,21 @@ class TierCalculatorTest {
                 payment("150.00", first)));
 
         assertThat(result.expiryDate()).isEqualTo(first.plusYears(1).plusYears(1));
+    }
+
+    @Test
+    void same_day_payments_keep_the_callers_authoritative_timestamp_order() {
+        TierResult memberThenBenefactor = TierCalculator.compute(List.of(
+                payment("150.00", TODAY),
+                payment("1000.00", TODAY)));
+        TierResult benefactorThenMember = TierCalculator.compute(List.of(
+                payment("1000.00", TODAY),
+                payment("150.00", TODAY)));
+
+        assertThat(memberThenBenefactor.tierName()).isEqualTo(TierCalculator.BENEFACTOR);
+        assertThat(memberThenBenefactor.expiryDate()).isEqualTo(TODAY.plusYears(2));
+        assertThat(benefactorThenMember.tierName()).isEqualTo(TierCalculator.BENEFACTOR);
+        assertThat(benefactorThenMember.expiryDate()).isEqualTo(TODAY.plusYears(1));
     }
 
     @Test

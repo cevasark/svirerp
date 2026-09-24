@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /** Records each dues or fee payment made by a member. */
@@ -39,6 +40,9 @@ public class MemberPayment {
     @NotNull
     @Column(name = "payment_date", nullable = false)
     private LocalDate paymentDate;
+
+    @Column(name = "source_created_at")
+    private OffsetDateTime sourceCreatedAt;
 
     /**
      * Allowed values (DB CHECK): cash, check, credit_card, ach, online, other.

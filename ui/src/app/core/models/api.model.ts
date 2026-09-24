@@ -153,6 +153,17 @@ export interface RecomputeTiersResult {
   membersProcessed: number;
 }
 
+/** Response shape of POST /api/members/rebuild-from-zeffy. */
+export interface ZeffyMembershipRebuildResult {
+  paymentsScanned: number;
+  peopleCreated: number;
+  membersCreated: number;
+  membershipPaymentsCreated: number;
+  membershipPaymentsUpdated: number;
+  membersRecomputed: number;
+  needsReview: number;
+}
+
 /** Response shape of GET /api/members/summary. Followers have no
  *  active/inactive split — they never expire (see TierCalculator on the backend). */
 export interface MemberSummary {
