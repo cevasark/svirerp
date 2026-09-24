@@ -549,3 +549,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V56 | Zeffy Phase 3 payment application: one `zeffy_payment` row per provider payment ID, mapping snapshots, processing outcomes, links to Person/Member/MemberPayment/JournalEntry, and the webhook-event payment link |
 | V57 | Zeffy Phase 4 historical synchronization: preview/apply run metadata and one durable outcome per fetched payment |
 | V58 | Zeffy Phase 5A payment lifecycle audit: fetched snapshots and field-change history, refund/dispute records with correction state, payment tombstones, and operator-facing processing summaries |
+| V59 | Corrects the three Phase 5A SHA-256 columns from fixed-width `CHAR(64)` to JPA-compatible `VARCHAR(64)` |
