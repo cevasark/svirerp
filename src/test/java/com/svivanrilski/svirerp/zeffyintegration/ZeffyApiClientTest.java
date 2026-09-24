@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -106,6 +107,46 @@ class ZeffyApiClientTest {
         assertThat(result.payments()).extracting(node -> node.get("id").asText())
                 .containsExactly("pay-1");
         assertThat(result.hasMore()).isFalse();
+        verify(pacer).awaitPermit();
+        server.verify();
+    }
+
+    @Test
+    void fetchesCurrentPaymentByIdWithBearerAuthAndPacing() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.zeffy.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ZeffyRequestPacer pacer = mock(ZeffyRequestPacer.class);
+        AppSettingService settings = mock(AppSettingService.class);
+        org.mockito.Mockito.when(settings.getDecryptedValue("zeffy.api-key"))
+                .thenReturn(Optional.of("test-key"));
+        ZeffyApiClient client = new ZeffyApiClient(settings, pacer, builder.build());
+
+        server.expect(requestTo("https://api.zeffy.test/api/v1/payments/pay-1"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andRespond(withSuccess("{\"id\":\"pay-1\",\"status\":\"succeeded\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchPayment("pay-1").get("status").asText()).isEqualTo("succeeded");
+        verify(pacer).awaitPermit();
+        server.verify();
+    }
+
+    @Test
+    void preservesNotFoundStatusWhenUpdatedPaymentNoLongerExists() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.zeffy.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ZeffyRequestPacer pacer = mock(ZeffyRequestPacer.class);
+        AppSettingService settings = mock(AppSettingService.class);
+        org.mockito.Mockito.when(settings.getDecryptedValue("zeffy.api-key"))
+                .thenReturn(Optional.of("test-key"));
+        ZeffyApiClient client = new ZeffyApiClient(settings, pacer, builder.build());
+
+        server.expect(requestTo("https://api.zeffy.test/api/v1/payments/pay-missing"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.fetchPayment("pay-missing"))
+                .isInstanceOfSatisfying(ZeffyApiException.class,
+                        failure -> assertThat(failure.getStatus()).isEqualTo(404));
         verify(pacer).awaitPermit();
         server.verify();
     }

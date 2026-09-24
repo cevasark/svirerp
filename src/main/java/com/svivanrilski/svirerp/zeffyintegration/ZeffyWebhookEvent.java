@@ -74,6 +74,9 @@ public class ZeffyWebhookEvent {
     @Column(name = "error_summary", length = 1000)
     private String errorSummary;
 
+    @Column(name = "processing_summary", length = 1000)
+    private String processingSummary;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "zeffy_payment_record_id")
     private ZeffyPayment zeffyPayment;

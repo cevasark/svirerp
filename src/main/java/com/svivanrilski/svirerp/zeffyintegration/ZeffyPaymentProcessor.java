@@ -1,9 +1,6 @@
 package com.svivanrilski.svirerp.zeffyintegration;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.svivanrilski.svirerp.finance.Account;
 import com.svivanrilski.svirerp.finance.FinanceService;
 import com.svivanrilski.svirerp.finance.JournalEntry;
@@ -19,18 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -53,7 +43,7 @@ public class ZeffyPaymentProcessor {
     private final MembershipService membershipService;
     private final MemberPaymentRepository memberPaymentRepository;
     private final FinanceService financeService;
-    private final ObjectMapper objectMapper;
+    private final ZeffyPaymentPayload payload;
 
     @Transactional
     public void applyEvent(UUID eventId) {
@@ -61,8 +51,10 @@ public class ZeffyPaymentProcessor {
                 .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
         if ("PROCESSED".equals(event.getStatus()) || "IGNORED".equals(event.getStatus())) return;
         if ("NEEDS_REVIEW".equals(event.getStatus()) && PAYLOAD_MISMATCH.equals(event.getErrorSummary())) return;
-        if (event.getSchemaVersion() != 1 || !"payment.completed".equals(event.getEventType())) {
-            throw new IllegalArgumentException("Only version 1 payment.completed events can be processed");
+        if (event.getSchemaVersion() != 1 || !("payment.completed".equals(event.getEventType())
+                || "payment.created".equals(event.getEventType()))) {
+            throw new IllegalArgumentException(
+                    "Only version 1 payment.completed or succeeded payment.created events can be processed");
         }
 
         OffsetDateTime attemptedAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -70,25 +62,25 @@ public class ZeffyPaymentProcessor {
         event.setProcessingAttemptCount(event.getProcessingAttemptCount() + 1);
         event.setLastAttemptedAt(attemptedAt);
         event.setErrorSummary(null);
-        process(parseEvent(event.getRawPayload()), event, "WEBHOOK", true,
+        process(payload.parseEvent(event.getRawPayload()), event, "WEBHOOK", true,
                 event.getDispatchedAt(), attemptedAt);
     }
 
     @Transactional
     public ProcessingResult previewApiPayment(JsonNode payment, OffsetDateTime observedAt) {
-        return process(parsePayment(payment), null, "API_SYNC", false, observedAt, observedAt);
+        return process(payload.parse(payment), null, "API_SYNC", false, observedAt, observedAt);
     }
 
     @Transactional
     public ProcessingResult applyApiPayment(JsonNode payment, OffsetDateTime observedAt) {
-        return process(parsePayment(payment), null, "API_SYNC", true, observedAt, observedAt);
+        return process(payload.parse(payment), null, "API_SYNC", true, observedAt, observedAt);
     }
 
-    private ProcessingResult process(ParsedPayment parsed, ZeffyWebhookEvent event, String source,
+    private ProcessingResult process(ZeffyPaymentPayload.PaymentData parsed, ZeffyWebhookEvent event, String source,
                                      boolean apply, OffsetDateTime observedAt,
                                      OffsetDateTime processingAt) {
         if (parsed.id() == null) throw new IllegalArgumentException("Payment ID is missing");
-        String payloadHash = fingerprint(parsed.payloadNode());
+        String payloadHash = payload.fingerprint(parsed.payloadNode());
         Optional<ZeffyPayment> existing = paymentRepository.findByZeffyPaymentIdForUpdate(parsed.id());
         boolean inserted = existing.isEmpty();
         ZeffyPayment payment = existing.orElseGet(() -> {
@@ -103,7 +95,7 @@ public class ZeffyPaymentProcessor {
             return paymentRepository.saveAndFlush(created);
         });
         if (event != null) event.setZeffyPayment(payment);
-        updateSnapshot(payment, parsed, source, observedAt);
+        payload.applySnapshot(payment, parsed, source, observedAt);
 
         if (payment.getAppliedAt() != null || "PROCESSED".equals(payment.getProcessingStatus())) {
             finish(event, payment, "PROCESSED", null, payment.getAppliedAt());
@@ -202,49 +194,10 @@ public class ZeffyPaymentProcessor {
     }
 
     public String fingerprint(JsonNode payment) {
-        if (payment == null) throw new IllegalArgumentException("Payment payload is missing");
-        try {
-            Object value = objectMapper.convertValue(payment, Object.class);
-            String canonical = objectMapper.writer()
-                    .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-                    .writeValueAsString(value);
-            return sha256(canonical);
-        } catch (IllegalArgumentException | JsonProcessingException ex) {
-            throw new IllegalArgumentException("Payment payload could not be fingerprinted", ex);
-        }
+        return payload.fingerprint(payment);
     }
 
-    private ParsedPayment parseEvent(String rawPayload) {
-        final JsonNode data;
-        try {
-            JsonNode root = objectMapper.readTree(rawPayload);
-            data = root == null ? null : root.get("data");
-        } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("Stored Zeffy event payload is not valid JSON");
-        }
-        if (data == null || !data.isObject()) {
-            throw new IllegalArgumentException("Stored Zeffy event has no payment data object");
-        }
-        return parsePayment(data);
-    }
-
-    private ParsedPayment parsePayment(JsonNode data) {
-        if (data == null || !data.isObject()) throw new IllegalArgumentException("Payment data must be an object");
-        JsonNode buyer = data.path("buyer");
-        JsonNode address = buyer.path("address");
-        JsonNode dispute = data.path("dispute");
-        return new ParsedPayment(
-                text(data, "id"), text(data, "status"), text(data, "refund_status"),
-                dispute.isObject() ? text(dispute, "status") : null,
-                cents(data.get("amount")), cents(data.get("eligible_amount")), text(data, "currency"),
-                text(data, "type"), unixTime(data.get("created")), text(data, "campaign_id"),
-                text(data, "description"), text(data, "contact"), text(buyer, "email"),
-                text(buyer, "first_name"), text(buyer, "last_name"), text(address, "line1"),
-                text(address, "city"), text(address, "state"), text(address, "postal_code"),
-                data.toString(), data);
-    }
-
-    private String validatePayment(ParsedPayment payment) {
+    private String validatePayment(ZeffyPaymentPayload.PaymentData payment) {
         if (payment.id() == null) return "Payment ID is missing";
         if (!"succeeded".equalsIgnoreCase(payment.status())) return "Payment status is not succeeded";
         if (payment.amount() == null) return "Payment amount is missing or is not whole cents";
@@ -262,8 +215,8 @@ public class ZeffyPaymentProcessor {
         return null;
     }
 
-    private PersonAssessment assessPerson(ParsedPayment payment) {
-        String email = normalizedEmail(payment.email());
+    private PersonAssessment assessPerson(ZeffyPaymentPayload.PaymentData payment) {
+        String email = payload.normalizedEmail(payment.email());
         if (email == null || !EMAIL.matcher(email).matches()) {
             return new PersonAssessment(null, null, "Buyer email is missing or invalid");
         }
@@ -271,45 +224,22 @@ public class ZeffyPaymentProcessor {
         if (matches.size() > 1) {
             return new PersonAssessment(email, null, "Buyer email matches more than one local person");
         }
-        if (matches.isEmpty() && (trim(payment.firstName()) == null || trim(payment.lastName()) == null)) {
+        if (matches.isEmpty() && (payload.trim(payment.firstName()) == null
+                || payload.trim(payment.lastName()) == null)) {
             return new PersonAssessment(email, null, "Buyer name is required to create a local person");
         }
         return new PersonAssessment(email, matches.isEmpty() ? null : matches.getFirst(), null);
     }
 
-    private Person resolvePerson(ParsedPayment payment, PersonAssessment assessment) {
+    private Person resolvePerson(ZeffyPaymentPayload.PaymentData payment, PersonAssessment assessment) {
         Person incoming = Person.builder()
-                .firstName(trim(payment.firstName())).lastName(trim(payment.lastName())).email(assessment.email())
-                .addressLine1(trim(payment.addressLine1())).city(trim(payment.city()))
-                .state(trim(payment.state())).zip(trim(payment.postalCode())).build();
+                .firstName(payload.trim(payment.firstName())).lastName(payload.trim(payment.lastName()))
+                .email(assessment.email()).addressLine1(payload.trim(payment.addressLine1()))
+                .city(payload.trim(payment.city())).state(payload.trim(payment.state()))
+                .zip(payload.trim(payment.postalCode())).build();
         return assessment.existing() == null
                 ? personService.create(incoming)
                 : personService.fillBlankFields(assessment.existing().getId(), incoming);
-    }
-
-    private void updateSnapshot(ZeffyPayment target, ParsedPayment source, String origin, OffsetDateTime observedAt) {
-        target.setStatus(source.status());
-        target.setRefundStatus(source.refundStatus());
-        target.setDisputeStatus(source.disputeStatus());
-        target.setAmount(source.amount());
-        target.setEligibleAmount(source.eligibleAmount());
-        target.setCurrency(source.currency() == null ? null : source.currency().toUpperCase(Locale.ROOT));
-        target.setPaymentType(source.paymentType());
-        target.setPaymentCreatedAt(source.createdAt());
-        target.setCampaignId(source.campaignId());
-        target.setCampaignTitle(source.campaignTitle());
-        target.setContactId(source.contactId());
-        target.setBuyerEmail(normalizedEmail(source.email()));
-        target.setBuyerFirstName(trim(source.firstName()));
-        target.setBuyerLastName(trim(source.lastName()));
-        target.setLatestPayload(source.payload());
-        if ("WEBHOOK".equals(origin)) {
-            if (target.getLastEventAt() == null || observedAt.isAfter(target.getLastEventAt())) {
-                target.setLastEventAt(observedAt);
-            }
-        } else {
-            target.setLastSyncedAt(observedAt);
-        }
     }
 
     private void finish(ZeffyWebhookEvent event, ZeffyPayment payment, String status,
@@ -332,54 +262,6 @@ public class ZeffyPaymentProcessor {
                 truncate(detail), payloadHash, inserted);
     }
 
-    private String sha256(String value) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 is unavailable", ex);
-        }
-    }
-
-    private BigDecimal cents(JsonNode value) {
-        if (value == null || !value.isNumber()) return null;
-        try {
-            BigDecimal cents = value.decimalValue().stripTrailingZeros();
-            if (cents.scale() > 0) return null;
-            return BigDecimal.valueOf(cents.longValueExact(), 2);
-        } catch (ArithmeticException ex) {
-            return null;
-        }
-    }
-
-    private OffsetDateTime unixTime(JsonNode value) {
-        if (value == null || !value.isNumber()) return null;
-        try {
-            BigDecimal seconds = value.decimalValue().stripTrailingZeros();
-            if (seconds.scale() > 0) return null;
-            return OffsetDateTime.ofInstant(Instant.ofEpochSecond(seconds.longValueExact()), ZoneOffset.UTC);
-        } catch (ArithmeticException ex) {
-            return null;
-        }
-    }
-
-    private String text(JsonNode parent, String field) {
-        if (parent == null || !parent.isObject()) return null;
-        JsonNode value = parent.get(field);
-        return value != null && value.isTextual() ? trim(value.textValue()) : null;
-    }
-
-    private String normalizedEmail(String value) {
-        String trimmed = trim(value);
-        return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT);
-    }
-
-    private String trim(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
     private String truncate(String value) {
         if (value == null) return null;
         return value.length() <= REASON_MAX_LENGTH ? value : value.substring(0, REASON_MAX_LENGTH);
@@ -392,11 +274,4 @@ public class ZeffyPaymentProcessor {
     private record PersonAssessment(String email, Person existing, String reason) {
     }
 
-    private record ParsedPayment(
-            String id, String status, String refundStatus, String disputeStatus, BigDecimal amount,
-            BigDecimal eligibleAmount, String currency, String paymentType, OffsetDateTime createdAt,
-            String campaignId, String campaignTitle, String contactId, String email, String firstName,
-            String lastName, String addressLine1, String city, String state, String postalCode,
-            String payload, JsonNode payloadNode) {
-    }
 }

@@ -40,4 +40,9 @@ public class ZeffyWebhookEventController {
     public ZeffyWebhookService.EventResponse reprocess(@PathVariable UUID id) {
         return service.reprocess(id);
     }
+
+    @GetMapping("/{id}/lifecycle")
+    public ZeffyWebhookService.LifecycleResponse lifecycle(@PathVariable UUID id) {
+        return service.lifecycle(id);
+    }
 }

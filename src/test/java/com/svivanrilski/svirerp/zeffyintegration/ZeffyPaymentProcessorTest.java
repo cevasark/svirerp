@@ -48,7 +48,7 @@ class ZeffyPaymentProcessorTest {
         memberPayments = mock(MemberPaymentRepository.class);
         finance = mock(FinanceService.class);
         processor = new ZeffyPaymentProcessor(events, payments, campaigns, people,
-                memberships, memberPayments, finance, new ObjectMapper());
+                memberships, memberPayments, finance, new ZeffyPaymentPayload(new ObjectMapper()));
         when(payments.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(payments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(events.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

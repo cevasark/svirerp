@@ -20,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +41,10 @@ public class ZeffyWebhookService {
     private final ZeffyWebhookEventRepository eventRepository;
     private final ObjectMapper objectMapper;
     private final ZeffyPaymentProcessingCoordinator processingCoordinator;
+    private final ZeffyPaymentLifecycleCoordinator lifecycleCoordinator;
+    private final ZeffyPaymentChangeRepository changeRepository;
+    private final ZeffyRefundRepository refundRepository;
+    private final ZeffyDisputeRepository disputeRepository;
 
     public ReceiptResponse receive(byte[] rawBody, String signatureHeader) {
         String mode = settingService.getDecryptedValue(MODE).orElse("DISABLED");
@@ -74,9 +79,8 @@ public class ZeffyWebhookService {
 
         try {
             ZeffyWebhookEvent inserted = eventStore.insert(event);
-            if ("LIVE".equalsIgnoreCase(mode) && supported
-                    && "payment.completed".equals(envelope.type())) {
-                processingCoordinator.process(inserted.getId());
+            if ("LIVE".equalsIgnoreCase(mode) && supported && envelope.type().startsWith("payment.")) {
+                processPaymentEvent(inserted.getId(), envelope.type());
                 String finalStatus = eventRepository.findById(inserted.getId())
                         .map(ZeffyWebhookEvent::getStatus).orElse(inserted.getStatus());
                 return new ReceiptResponse(inserted.getId(), finalStatus, false);
@@ -127,10 +131,52 @@ public class ZeffyWebhookService {
         if (!"LIVE".equalsIgnoreCase(mode)) {
             throw new IllegalArgumentException("Zeffy payment reprocessing requires LIVE mode");
         }
-        processingCoordinator.process(eventId);
+        ZeffyWebhookEvent stored = eventRepository.findById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
+        if (!stored.getEventType().startsWith("payment.")) {
+            throw new IllegalArgumentException("Contact event processing is introduced in Phase 5C");
+        }
+        processPaymentEvent(eventId, stored.getEventType());
         ZeffyWebhookEvent event = eventRepository.findDetailedById(eventId)
                 .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
         return toResponse(event);
+    }
+
+    @Transactional(readOnly = true)
+    public LifecycleResponse lifecycle(UUID eventId) {
+        ZeffyWebhookEvent event = eventRepository.findDetailedById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
+        ZeffyPayment payment = event.getZeffyPayment();
+        if (payment == null) {
+            return new LifecycleResponse(eventId, null, null, List.of(), List.of(), List.of());
+        }
+        List<PaymentChangeResponse> changes = changeRepository
+                .findByZeffyPayment_IdOrderByObservedAtDesc(payment.getId()).stream()
+                .map(change -> new PaymentChangeResponse(change.getId(), change.getChangeKind(),
+                        change.getChangedFields(), change.getSummary(), text(change.getObservedAt())))
+                .toList();
+        List<RefundResponse> refunds = refundRepository
+                .findByZeffyPayment_IdOrderByRefundCreatedAtAsc(payment.getId()).stream()
+                .map(refund -> new RefundResponse(refund.getId(), refund.getZeffyRefundId(), refund.getAmount(),
+                        refund.getCurrency(), refund.getStatus(), text(refund.getRefundCreatedAt()),
+                        refund.getCorrectionStatus(), refund.getCorrectionJournalEntry() == null
+                                ? null : refund.getCorrectionJournalEntry().getId()))
+                .toList();
+        List<DisputeResponse> disputes = disputeRepository
+                .findByZeffyPayment_IdOrderByDisputeCreatedAtAsc(payment.getId()).stream()
+                .map(dispute -> new DisputeResponse(dispute.getId(), dispute.getZeffyDisputeId(),
+                        dispute.getAmount(), dispute.getCurrency(), dispute.getStatus(), dispute.getReason(),
+                        text(dispute.getDisputeCreatedAt()), dispute.getCorrectionStatus(),
+                        dispute.getCorrectionJournalEntry() == null
+                                ? null : dispute.getCorrectionJournalEntry().getId()))
+                .toList();
+        return new LifecycleResponse(eventId, payment.getId(), text(payment.getDeletedAt()),
+                changes, refunds, disputes);
+    }
+
+    private void processPaymentEvent(UUID eventId, String eventType) {
+        if ("payment.completed".equals(eventType)) processingCoordinator.process(eventId);
+        else lifecycleCoordinator.process(eventId);
     }
 
     private Envelope parseEnvelope(byte[] rawBody) {
@@ -196,6 +242,7 @@ public class ZeffyWebhookService {
                 text(event.getReceivedAt()), text(event.getLastReceivedAt()),
                 event.getProcessingAttemptCount(), text(event.getLastAttemptedAt()),
                 text(event.getProcessedAt()), event.getErrorSummary(),
+                event.getProcessingSummary(),
                 payment == null ? null : payment.getId(),
                 payment == null ? null : payment.getStatus(),
                 payment == null ? null : payment.getAmount(),
@@ -240,11 +287,32 @@ public class ZeffyWebhookService {
                                 int deliveryCount, String dispatchedAt, String receivedAt,
                                 String lastReceivedAt, int processingAttemptCount,
                                 String lastAttemptedAt, String processedAt, String errorSummary,
+                                String processingSummary,
                                 UUID paymentRecordId, String paymentStatus, BigDecimal amount,
                                 BigDecimal eligibleAmount, String currency, String paymentCreatedAt,
                                 String campaignId, String campaignTitle, String mappingAction,
                                 String mappedFund, String mappedAccount, boolean membershipCredit,
                                 String buyerEmail, UUID personId, UUID memberId,
                                 UUID memberPaymentId, UUID journalEntryId) {
+    }
+
+    public record LifecycleResponse(UUID eventId, UUID paymentRecordId, String deletedAt,
+                                    List<PaymentChangeResponse> changes,
+                                    List<RefundResponse> refunds,
+                                    List<DisputeResponse> disputes) {
+    }
+
+    public record PaymentChangeResponse(UUID id, String changeKind, String changedFields,
+                                        String summary, String observedAt) {
+    }
+
+    public record RefundResponse(UUID id, String zeffyRefundId, BigDecimal amount, String currency,
+                                 String status, String refundCreatedAt, String correctionStatus,
+                                 UUID correctionJournalEntryId) {
+    }
+
+    public record DisputeResponse(UUID id, String zeffyDisputeId, BigDecimal amount, String currency,
+                                  String status, String reason, String disputeCreatedAt,
+                                  String correctionStatus, UUID correctionJournalEntryId) {
     }
 }

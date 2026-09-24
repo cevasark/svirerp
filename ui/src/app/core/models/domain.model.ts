@@ -604,6 +604,7 @@ export interface ZeffyWebhookEvent {
   lastAttemptedAt?: string;
   processedAt?: string;
   errorSummary?: string;
+  processingSummary?: string;
   paymentRecordId?: string;
   paymentStatus?: string;
   amount?: number;
@@ -621,6 +622,46 @@ export interface ZeffyWebhookEvent {
   memberId?: string;
   memberPaymentId?: string;
   journalEntryId?: string;
+}
+
+export interface ZeffyPaymentChange {
+  id: string;
+  changeKind: 'CREATED' | 'UPDATED' | 'DELETED' | 'FETCH_NOT_FOUND';
+  changedFields?: string;
+  summary: string;
+  observedAt: string;
+}
+
+export interface ZeffyRefund {
+  id: string;
+  zeffyRefundId: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  refundCreatedAt: string;
+  correctionStatus: 'NOT_REQUIRED' | 'AWAITING_CORRECTION' | 'CORRECTED' | 'NEEDS_REVIEW';
+  correctionJournalEntryId?: string;
+}
+
+export interface ZeffyDispute {
+  id: string;
+  zeffyDisputeId: string;
+  amount: number;
+  currency: string;
+  status: 'needs_response' | 'won' | 'lost';
+  reason?: string;
+  disputeCreatedAt: string;
+  correctionStatus: 'NOT_REQUIRED' | 'AWAITING_CORRECTION' | 'CORRECTED' | 'NEEDS_REVIEW';
+  correctionJournalEntryId?: string;
+}
+
+export interface ZeffyPaymentLifecycle {
+  eventId: string;
+  paymentRecordId?: string;
+  deletedAt?: string;
+  changes: ZeffyPaymentChange[];
+  refunds: ZeffyRefund[];
+  disputes: ZeffyDispute[];
 }
 
 // ─── Stripe Integration ──────────────────────────────────────────────────────

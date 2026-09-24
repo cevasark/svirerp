@@ -188,15 +188,15 @@ Full details, including the separate production client and the org's Workspace-d
 
 ## Step 12 (optional) — Connect Zeffy
 
-Phases 1–4 synchronize campaigns, receive signed events, apply live completed payments, and load
-historical payments through the API:
+Phases 1–5A synchronize campaigns, receive signed events, apply live completed payments, load
+historical payments through the API, and audit payment updates/refunds/disputes/deletions:
 
 1. Generate an API key in Zeffy under **Settings → Integrations**.
 2. In SVIR ERP, open **Settings → Zeffy**, enter the API key, and leave validation enabled when saving.
 3. Use **Test Connection**, then **Sync Campaigns**. Every outbound request is paced at one request per second, and each synchronization attempt is retained in the history table.
 4. Open **Finance → Zeffy** and confirm an APPLY or IGNORE policy for each campaign. APPLY requires a Fund and revenue Account.
 5. For a clean installation, use **Historical payments** to preview a date range, review its per-payment outcomes, and then apply that completed preview. A new, missing, or changed payment is held for a fresh preview.
-6. In Zeffy, configure the production webhook URL `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and subscribe to the payment and contact events needed by the integration.
+6. In Zeffy, configure the production webhook URL `https://svirerp.svivanrilski.com/api/webhooks/zeffy` and subscribe to `payment.completed`, `payment.created`, `payment.updated`, and `payment.deleted`. Contact events may also be subscribed now; they are retained for Phase 5C but are not yet applied.
 7. Copy Zeffy's `whsec_...` signing secret into **Settings → Zeffy**, select **Record only**, and save.
 8. Confirm signed deliveries under **Finance → Zeffy → Webhook Events**. Record-only mode creates no Person, membership, contribution, or accounting records.
 

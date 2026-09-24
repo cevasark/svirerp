@@ -2,7 +2,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
-import { ZeffyCampaign, ZeffyWebhookEvent } from '../../../core/models/domain.model';
+import {
+  ZeffyCampaign, ZeffyPaymentLifecycle, ZeffyWebhookEvent,
+} from '../../../core/models/domain.model';
 import {
   Page,
   PageParams,
@@ -108,6 +110,12 @@ export class ZeffyIntegrationService {
   reprocessWebhookEvent(id: string): Observable<ZeffyWebhookEvent> {
     return this.http.post<ZeffyWebhookEvent>(
       `${this.env.apiUrl}/zeffy-webhook-events/${id}/reprocess`, {},
+    );
+  }
+
+  getWebhookEventLifecycle(id: string): Observable<ZeffyPaymentLifecycle> {
+    return this.http.get<ZeffyPaymentLifecycle>(
+      `${this.env.apiUrl}/zeffy-webhook-events/${id}/lifecycle`,
     );
   }
 }

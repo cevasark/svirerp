@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDialog } from '@angular/material/dialog';
 
 import { DEFAULT_PAGE_PARAMS, Page, PageParams, ZeffyWebhookEventFilters } from '../../../../core/models/api.model';
 import { ZeffyWebhookEvent } from '../../../../core/models/domain.model';
@@ -12,6 +13,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { DataTableComponent, TableAction, TableColumn } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ZeffyIntegrationService } from '../../services/zeffy-integration.service';
+import { ZeffyPaymentLifecycleDialogComponent } from './zeffy-payment-lifecycle-dialog.component';
 
 const STATUS_LABELS: Record<string, string> = {
   RECEIVED: 'Received',
@@ -41,7 +43,7 @@ const STATUS_LABELS: Record<string, string> = {
     <div class="page-container">
       <app-page-header
         title="Zeffy Webhook Events"
-        subtitle="Signed Zeffy deliveries and their payment-processing outcomes" />
+        subtitle="Signed Zeffy deliveries, payment lifecycle changes, and processing outcomes" />
 
       <div class="filters">
         <mat-form-field appearance="outline">
@@ -110,6 +112,7 @@ const STATUS_LABELS: Record<string, string> = {
 export class ZeffyWebhookEventListComponent implements OnInit {
   private readonly service = inject(ZeffyIntegrationService);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
 
   readonly eventTypes = [
     'payment.completed', 'payment.created', 'payment.updated', 'payment.deleted',
@@ -158,7 +161,7 @@ export class ZeffyWebhookEventListComponent implements OnInit {
     { key: 'deliveryCount', header: 'Deliveries', type: 'number', sortable: true },
     {
       key: 'detail', header: 'Detail',
-      cell: (event: ZeffyWebhookEvent) => event.errorSummary ??
+      cell: (event: ZeffyWebhookEvent) => event.errorSummary ?? event.processingSummary ??
         (event.status === 'RECEIVED' ? 'Recorded only' : '-'),
     },
     {
@@ -170,10 +173,16 @@ export class ZeffyWebhookEventListComponent implements OnInit {
   readonly actions: TableAction[] = [
     {
       icon: 'replay',
-      label: 'Reprocess completed payment',
-      disabled: (event: ZeffyWebhookEvent) => event.eventType !== 'payment.completed'
+      label: 'Reprocess payment event',
+      disabled: (event: ZeffyWebhookEvent) => !event.eventType.startsWith('payment.')
         || ['PROCESSED', 'IGNORED', 'UNSUPPORTED', 'PROCESSING'].includes(event.status),
       action: (event: ZeffyWebhookEvent) => this.reprocess(event),
+    },
+    {
+      icon: 'manage_search',
+      label: 'View payment lifecycle',
+      disabled: (event: ZeffyWebhookEvent) => !event.eventType.startsWith('payment.'),
+      action: (event: ZeffyWebhookEvent) => this.viewLifecycle(event),
     },
   ];
 
@@ -245,6 +254,15 @@ export class ZeffyWebhookEventListComponent implements OnInit {
         }
         this.load();
       },
+    });
+  }
+
+  viewLifecycle(event: ZeffyWebhookEvent): void {
+    this.service.getWebhookEventLifecycle(event.id).subscribe(lifecycle => {
+      this.dialog.open(ZeffyPaymentLifecycleDialogComponent, {
+        width: '760px',
+        data: { event, lifecycle },
+      });
     });
   }
 

@@ -96,6 +96,11 @@ public class ZeffyApiClient {
         return new PaymentPageFetch(payments, page.hasMore(), nextCursor);
     }
 
+    public JsonNode fetchPayment(String paymentId) {
+        requireNonBlank(paymentId);
+        return getPayment(requireConfiguredApiKey(), paymentId);
+    }
+
     private ZeffyApiModels.CampaignPage getCampaignPage(String apiKey, String cursor, int limit) {
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -182,6 +187,51 @@ public class ZeffyApiClient {
                     continue;
                 }
                 if (status < 500 || attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Zeffy API request failed", null, ex);
+                }
+                lastFailure = ex;
+            } catch (ResourceAccessException ex) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Could not reach the Zeffy API", null, ex);
+                }
+                lastFailure = ex;
+            }
+        }
+        throw new ZeffyApiException(502, "Zeffy API request failed", null, lastFailure);
+    }
+
+    private JsonNode getPayment(String apiKey, String paymentId) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            pacer.awaitPermit();
+            try {
+                JsonNode payment = restClient.get()
+                        .uri("/api/v1/payments/{id}", paymentId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                        .retrieve()
+                        .body(JsonNode.class);
+                if (payment == null || !payment.isObject()) {
+                    throw new ZeffyApiException(502, "Zeffy returned an empty payment response");
+                }
+                return payment;
+            } catch (HttpStatusCodeException ex) {
+                int status = ex.getStatusCode().value();
+                if (status == 401) throw new ZeffyApiException(401, "Zeffy rejected the API key");
+                if (status == 404) throw new ZeffyApiException(404, "Zeffy payment was not found");
+                if (status == 429) {
+                    Duration delay = retryAfter(ex.getResponseHeaders());
+                    pacer.defer(delay);
+                    if (attempt == MAX_ATTEMPTS) {
+                        throw new ZeffyApiException(429,
+                                "Zeffy rate limit reached; retry after " + delay.toSeconds() + " seconds", delay);
+                    }
+                    lastFailure = ex;
+                    continue;
+                }
+                if (status < 500) {
+                    throw new ZeffyApiException(status, "Zeffy payment request was rejected", null, ex);
+                }
+                if (attempt == MAX_ATTEMPTS) {
                     throw new ZeffyApiException(502, "Zeffy API request failed", null, ex);
                 }
                 lastFailure = ex;

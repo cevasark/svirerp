@@ -23,6 +23,7 @@ class ZeffyWebhookServiceTest {
     private ZeffyWebhookEventStore store;
     private ZeffyWebhookEventRepository repository;
     private ZeffyPaymentProcessingCoordinator coordinator;
+    private ZeffyPaymentLifecycleCoordinator lifecycleCoordinator;
     private ZeffyWebhookService service;
 
     @BeforeEach
@@ -32,9 +33,12 @@ class ZeffyWebhookServiceTest {
         store = mock(ZeffyWebhookEventStore.class);
         repository = mock(ZeffyWebhookEventRepository.class);
         coordinator = mock(ZeffyPaymentProcessingCoordinator.class);
+        lifecycleCoordinator = mock(ZeffyPaymentLifecycleCoordinator.class);
         service = new ZeffyWebhookService(settings, verifier, store,
                 repository, new ObjectMapper(),
-                coordinator);
+                coordinator, lifecycleCoordinator,
+                mock(ZeffyPaymentChangeRepository.class), mock(ZeffyRefundRepository.class),
+                mock(ZeffyDisputeRepository.class));
         when(settings.getDecryptedValue("zeffy.integration-mode"))
                 .thenReturn(Optional.of("RECORD_ONLY"));
         when(settings.getDecryptedValue("zeffy.webhook-signing-secret"))
@@ -135,6 +139,26 @@ class ZeffyWebhookServiceTest {
 
         verify(coordinator).process(id);
         assertThat(response.status()).isEqualTo("PROCESSED");
+    }
+
+    @Test
+    void liveModeRoutesPaymentUpdatesThroughLifecycleProcessing() {
+        UUID id = UUID.randomUUID();
+        when(settings.getDecryptedValue("zeffy.integration-mode")).thenReturn(Optional.of("LIVE"));
+        when(store.insert(any())).thenAnswer(invocation -> {
+            ZeffyWebhookEvent event = invocation.getArgument(0);
+            event.setId(id);
+            return event;
+        });
+        when(repository.findById(id)).thenReturn(Optional.of(
+                ZeffyWebhookEvent.builder().id(id).status("NEEDS_REVIEW").build()));
+
+        ZeffyWebhookService.ReceiptResponse response =
+                service.receive(payload("payment.updated"), "valid");
+
+        verify(lifecycleCoordinator).process(id);
+        verifyNoInteractions(coordinator);
+        assertThat(response.status()).isEqualTo("NEEDS_REVIEW");
     }
 
     @Test

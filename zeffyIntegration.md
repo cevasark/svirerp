@@ -1,6 +1,6 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Living specification; Phases 1 and 2 implemented
+**Status:** Living specification; Phases 1–4 and Phase 5A implemented
 **Date:** September 23, 2026
 **Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
@@ -301,7 +301,13 @@ Stores one row per unique Zeffy payment ID, independent of webhook event IDs:
 
 This is the business idempotency boundary. A new event may update the record, but only one initial application may create the original domain effects.
 
-### 7.6 Contact link (Phase 5)
+### 7.6 Payment lifecycle audit (Phase 5A)
+
+`zeffy_payment_change` stores one immutable-current snapshot per lifecycle webhook event, including the change kind, normalized fields that changed, previous/current payload hashes, the fetched payment snapshot, an operator summary, and the event observation time. The snapshot is retained for recovery and audit but is not returned by the routine UI API.
+
+`zeffy_refund` and `zeffy_dispute` store stable external IDs, amount/currency/status, Zeffy creation time, the latest webhook that observed the record, and correction state. The nullable correction JournalEntry link is populated only by Phase 5B. Reprocessing the same event or observing the same refund/dispute again updates the existing record rather than creating a duplicate.
+
+### 7.7 Contact link (Phase 5C)
 
 Maps unique `zeffy_contact_id` to Person. Email remains a matching aid but is not the durable external identity because an email can change.
 
@@ -610,6 +616,12 @@ of the same range, which is safe because applied payment IDs are unique.
 
 ## 13. Phase 5 — Updates, refunds, disputes, and contacts
 
+Phase 5 is delivered in three bounded parts:
+
+- **Phase 5A — payment lifecycle audit (implemented):** process payment-created, updated, and deleted events; fetch the authoritative current Payment for ID-only updates; retain normalized changes, refunds, disputes, and deletion tombstones; and place material cases in operator review. This phase makes no accounting or membership corrections.
+- **Phase 5B — payment corrections (planned):** post idempotent refund and lost-dispute corrections using the approved rules below.
+- **Phase 5C — contact synchronization (planned):** maintain stable Zeffy contact links and synchronize Persons/Followers using the approved contact rules below.
+
 ### 13.1 Payment updates
 
 `payment.updated` carries only the payment ID. The processor must fetch `GET /api/v1/payments/{id}`, update the local snapshot, compare it with the previous version, and choose an outcome.
@@ -625,18 +637,19 @@ Supported changes should eventually include:
 
 No update may directly edit a posted JournalEntry. Financial corrections require linked reversing or reclassification entries dated according to an approved accounting policy.
 
-### 13.2 Refund and dispute policy requiring confirmation
-
-The following proposed policy must be reviewed before implementation:
+### 13.2 Approved refund and dispute policy
 
 - Full succeeded refund: create a full reversing journal entry, mark the integration-owned MemberPayment refunded, and recompute the affected membership from remaining completed payments.
-- Partial succeeded refund: create a partial reversing journal entry and record the refund independently. Whether membership credit is reduced to the net amount is an open business decision.
+- Partial succeeded refund: create a partial reversing journal entry, retain the refund independently, reduce the integration-owned membership contribution to the net retained payment amount, and recompute the affected membership.
 - Failed/pending refund: record it but do not reverse accounting until succeeded.
-- Dispute opened: record and alert; do not reverse immediately unless church accounting policy requires it.
-- Dispute lost: create an explicit reversal/correction.
+- Dispute opened/`needs_response`: record and alert; do not reverse accounting.
+- Dispute lost: automatically create an explicit reversal/correction.
 - Dispute won: clear the alert without financial reversal.
 - A reversal must retain the original Fund and link to the original journal/payment record.
+- Refund and lost-dispute correction entries use the original Zeffy payment date.
 - Manual payments/contributions remain outside automatic Zeffy correction logic.
+
+Phase 5A records succeeded refunds and lost disputes as `AWAITING_CORRECTION`; Phase 5B is responsible for posting the linked correction exactly once. If cumulative succeeded refunds exceed the original payment, the record becomes `NEEDS_REVIEW` and no correction is posted automatically.
 
 Membership-chain consequences can be significant: reducing or removing an old qualifying payment may change later chained periods. This must have dedicated tests and operator-visible before/after results.
 
@@ -655,6 +668,7 @@ Membership-chain consequences can be significant: reducing or removing an old qu
 - Stable contact ID is stored in `zeffy_contact_link`.
 - Initial match uses existing link, then unique normalized email.
 - New Zeffy contacts may create Person plus active free Follower, preserving the confirmed free-Follower rule.
+- A newly created contact/Follower defaults `emailOptIn` to false because the Zeffy Contact contract does not provide explicit communication consent.
 - Existing Persons should initially be enriched only in blank fields.
 - Email changes that conflict with another Person require review.
 - The supplied Contact schema does not expose an explicit unsubscribe/communication-preference field. The integration must not infer opt-out status from absent fields.
@@ -811,7 +825,7 @@ DTO parsing should ignore unknown additive fields while validating required fiel
 8. Enable Phase 3 LIVE mode for completed payments.
 9. Monitor and reconcile against Zeffy daily during an initial observation period.
 10. Run Phase 4 historical preview, approve its range, then execute.
-11. Implement Phase 5 policies only after refund/dispute/contact ownership decisions are approved.
+11. Deploy Phase 5A lifecycle audit, then implement Phase 5B corrections and Phase 5C contacts as separately reviewed changes.
 12. Continue API/webhook reconciliation until two or more accounting periods confirm completeness.
 
 Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain application without discarding received events. Re-enabling LIVE may process the backlog through explicit operator action after mappings and configuration are verified.
@@ -823,6 +837,10 @@ Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain applic
 - The installation represents exactly one church organization. Domain and integration records belong to it implicitly; they do not carry organization foreign keys and APIs do not accept organization IDs.
 - All authenticated operational users currently share access; Settings is local-admin-only.
 - Free Followers remain active until explicitly changed.
+- Refund and lost-dispute corrections use the original payment date.
+- Partial refunds reduce an integration-owned membership contribution to the net retained amount and trigger tier recomputation.
+- Lost disputes create automatic corrections; opened disputes only create review work, and won disputes require no correction.
+- Valid new Zeffy contacts create a Person and active free Follower. Email opt-in defaults to false because Zeffy supplies no explicit consent field.
 - Manual membership contributions, accounting records, and membership recalculation are deliberately maintained separately by staff.
 - Zeffy Contacts and Transactions spreadsheet imports are removed; the generic Member CSV import remains.
 - Synchronization history belongs in `zeffy_sync_run`, not `app_setting`.
@@ -850,14 +868,10 @@ These must be answered before their affected phase is implemented:
 2. Should automated payment recomputation preserve a manually suspended membership?
 3. Which income Account should each campaign use, and should the mapping always require explicit Account selection?
 4. How should payments with multiple materially different line items be allocated if one Fund/account is insufficient?
-5. Does a partial refund reduce membership credit to the net payment amount? If so, how should later chained renewals be recalculated and presented?
-6. When should a dispute affect accounting: when opened, only when lost, or through a manual treasurer decision?
-7. Which date should refund/reversal journal entries use: refund date, original payment date, or current accounting date?
-8. Should contact-created events automatically enroll every new Zeffy contact as an active Follower?
-9. Which Person fields may Zeffy update when local values already exist?
-10. If application-level raw-payload access is added later, which administrative users may use it?
-11. What eventual retention/redaction period should replace Phase 2's indefinite recovery retention?
-12. What historical cutoff/range should the first API synchronization use?
+5. Which Person fields may Zeffy update when local values already exist beyond filling blank values?
+6. If application-level raw-payload access is added later, which administrative users may use it?
+7. What eventual retention/redaction period should replace Phase 2's indefinite recovery retention?
+8. What historical cutoff/range should the first API synchronization use?
 
 ## 21. Definition of completion
 

@@ -91,6 +91,9 @@ public class ZeffyPayment {
     @Column(name = "latest_payload", nullable = false, columnDefinition = "LONGTEXT")
     private String latestPayload;
 
+    @Column(name = "latest_payload_sha256", length = 64)
+    private String latestPayloadSha256;
+
     @Column(name = "processing_status", nullable = false, length = 20)
     private String processingStatus;
 
@@ -108,6 +111,12 @@ public class ZeffyPayment {
 
     @Column(name = "last_synced_at")
     private OffsetDateTime lastSyncedAt;
+
+    @Column(name = "last_fetched_at")
+    private OffsetDateTime lastFetchedAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 
     @Column(name = "applied_at")
     private OffsetDateTime appliedAt;
