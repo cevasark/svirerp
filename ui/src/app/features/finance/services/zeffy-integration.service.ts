@@ -8,6 +8,7 @@ import {
 import {
   Page,
   PageParams,
+  ZeffyApplyPendingCorrectionsResult,
   ZeffyCampaignMappingRequest,
   ZeffyCampaignSyncResult,
   ZeffyConfigurationRequest,
@@ -116,6 +117,12 @@ export class ZeffyIntegrationService {
   getWebhookEventLifecycle(id: string): Observable<ZeffyPaymentLifecycle> {
     return this.http.get<ZeffyPaymentLifecycle>(
       `${this.env.apiUrl}/zeffy-webhook-events/${id}/lifecycle`,
+    );
+  }
+
+  applyPendingCorrections(): Observable<ZeffyApplyPendingCorrectionsResult> {
+    return this.http.post<ZeffyApplyPendingCorrectionsResult>(
+      `${this.env.apiUrl}/zeffy-webhook-events/corrections/apply-pending`, {},
     );
   }
 }

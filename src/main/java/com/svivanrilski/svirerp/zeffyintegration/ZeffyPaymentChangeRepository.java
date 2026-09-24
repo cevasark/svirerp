@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface ZeffyPaymentChangeRepository extends JpaRepository<ZeffyPaymentChange, UUID> {
     Optional<ZeffyPaymentChange> findByWebhookEvent_Id(UUID eventId);
     List<ZeffyPaymentChange> findByZeffyPayment_IdOrderByObservedAtDesc(UUID paymentId);
+    List<ZeffyPaymentChange> findByZeffyPayment_IdOrderByObservedAtAsc(UUID paymentId);
 }

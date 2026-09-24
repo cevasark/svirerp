@@ -444,6 +444,7 @@ export interface JournalEntry {
   serviceRequest?: ServiceRequest;
   categoryAccount?: Account;
   fund?: Fund;
+  correctsJournalEntry?: JournalEntry;
   createdAt?: string;
   approvedAt?: string;
 }
@@ -630,6 +631,12 @@ export interface ZeffyPaymentChange {
   changedFields?: string;
   summary: string;
   observedAt: string;
+  previousAmount?: number;
+  currentAmount?: number;
+  correctionStatus?: 'NOT_REQUIRED' | 'AWAITING_CORRECTION' | 'CORRECTED' | 'NEEDS_REVIEW';
+  correctionJournalEntryId?: string;
+  correctionSummary?: string;
+  correctedAt?: string;
 }
 
 export interface ZeffyRefund {
@@ -641,6 +648,9 @@ export interface ZeffyRefund {
   refundCreatedAt: string;
   correctionStatus: 'NOT_REQUIRED' | 'AWAITING_CORRECTION' | 'CORRECTED' | 'NEEDS_REVIEW';
   correctionJournalEntryId?: string;
+  correctedAmount?: number;
+  correctionSummary?: string;
+  correctedAt?: string;
 }
 
 export interface ZeffyDispute {
@@ -653,6 +663,9 @@ export interface ZeffyDispute {
   disputeCreatedAt: string;
   correctionStatus: 'NOT_REQUIRED' | 'AWAITING_CORRECTION' | 'CORRECTED' | 'NEEDS_REVIEW';
   correctionJournalEntryId?: string;
+  correctedAmount?: number;
+  correctionSummary?: string;
+  correctedAt?: string;
 }
 
 export interface ZeffyPaymentLifecycle {

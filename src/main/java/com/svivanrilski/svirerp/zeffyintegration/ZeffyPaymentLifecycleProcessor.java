@@ -30,6 +30,7 @@ public class ZeffyPaymentLifecycleProcessor {
     private final ZeffyPaymentChangeRepository changeRepository;
     private final ZeffyRefundRepository refundRepository;
     private final ZeffyDisputeRepository disputeRepository;
+    private final ZeffyPaymentCorrectionService correctionService;
     private final ZeffyPaymentPayload payload;
 
     @Transactional
@@ -66,7 +67,8 @@ public class ZeffyPaymentLifecycleProcessor {
         String summary = "Succeeded payment.created was processed through the initial payment pipeline";
         upsertRefundsAndDispute(event.getZeffyPayment(), event, data, event.getDispatchedAt());
         upsertChange(event, event.getZeffyPayment(), "CREATED", List.of("initial_snapshot"),
-                null, event.getZeffyPayment().getLatestPayloadSha256(), summary);
+                null, event.getZeffyPayment().getLatestPayloadSha256(), summary,
+                event.getZeffyPayment().getAmount(), event.getZeffyPayment().getAmount(), false);
         event.setProcessingSummary(summary);
         eventRepository.save(event);
     }
@@ -97,7 +99,8 @@ public class ZeffyPaymentLifecycleProcessor {
         if (!confirmedByFetch && payment.getLastEventAt() != null
                 && payment.getLastEventAt().isAfter(observedAt)) {
             String summary = "Older payment.deleted event was ignored because newer payment data is stored";
-            upsertChange(event, payment, "DELETED", List.of(), previousHash, previousHash, summary);
+            upsertChange(event, payment, "DELETED", List.of(), previousHash, previousHash, summary,
+                    payment.getAmount(), payment.getAmount(), false);
             finish(event, "PROCESSED", summary, null);
             return;
         }
@@ -113,7 +116,7 @@ public class ZeffyPaymentLifecycleProcessor {
         payment.setOutcomeReason(applied ? summary : null);
         paymentRepository.save(payment);
         upsertChange(event, payment, confirmedByFetch ? "FETCH_NOT_FOUND" : "DELETED", List.of("deleted"),
-                previousHash, previousHash, summary);
+                previousHash, previousHash, summary, payment.getAmount(), payment.getAmount(), false);
         finish(event, applied ? "NEEDS_REVIEW" : "PROCESSED", summary,
                 applied ? summary : null);
     }
@@ -152,12 +155,14 @@ public class ZeffyPaymentLifecycleProcessor {
                 && payment.getLastEventAt().isAfter(observedAt)) {
             String summary = "Older payment.created snapshot was ignored because newer payment data is stored";
             upsertChange(event, payment, changeKind, List.of(), payment.getLatestPayloadSha256(),
-                    payment.getLatestPayloadSha256(), summary);
+                    payment.getLatestPayloadSha256(), summary,
+                    payment.getAmount(), payment.getAmount(), false);
             finish(event, "PROCESSED", summary, null);
             return;
         }
 
         String previousHash = payment.getLatestPayloadSha256();
+        BigDecimal previousAmount = payment.getAmount();
         List<String> changedFields = existing.isEmpty()
                 ? List.of("initial_snapshot") : payload.changedFields(payment, data);
         String previousProcessingStatus = payment.getProcessingStatus();
@@ -166,9 +171,14 @@ public class ZeffyPaymentLifecycleProcessor {
         RefundDisputeOutcome lifecycle = upsertRefundsAndDispute(payment, event, data, observedAt);
 
         List<String> material = changedFields.stream().filter(MATERIAL_APPLIED_FIELDS::contains).toList();
+        List<String> unsupportedMaterial = material.stream()
+                .filter(field -> !"amount".equals(field)).toList();
+        String materialReview = applied && !unsupportedMaterial.isEmpty()
+                ? "Applied payment changed material fields: " + String.join(", ", unsupportedMaterial)
+                : null;
         String reviewReason = lifecycle.reviewReason();
-        if (reviewReason == null && applied && !material.isEmpty()) {
-            reviewReason = "Applied payment changed material fields: " + String.join(", ", material);
+        if (reviewReason == null && materialReview != null) {
+            reviewReason = materialReview;
         }
         if (reviewReason == null && !applied && "succeeded".equalsIgnoreCase(data.status())
                 && "UPDATED".equals(changeKind)) {
@@ -193,7 +203,32 @@ public class ZeffyPaymentLifecycleProcessor {
         }
         paymentRepository.save(payment);
         upsertChange(event, payment, changeKind, changedFields, previousHash,
-                payment.getLatestPayloadSha256(), summary);
+                payment.getLatestPayloadSha256(), summary, previousAmount, payment.getAmount(),
+                applied && changedFields.contains("amount"));
+
+        ZeffyPaymentCorrectionService.CorrectionOutcome correction =
+                correctionService.applyCorrections(payment);
+        if (correction.changed()) {
+            summary = correction.summary();
+            if (reviewReason != null && reviewReason.contains("awaits Phase 5B correction")) {
+                reviewReason = null;
+            }
+            if (material.size() == 1 && material.contains("amount")) {
+                reviewReason = null;
+            }
+            if (materialReview != null) {
+                reviewReason = materialReview;
+            }
+        }
+        if (correction.reviewReason() != null) {
+            reviewReason = correction.reviewReason();
+            summary = correction.summary();
+        }
+        if (reviewReason == null && applied) {
+            payment.setProcessingStatus("PROCESSED");
+            payment.setOutcomeReason(null);
+            paymentRepository.save(payment);
+        }
         finish(event, reviewReason == null ? "PROCESSED" : "NEEDS_REVIEW", summary, reviewReason);
     }
 
@@ -212,22 +247,40 @@ public class ZeffyPaymentLifecycleProcessor {
                     && !target.getZeffyPayment().getId().equals(payment.getId())) {
                 throw new IllegalArgumentException("Zeffy refund ID is already linked to another payment");
             }
+            String previousRefundStatus = target.getStatus();
+            BigDecimal previousRefundAmount = target.getAmount();
+            boolean wasCorrected = "CORRECTED".equals(target.getCorrectionStatus());
             target.setLatestWebhookEvent(event);
             target.setAmount(refund.amount());
             target.setCurrency(refund.currency().toUpperCase(Locale.ROOT));
             target.setStatus(refund.status().toLowerCase(Locale.ROOT));
             target.setRefundCreatedAt(refund.createdAt());
             target.setLastSeenAt(observedAt);
-            if (!"CORRECTED".equals(target.getCorrectionStatus())) {
+            boolean correctedRefundChanged = wasCorrected
+                    && (previousRefundAmount == null || previousRefundAmount.compareTo(refund.amount()) != 0
+                    || previousRefundStatus == null
+                    || !previousRefundStatus.equalsIgnoreCase(refund.status()));
+            if (correctedRefundChanged) {
+                target.setCorrectionStatus("NEEDS_REVIEW");
+                target.setCorrectionSummary("Already-corrected refund changed amount or status in Zeffy");
+            } else if (!wasCorrected && !"NEEDS_REVIEW".equals(target.getCorrectionStatus())) {
                 target.setCorrectionStatus("succeeded".equalsIgnoreCase(refund.status())
                         && payment.getAppliedAt() != null ? "AWAITING_CORRECTION" : "NOT_REQUIRED");
             }
             refundRepository.save(target);
             if ("succeeded".equalsIgnoreCase(refund.status())) {
                 succeededRefundTotal = succeededRefundTotal.add(refund.amount());
-                if (payment.getAppliedAt() != null) {
+            }
+            if (correctedRefundChanged || "NEEDS_REVIEW".equals(target.getCorrectionStatus())) {
+                review = target.getCorrectionSummary();
+                summary = review;
+            } else if ("succeeded".equalsIgnoreCase(refund.status())) {
+                if (payment.getAppliedAt() != null
+                        && "AWAITING_CORRECTION".equals(target.getCorrectionStatus())) {
                     review = "Succeeded refund " + refund.id() + " awaits Phase 5B correction";
                     summary = "Succeeded refund recorded; no accounting or membership correction was posted";
+                } else if (wasCorrected) {
+                    summary = "Succeeded refund was already corrected";
                 }
             }
         }
@@ -252,6 +305,9 @@ public class ZeffyPaymentLifecycleProcessor {
                     && !target.getZeffyPayment().getId().equals(payment.getId())) {
                 throw new IllegalArgumentException("Zeffy dispute ID is already linked to another payment");
             }
+            String previousDisputeStatus = target.getStatus();
+            BigDecimal previousDisputeAmount = target.getAmount();
+            boolean wasCorrected = "CORRECTED".equals(target.getCorrectionStatus());
             target.setLatestWebhookEvent(event);
             target.setAmount(dispute.amount());
             target.setCurrency(dispute.currency().toUpperCase(Locale.ROOT));
@@ -259,17 +315,30 @@ public class ZeffyPaymentLifecycleProcessor {
             target.setReason(dispute.reason());
             target.setDisputeCreatedAt(dispute.createdAt());
             target.setLastSeenAt(observedAt);
-            if (!"CORRECTED".equals(target.getCorrectionStatus())) {
+            boolean correctedDisputeChanged = wasCorrected
+                    && (previousDisputeAmount == null || previousDisputeAmount.compareTo(dispute.amount()) != 0
+                    || previousDisputeStatus == null
+                    || !previousDisputeStatus.equalsIgnoreCase(dispute.status()));
+            if (correctedDisputeChanged) {
+                target.setCorrectionStatus("NEEDS_REVIEW");
+                target.setCorrectionSummary("Already-corrected dispute changed amount or status in Zeffy");
+            } else if (!wasCorrected && !"NEEDS_REVIEW".equals(target.getCorrectionStatus())) {
                 target.setCorrectionStatus("lost".equalsIgnoreCase(dispute.status())
                         && payment.getAppliedAt() != null ? "AWAITING_CORRECTION" : "NOT_REQUIRED");
             }
             disputeRepository.save(target);
-            if ("needs_response".equalsIgnoreCase(dispute.status())) {
+            if (correctedDisputeChanged || "NEEDS_REVIEW".equals(target.getCorrectionStatus())) {
+                review = target.getCorrectionSummary();
+                summary = review;
+            } else if ("needs_response".equalsIgnoreCase(dispute.status())) {
                 review = "Zeffy dispute requires a response";
                 summary = review;
-            } else if ("lost".equalsIgnoreCase(dispute.status()) && payment.getAppliedAt() != null) {
+            } else if ("lost".equalsIgnoreCase(dispute.status()) && payment.getAppliedAt() != null
+                    && "AWAITING_CORRECTION".equals(target.getCorrectionStatus())) {
                 review = "Lost dispute " + dispute.id() + " awaits Phase 5B correction";
                 summary = "Lost dispute recorded; no accounting or membership correction was posted";
+            } else if ("lost".equalsIgnoreCase(dispute.status()) && wasCorrected) {
+                summary = "Lost dispute was already corrected";
             } else if ("won".equalsIgnoreCase(dispute.status())) {
                 summary = "Won dispute recorded; no correction is required";
             }
@@ -277,9 +346,10 @@ public class ZeffyPaymentLifecycleProcessor {
         return new RefundDisputeOutcome(summary, review);
     }
 
-    private void upsertChange(ZeffyWebhookEvent event, ZeffyPayment payment, String kind,
-                              List<String> changedFields, String previousHash, String currentHash,
-                              String summary) {
+    private ZeffyPaymentChange upsertChange(ZeffyWebhookEvent event, ZeffyPayment payment, String kind,
+                                            List<String> changedFields, String previousHash, String currentHash,
+                                            String summary, BigDecimal previousAmount,
+                                            BigDecimal currentAmount, boolean amountNeedsCorrection) {
         ZeffyPaymentChange change = changeRepository.findByWebhookEvent_Id(event.getId())
                 .orElseGet(() -> ZeffyPaymentChange.builder()
                         .webhookEvent(event).zeffyPayment(payment).build());
@@ -290,7 +360,12 @@ public class ZeffyPaymentLifecycleProcessor {
         change.setPaymentSnapshot(payment.getLatestPayload());
         change.setSummary(truncate(summary));
         change.setObservedAt(event.getDispatchedAt());
-        changeRepository.save(change);
+        change.setPreviousAmount(previousAmount);
+        change.setCurrentAmount(currentAmount);
+        if (amountNeedsCorrection && change.getCorrectionStatus() == null) {
+            change.setCorrectionStatus("AWAITING_CORRECTION");
+        }
+        return changeRepository.save(change);
     }
 
     private ZeffyWebhookEvent lockSupportedEvent(UUID eventId, String expectedType) {

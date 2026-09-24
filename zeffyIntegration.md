@@ -1,6 +1,6 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Living specification; Phases 1–4, Phase 5A, and Zeffy membership rebuilding implemented
+**Status:** Living specification; Phases 1–4, Phases 5A–5B, and Zeffy membership rebuilding implemented
 **Date:** September 23, 2026
 **Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
@@ -621,7 +621,7 @@ of the same range, which is safe because applied payment IDs are unique.
 Phase 5 is delivered in three bounded parts:
 
 - **Phase 5A — payment lifecycle audit (implemented):** process payment-created, updated, and deleted events; fetch the authoritative current Payment for ID-only updates; retain normalized changes, refunds, disputes, and deletion tombstones; and place material cases in operator review. This phase makes no accounting or membership corrections.
-- **Phase 5B — payment corrections (planned):** post idempotent refund and lost-dispute corrections using the approved rules below.
+- **Phase 5B — payment corrections (implemented):** post idempotent refund, lost-dispute, and payment-amount corrections using the approved rules below.
 - **Phase 5C — contact synchronization (planned):** maintain stable Zeffy contact links and synchronize Persons/Followers using the approved contact rules below.
 
 ### 13.1 Payment updates
@@ -650,10 +650,31 @@ No update may directly edit a posted JournalEntry. Financial corrections require
 - A reversal must retain the original Fund and link to the original journal/payment record.
 - Refund and lost-dispute correction entries use the original Zeffy payment date.
 - Manual payments/contributions remain outside automatic Zeffy correction logic.
+- An increase to an applied payment amount creates a linked adjusting income entry for the difference.
+- A decrease to an applied payment amount creates a linked reversing entry for the difference.
+- Eligible-amount-only, status, currency, campaign, contact, and deletion changes remain review cases because no automatic reclassification rule has been approved.
+- If an already-corrected refund changes amount/status, or an already-corrected lost dispute changes status, the posted correction is preserved and the record returns to `NEEDS_REVIEW`.
 
 Phase 5A records succeeded refunds and lost disputes as `AWAITING_CORRECTION`; Phase 5B is responsible for posting the linked correction exactly once. If cumulative succeeded refunds exceed the original payment, the record becomes `NEEDS_REVIEW` and no correction is posted automatically.
 
 Membership-chain consequences can be significant: reducing or removing an old qualifying payment may change later chained periods. This must have dedicated tests and operator-visible before/after results.
+
+Phase 5B corrections run automatically inside the lifecycle transaction after the authoritative
+Payment is fetched. The original posted journal entry is never changed. Each nonzero correction is
+a new posted `adjusting` or `reversing` journal entry linked through
+`journal_entry.corrects_journal_entry_id`. The correction copies the original accounts, Fund,
+payer, category, and Zeffy payment method and uses the original payment date.
+
+After all safe financial corrections for a payment are posted, the integration-owned contribution
+is set to the current Zeffy amount less corrected succeeded refunds and corrected lost disputes. A
+zero retained amount marks it `refunded`; a positive retained amount remains `completed`. The full
+membership timeline is then recomputed. Refund, dispute, and amount-change audit records retain the
+correction journal link, correction time, and an operator-facing membership before/after summary.
+
+Finance → Zeffy Webhook Events includes **Apply Pending Corrections** for Phase 5A backlog and
+recoverable retries. `POST /api/zeffy-webhook-events/corrections/apply-pending` processes one locked
+payment per transaction, uses only local data, makes no Zeffy API calls, and reports applied,
+already-corrected, needs-review, and failed counts.
 
 ### 13.3 Payment deletion
 
@@ -699,7 +720,11 @@ The endpoint is `POST /api/members/rebuild-from-zeffy`. A confirmation dialog ex
 - Updated/deleted ID references are fetched or tombstoned correctly.
 - Fetch `401`, `404`, `429`, network, and 5xx outcomes are distinguishable and retryable where appropriate.
 - Refund application is idempotent by refund ID.
+- Lost-dispute application is idempotent by dispute ID.
+- Payment amount corrections are idempotent by lifecycle change/event ID.
 - Corrections preserve Fund/account attribution and link to originals.
+- Partial/full corrections update integration-owned membership contributions and recompute all later periods.
+- Re-running pending corrections cannot create another journal entry for a corrected item.
 - Contacts are not duplicated when email changes after a stable contact link exists.
 - Contact deletion never cascades into church records.
 
@@ -845,7 +870,7 @@ DTO parsing should ignore unknown additive fields while validating required fiel
 8. Enable Phase 3 LIVE mode for completed payments.
 9. Monitor and reconcile against Zeffy daily during an initial observation period.
 10. Run Phase 4 historical preview, approve its range, then execute.
-11. Deploy Phase 5A lifecycle audit, then implement Phase 5B corrections and Phase 5C contacts as separately reviewed changes.
+11. Deploy Phase 5A lifecycle audit and Phase 5B corrections, then implement Phase 5C contacts as a separately reviewed change.
 12. Continue API/webhook reconciliation until two or more accounting periods confirm completeness.
 
 Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain application without discarding received events. Re-enabling LIVE may process the backlog through explicit operator action after mappings and configuration are verified.

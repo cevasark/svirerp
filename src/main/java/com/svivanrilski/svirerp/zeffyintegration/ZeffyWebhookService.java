@@ -153,14 +153,19 @@ public class ZeffyWebhookService {
         List<PaymentChangeResponse> changes = changeRepository
                 .findByZeffyPayment_IdOrderByObservedAtDesc(payment.getId()).stream()
                 .map(change -> new PaymentChangeResponse(change.getId(), change.getChangeKind(),
-                        change.getChangedFields(), change.getSummary(), text(change.getObservedAt())))
+                        change.getChangedFields(), change.getSummary(), text(change.getObservedAt()),
+                        change.getPreviousAmount(), change.getCurrentAmount(), change.getCorrectionStatus(),
+                        change.getCorrectionJournalEntry() == null ? null
+                                : change.getCorrectionJournalEntry().getId(),
+                        change.getCorrectionSummary(), text(change.getCorrectedAt())))
                 .toList();
         List<RefundResponse> refunds = refundRepository
                 .findByZeffyPayment_IdOrderByRefundCreatedAtAsc(payment.getId()).stream()
                 .map(refund -> new RefundResponse(refund.getId(), refund.getZeffyRefundId(), refund.getAmount(),
                         refund.getCurrency(), refund.getStatus(), text(refund.getRefundCreatedAt()),
                         refund.getCorrectionStatus(), refund.getCorrectionJournalEntry() == null
-                                ? null : refund.getCorrectionJournalEntry().getId()))
+                                ? null : refund.getCorrectionJournalEntry().getId(),
+                        refund.getCorrectedAmount(), refund.getCorrectionSummary(), text(refund.getCorrectedAt())))
                 .toList();
         List<DisputeResponse> disputes = disputeRepository
                 .findByZeffyPayment_IdOrderByDisputeCreatedAtAsc(payment.getId()).stream()
@@ -168,7 +173,8 @@ public class ZeffyWebhookService {
                         dispute.getAmount(), dispute.getCurrency(), dispute.getStatus(), dispute.getReason(),
                         text(dispute.getDisputeCreatedAt()), dispute.getCorrectionStatus(),
                         dispute.getCorrectionJournalEntry() == null
-                                ? null : dispute.getCorrectionJournalEntry().getId()))
+                                ? null : dispute.getCorrectionJournalEntry().getId(),
+                        dispute.getCorrectedAmount(), dispute.getCorrectionSummary(), text(dispute.getCorrectedAt())))
                 .toList();
         return new LifecycleResponse(eventId, payment.getId(), text(payment.getDeletedAt()),
                 changes, refunds, disputes);
@@ -303,16 +309,22 @@ public class ZeffyWebhookService {
     }
 
     public record PaymentChangeResponse(UUID id, String changeKind, String changedFields,
-                                        String summary, String observedAt) {
+                                        String summary, String observedAt,
+                                        BigDecimal previousAmount, BigDecimal currentAmount,
+                                        String correctionStatus, UUID correctionJournalEntryId,
+                                        String correctionSummary, String correctedAt) {
     }
 
     public record RefundResponse(UUID id, String zeffyRefundId, BigDecimal amount, String currency,
                                  String status, String refundCreatedAt, String correctionStatus,
-                                 UUID correctionJournalEntryId) {
+                                 UUID correctionJournalEntryId, BigDecimal correctedAmount,
+                                 String correctionSummary,
+                                 String correctedAt) {
     }
 
     public record DisputeResponse(UUID id, String zeffyDisputeId, BigDecimal amount, String currency,
                                   String status, String reason, String disputeCreatedAt,
-                                  String correctionStatus, UUID correctionJournalEntryId) {
+                                  String correctionStatus, UUID correctionJournalEntryId,
+                                  BigDecimal correctedAmount, String correctionSummary, String correctedAt) {
     }
 }

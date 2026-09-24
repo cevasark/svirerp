@@ -104,6 +104,11 @@ public class JournalEntry {
     @JoinColumn(name = "fund_id")
     private Fund fund;
 
+    /** Posted entry whose accounting effect this adjusting/reversing entry corrects. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "corrects_journal_entry_id")
+    private JournalEntry correctsJournalEntry;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

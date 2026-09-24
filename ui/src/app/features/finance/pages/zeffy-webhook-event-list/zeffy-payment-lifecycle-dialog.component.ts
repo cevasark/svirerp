@@ -34,6 +34,17 @@ export interface ZeffyPaymentLifecycleDialogData {
           <span>{{ change.observedAt | date:'medium' }}</span>
           <p>{{ change.summary }}</p>
           @if (change.changedFields) { <small>Fields: {{ change.changedFields }}</small> }
+          @if (change.correctionStatus) {
+            <p>Correction: {{ change.correctionStatus }}</p>
+            @if (change.previousAmount != null && change.currentAmount != null) {
+              <p>Amount: {{ change.previousAmount | number:'1.2-2' }} →
+                {{ change.currentAmount | number:'1.2-2' }}</p>
+            }
+            @if (change.correctionSummary) { <p>{{ change.correctionSummary }}</p> }
+            @if (change.correctionJournalEntryId) {
+              <small>Journal: {{ change.correctionJournalEntryId }}</small>
+            }
+          }
         </section>
       }
 
@@ -44,6 +55,10 @@ export interface ZeffyPaymentLifecycleDialogData {
           <strong>{{ refund.currency }} {{ refund.amount | number:'1.2-2' }} — {{ refund.status }}</strong>
           <span>{{ refund.refundCreatedAt | date:'medium' }}</span>
           <p>Correction: {{ refund.correctionStatus }}</p>
+          @if (refund.correctionSummary) { <p>{{ refund.correctionSummary }}</p> }
+          @if (refund.correctionJournalEntryId) {
+            <small>Journal: {{ refund.correctionJournalEntryId }}</small><br />
+          }
           <small>{{ refund.zeffyRefundId }}</small>
         </section>
       }
@@ -55,6 +70,10 @@ export interface ZeffyPaymentLifecycleDialogData {
           <strong>{{ dispute.currency }} {{ dispute.amount | number:'1.2-2' }} — {{ dispute.status }}</strong>
           <span>{{ dispute.disputeCreatedAt | date:'medium' }}</span>
           <p>{{ dispute.reason ?? 'No reason supplied' }}; correction: {{ dispute.correctionStatus }}</p>
+          @if (dispute.correctionSummary) { <p>{{ dispute.correctionSummary }}</p> }
+          @if (dispute.correctionJournalEntryId) {
+            <small>Journal: {{ dispute.correctionJournalEntryId }}</small><br />
+          }
           <small>{{ dispute.zeffyDisputeId }}</small>
         </section>
       }

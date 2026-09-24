@@ -40,6 +40,12 @@ public class ZeffyRefund {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "correction_journal_entry_id")
     private JournalEntry correctionJournalEntry;
+    @Column(name = "corrected_amount", precision = 15, scale = 2)
+    private BigDecimal correctedAmount;
+    @Column(name = "correction_summary", length = 1000)
+    private String correctionSummary;
+    @Column(name = "corrected_at")
+    private OffsetDateTime correctedAt;
     @Column(name = "first_seen_at", nullable = false, updatable = false)
     private OffsetDateTime firstSeenAt;
     @Column(name = "last_seen_at", nullable = false)

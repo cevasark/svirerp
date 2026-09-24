@@ -164,6 +164,14 @@ export interface ZeffyMembershipRebuildResult {
   needsReview: number;
 }
 
+export interface ZeffyApplyPendingCorrectionsResult {
+  paymentsScanned: number;
+  correctionsApplied: number;
+  alreadyCorrected: number;
+  needsReview: number;
+  failed: number;
+}
+
 /** Response shape of GET /api/members/summary. Followers have no
  *  active/inactive split — they never expire (see TierCalculator on the backend). */
 export interface MemberSummary {

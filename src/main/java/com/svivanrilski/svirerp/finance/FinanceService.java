@@ -676,6 +676,85 @@ public class FinanceService {
     // (no draft/approval step — see FinanceService class docs / the Finance Phase 1 plan) so a
     // treasurer never has to think in debits and credits.
 
+    public record JournalCorrectionRequest(
+            UUID originalJournalEntryId,
+            LocalDate entryDate,
+            BigDecimal signedAmount,
+            String description,
+            String reference) {
+    }
+
+    /**
+     * Posts an adjustment using the exact accounts and Funds from an existing two-line Zeffy
+     * income entry. A positive amount adds the original accounting effect; a negative amount
+     * reverses it. The original posted entry is never edited.
+     */
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
+    public JournalEntry recordJournalCorrection(JournalCorrectionRequest request) {
+        if (request == null || request.originalJournalEntryId() == null
+                || request.entryDate() == null || request.signedAmount() == null
+                || request.signedAmount().signum() == 0) {
+            throw new IllegalArgumentException("A journal correction requires an original entry, date, and non-zero amount");
+        }
+        JournalEntry original = findEntryById(request.originalJournalEntryId());
+        if (!"posted".equals(original.getStatus()) || !"zeffy".equals(original.getPaymentMethod())) {
+            throw new IllegalArgumentException("Only a posted Zeffy journal entry can be corrected automatically");
+        }
+        List<JournalLine> originalLines = journalLineRepo.findByJournalEntryId(original.getId());
+        if (originalLines.size() != 2 || original.getTotalDebit() == null
+                || original.getTotalDebit().signum() <= 0
+                || original.getTotalDebit().compareTo(original.getTotalCredit()) != 0) {
+            throw new IllegalArgumentException("The original Zeffy journal entry is not a balanced two-line income entry");
+        }
+        JournalLine debitLine = originalLines.stream()
+                .filter(line -> line.getDebitAmount() != null && line.getDebitAmount().signum() > 0
+                        && line.getCreditAmount() != null && line.getCreditAmount().signum() == 0)
+                .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                        "The original Zeffy journal entry does not have one debit line"));
+        JournalLine creditLine = originalLines.stream()
+                .filter(line -> line.getCreditAmount() != null && line.getCreditAmount().signum() > 0
+                        && line.getDebitAmount() != null && line.getDebitAmount().signum() == 0)
+                .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                        "The original Zeffy journal entry does not have one credit line"));
+        if (debitLine.getDebitAmount().compareTo(original.getTotalDebit()) != 0
+                || creditLine.getCreditAmount().compareTo(original.getTotalCredit()) != 0) {
+            throw new IllegalArgumentException("The original Zeffy journal entry cannot be corrected proportionally");
+        }
+
+        boolean reversing = request.signedAmount().signum() < 0;
+        BigDecimal amount = request.signedAmount().abs();
+        JournalEntry correction = journalEntryRepo.save(JournalEntry.builder()
+                .entryDate(request.entryDate())
+                .description(request.description())
+                .reference(request.reference())
+                .entryType(reversing ? "reversing" : "adjusting")
+                .status("draft")
+                .totalDebit(amount)
+                .totalCredit(amount)
+                .paymentMethod(original.getPaymentMethod())
+                .payer(original.getPayer())
+                .serviceRequest(original.getServiceRequest())
+                .categoryAccount(original.getCategoryAccount())
+                .fund(original.getFund())
+                .correctsJournalEntry(original)
+                .build());
+
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(correction)
+                .account(reversing ? creditLine.getAccount() : debitLine.getAccount())
+                .fund(reversing ? creditLine.getFund() : debitLine.getFund())
+                .debitAmount(amount).creditAmount(BigDecimal.ZERO)
+                .memo(request.description()).build());
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(correction)
+                .account(reversing ? debitLine.getAccount() : creditLine.getAccount())
+                .fund(reversing ? debitLine.getFund() : creditLine.getFund())
+                .debitAmount(BigDecimal.ZERO).creditAmount(amount)
+                .memo(request.description()).build());
+
+        return postEntry(correction.getId(), null);
+    }
+
     @Transactional
     public JournalEntry recordIncome(RecordIncomeRequest req) {
         validate(PAYMENT_METHODS, req.paymentMethod(), "payment method");

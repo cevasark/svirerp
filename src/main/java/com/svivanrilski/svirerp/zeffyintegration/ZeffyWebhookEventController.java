@@ -21,6 +21,7 @@ import java.util.UUID;
 public class ZeffyWebhookEventController {
 
     private final ZeffyWebhookService service;
+    private final ZeffyPaymentCorrectionCoordinator correctionCoordinator;
 
     @GetMapping
     public Page<ZeffyWebhookService.EventResponse> list(
@@ -44,5 +45,10 @@ public class ZeffyWebhookEventController {
     @GetMapping("/{id}/lifecycle")
     public ZeffyWebhookService.LifecycleResponse lifecycle(@PathVariable UUID id) {
         return service.lifecycle(id);
+    }
+
+    @PostMapping("/corrections/apply-pending")
+    public ZeffyPaymentCorrectionCoordinator.ApplyPendingResult applyPendingCorrections() {
+        return correctionCoordinator.applyPending();
     }
 }

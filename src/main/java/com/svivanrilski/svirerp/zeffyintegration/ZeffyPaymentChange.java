@@ -1,8 +1,10 @@
 package com.svivanrilski.svirerp.zeffyintegration;
 
+import com.svivanrilski.svirerp.finance.JournalEntry;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -49,6 +51,25 @@ public class ZeffyPaymentChange {
 
     @Column(name = "observed_at", nullable = false)
     private OffsetDateTime observedAt;
+
+    @Column(name = "previous_amount", precision = 15, scale = 2)
+    private BigDecimal previousAmount;
+
+    @Column(name = "current_amount", precision = 15, scale = 2)
+    private BigDecimal currentAmount;
+
+    @Column(name = "correction_status", length = 30)
+    private String correctionStatus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "correction_journal_entry_id")
+    private JournalEntry correctionJournalEntry;
+
+    @Column(name = "correction_summary", length = 1000)
+    private String correctionSummary;
+
+    @Column(name = "corrected_at")
+    private OffsetDateTime correctedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

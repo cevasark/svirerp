@@ -19,6 +19,22 @@ public interface ZeffyPaymentRepository extends JpaRepository<ZeffyPayment, UUID
     @Query("select p from ZeffyPayment p where p.zeffyPaymentId = :paymentId")
     Optional<ZeffyPayment> findByZeffyPaymentIdForUpdate(@Param("paymentId") String paymentId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from ZeffyPayment p where p.id = :paymentId")
+    Optional<ZeffyPayment> findByIdForUpdate(@Param("paymentId") UUID paymentId);
+
+    @Query("""
+            select distinct p.id from ZeffyPayment p
+            where exists (select r.id from ZeffyRefund r
+                          where r.zeffyPayment = p and r.correctionStatus = 'AWAITING_CORRECTION')
+               or exists (select d.id from ZeffyDispute d
+                          where d.zeffyPayment = p and d.correctionStatus = 'AWAITING_CORRECTION')
+               or exists (select c.id from ZeffyPaymentChange c
+                          where c.zeffyPayment = p and c.correctionStatus = 'AWAITING_CORRECTION')
+            order by p.id
+            """)
+    java.util.List<UUID> findPaymentIdsAwaitingCorrection();
+
     @EntityGraph(attributePaths = {"person", "member", "memberPayment"})
     @Query("""
             select p from ZeffyPayment p

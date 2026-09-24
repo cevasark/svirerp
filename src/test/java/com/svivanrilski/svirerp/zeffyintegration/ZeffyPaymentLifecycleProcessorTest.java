@@ -22,6 +22,7 @@ class ZeffyPaymentLifecycleProcessorTest {
     private ZeffyPaymentChangeRepository changes;
     private ZeffyRefundRepository refunds;
     private ZeffyDisputeRepository disputes;
+    private ZeffyPaymentCorrectionService corrections;
     private ZeffyPaymentLifecycleProcessor processor;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -32,23 +33,30 @@ class ZeffyPaymentLifecycleProcessorTest {
         changes = mock(ZeffyPaymentChangeRepository.class);
         refunds = mock(ZeffyRefundRepository.class);
         disputes = mock(ZeffyDisputeRepository.class);
-        processor = new ZeffyPaymentLifecycleProcessor(events, payments, changes, refunds, disputes,
+        corrections = mock(ZeffyPaymentCorrectionService.class);
+        processor = new ZeffyPaymentLifecycleProcessor(events, payments, changes, refunds, disputes, corrections,
                 new ZeffyPaymentPayload(objectMapper));
         when(events.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(payments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(changes.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(refunds.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(disputes.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(corrections.applyCorrections(any())).thenReturn(
+                new ZeffyPaymentCorrectionService.CorrectionOutcome(
+                        0, 0, 0, "No pending Zeffy corrections", null));
     }
 
     @Test
-    void succeededRefundOnAppliedPaymentIsAuditedWithoutPostingCorrection() throws Exception {
+    void succeededRefundOnAppliedPaymentDelegatesAutomaticCorrection() throws Exception {
         ZeffyWebhookEvent event = updatedEvent();
         ZeffyPayment payment = appliedPayment();
         when(events.findByIdForUpdate(event.getId())).thenReturn(Optional.of(event));
         when(payments.findByZeffyPaymentIdForUpdate("pay-1")).thenReturn(Optional.of(payment));
         when(changes.findByWebhookEvent_Id(event.getId())).thenReturn(Optional.empty());
         when(refunds.findByZeffyRefundId("refund-1")).thenReturn(Optional.empty());
+        when(corrections.applyCorrections(payment)).thenReturn(
+                new ZeffyPaymentCorrectionService.CorrectionOutcome(
+                        1, 0, 0, "Applied 1 Zeffy correction(s)", null));
 
         processor.recordUpdated(event.getId(), paymentWithRefund());
 
@@ -56,19 +64,23 @@ class ZeffyPaymentLifecycleProcessorTest {
         verify(refunds).save(savedRefund.capture());
         assertThat(savedRefund.getValue().getCorrectionStatus()).isEqualTo("AWAITING_CORRECTION");
         assertThat(savedRefund.getValue().getAmount()).isEqualByComparingTo("25.00");
-        assertThat(event.getStatus()).isEqualTo("NEEDS_REVIEW");
-        assertThat(event.getProcessingSummary()).contains("no accounting or membership correction");
+        assertThat(event.getStatus()).isEqualTo("PROCESSED");
+        assertThat(event.getProcessingSummary()).contains("Applied 1");
         assertThat(payment.getJournalEntry()).isNotNull();
+        verify(corrections).applyCorrections(payment);
     }
 
     @Test
-    void lostDisputeOnAppliedPaymentAwaitsCorrection() throws Exception {
+    void lostDisputeOnAppliedPaymentDelegatesAutomaticCorrection() throws Exception {
         ZeffyWebhookEvent event = updatedEvent();
         ZeffyPayment payment = appliedPayment();
         when(events.findByIdForUpdate(event.getId())).thenReturn(Optional.of(event));
         when(payments.findByZeffyPaymentIdForUpdate("pay-1")).thenReturn(Optional.of(payment));
         when(changes.findByWebhookEvent_Id(event.getId())).thenReturn(Optional.empty());
         when(disputes.findByZeffyDisputeId("dispute-1")).thenReturn(Optional.empty());
+        when(corrections.applyCorrections(payment)).thenReturn(
+                new ZeffyPaymentCorrectionService.CorrectionOutcome(
+                        1, 0, 0, "Applied 1 Zeffy correction(s)", null));
 
         processor.recordUpdated(event.getId(), paymentWithLostDispute());
 
@@ -76,8 +88,8 @@ class ZeffyPaymentLifecycleProcessorTest {
         verify(disputes).save(savedDispute.capture());
         assertThat(savedDispute.getValue().getCorrectionStatus()).isEqualTo("AWAITING_CORRECTION");
         assertThat(savedDispute.getValue().getStatus()).isEqualTo("lost");
-        assertThat(event.getStatus()).isEqualTo("NEEDS_REVIEW");
-        assertThat(event.getProcessingSummary()).contains("no accounting or membership correction");
+        assertThat(event.getStatus()).isEqualTo("PROCESSED");
+        assertThat(event.getProcessingSummary()).contains("Applied 1");
     }
 
     @Test

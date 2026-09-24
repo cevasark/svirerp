@@ -265,6 +265,30 @@ public class MembershipService {
         return new ExternalPaymentUpsert(paymentRepo.save(payment), created);
     }
 
+    public record ZeffyMembershipCorrection(String summary) {
+    }
+
+    /** Applies the retained Zeffy amount and recomputes the complete membership timeline. */
+    @Transactional
+    public ZeffyMembershipCorrection applyZeffyCorrection(
+            UUID memberPaymentId, BigDecimal retainedAmount) {
+        if (retainedAmount == null || retainedAmount.signum() < 0) {
+            throw new IllegalArgumentException("Retained membership amount cannot be negative");
+        }
+        MemberPayment payment = findPaymentById(memberPaymentId);
+        if (!"zeffy".equals(payment.getPaymentMethod())) {
+            throw new IllegalArgumentException("Only an integration-owned Zeffy contribution can be corrected automatically");
+        }
+        Member member = payment.getMember();
+        String before = describeMembership(payment, member);
+        payment.setAmount(retainedAmount);
+        payment.setStatus(retainedAmount.signum() == 0 ? "refunded" : "completed");
+        paymentRepo.save(payment);
+        Member recomputed = recomputeTier(member.getId());
+        String after = describeMembership(payment, recomputed);
+        return new ZeffyMembershipCorrection(before + " -> " + after);
+    }
+
     @Transactional
     public MemberPayment createPayment(MemberPayment payment) {
         validatePaymentMethod(payment.getPaymentMethod());
@@ -451,5 +475,12 @@ public class MembershipService {
             throw new IllegalArgumentException("Invalid payment status: " + status
                     + ". Allowed: " + PAYMENT_STATUSES);
         }
+    }
+
+    private String describeMembership(MemberPayment payment, Member member) {
+        String expiry = member.getExpiryDate() == null ? "no expiry" : member.getExpiryDate().toString();
+        return "contribution $" + payment.getAmount().toPlainString() + " " + payment.getStatus()
+                + ", membership " + member.getMembershipType().getName() + " "
+                + member.getStatus() + " through " + expiry;
     }
 }

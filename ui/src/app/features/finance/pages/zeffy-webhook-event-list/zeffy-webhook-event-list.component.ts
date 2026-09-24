@@ -6,12 +6,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 
 import { DEFAULT_PAGE_PARAMS, Page, PageParams, ZeffyWebhookEventFilters } from '../../../../core/models/api.model';
 import { ZeffyWebhookEvent } from '../../../../core/models/domain.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { DataTableComponent, TableAction, TableColumn } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ZeffyIntegrationService } from '../../services/zeffy-integration.service';
 import { ZeffyPaymentLifecycleDialogComponent } from './zeffy-payment-lifecycle-dialog.component';
 
@@ -38,12 +40,19 @@ const STATUS_LABELS: Record<string, string> = {
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatIconModule,
   ],
   template: `
     <div class="page-container">
       <app-page-header
         title="Zeffy Webhook Events"
-        subtitle="Signed Zeffy deliveries, payment lifecycle changes, and processing outcomes" />
+        subtitle="Signed Zeffy deliveries, payment lifecycle changes, and processing outcomes">
+        <button extraActions mat-stroked-button
+          [disabled]="applyingCorrections()" (click)="confirmApplyPendingCorrections()">
+          <mat-icon>rule</mat-icon>
+          Apply Pending Corrections
+        </button>
+      </app-page-header>
 
       <div class="filters">
         <mat-form-field appearance="outline">
@@ -124,6 +133,7 @@ export class ZeffyWebhookEventListComponent implements OnInit {
   readonly page = signal<Page<ZeffyWebhookEvent> | null>(null);
   readonly filters = signal<ZeffyWebhookEventFilters>({});
   readonly loading = signal(false);
+  readonly applyingCorrections = signal(false);
 
   eventTypeDraft = '';
   statusDraft = '';
@@ -263,6 +273,38 @@ export class ZeffyWebhookEventListComponent implements OnInit {
         width: '760px',
         data: { event, lifecycle },
       });
+    });
+  }
+
+  confirmApplyPendingCorrections(): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Apply Pending Zeffy Corrections',
+        message: 'Post correction journal entries for pending succeeded refunds, lost disputes, and payment amount changes? Entries use the original payment date and affected memberships will be recomputed.',
+        confirmLabel: 'Apply Corrections',
+      },
+    }).afterClosed().subscribe(confirmed => {
+      if (confirmed) this.applyPendingCorrections();
+    });
+  }
+
+  private applyPendingCorrections(): void {
+    this.applyingCorrections.set(true);
+    this.service.applyPendingCorrections().subscribe({
+      next: result => {
+        this.applyingCorrections.set(false);
+        const message = `Applied ${result.correctionsApplied} correction(s) across ${result.paymentsScanned} payment(s).`;
+        if (result.needsReview || result.failed) {
+          this.notifications.info(`${message} ${result.needsReview} need review; ${result.failed} failed.`);
+        } else {
+          this.notifications.success(message);
+        }
+        this.load();
+      },
+      error: () => {
+        this.applyingCorrections.set(false);
+        this.notifications.error('Could not apply pending Zeffy corrections.');
+      },
     });
   }
 
