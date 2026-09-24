@@ -15,6 +15,9 @@ public interface ZeffyPaymentRepository extends JpaRepository<ZeffyPayment, UUID
 
     Optional<ZeffyPayment> findByZeffyPaymentId(String zeffyPaymentId);
 
+    @EntityGraph(attributePaths = {"person", "member"})
+    List<ZeffyPayment> findByContactId(String contactId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from ZeffyPayment p where p.zeffyPaymentId = :paymentId")
     Optional<ZeffyPayment> findByZeffyPaymentIdForUpdate(@Param("paymentId") String paymentId);

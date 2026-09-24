@@ -150,4 +150,30 @@ class ZeffyApiClientTest {
         verify(pacer).awaitPermit();
         server.verify();
     }
+
+    @Test
+    void fetchesContactPageAndCurrentContactThroughSharedPacer() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.zeffy.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ZeffyRequestPacer pacer = mock(ZeffyRequestPacer.class);
+        AppSettingService settings = mock(AppSettingService.class);
+        org.mockito.Mockito.when(settings.getDecryptedValue("zeffy.api-key"))
+                .thenReturn(Optional.of("test-key"));
+        ZeffyApiClient client = new ZeffyApiClient(settings, pacer, builder.build());
+
+        server.expect(requestTo("https://api.zeffy.test/api/v1/contacts?limit=100"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andRespond(withSuccess("""
+                        {"data":[{"id":"contact-1"}],"has_more":false,"next_cursor":null}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.zeffy.test/api/v1/contacts/contact-1"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andRespond(withSuccess("{\"id\":\"contact-1\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchContactPage(null).contacts())
+                .extracting(node -> node.get("id").asText()).containsExactly("contact-1");
+        assertThat(client.fetchContact("contact-1").get("id").asText()).isEqualTo("contact-1");
+        verify(pacer, times(2)).awaitPermit();
+        server.verify();
+    }
 }

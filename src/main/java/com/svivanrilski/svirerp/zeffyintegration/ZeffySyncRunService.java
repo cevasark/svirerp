@@ -23,6 +23,10 @@ public class ZeffySyncRunService {
                                 int needsReview, int processed) {
     }
 
+    public record ContactCounts(int fetched, int inserted, int updated, int ignored,
+                                int failed, int needsReview, int processed) {
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ZeffySyncRun start(String syncType, String triggerType, String initiatedBy) {
         return repository.saveAndFlush(ZeffySyncRun.builder()
@@ -46,6 +50,35 @@ public class ZeffySyncRunService {
         run.setIgnoredCount(result.ignored());
         run.setFailedCount(result.failed());
         return repository.save(run);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ZeffySyncRun checkpointContacts(UUID runId, ContactCounts counts, String endingCursor) {
+        ZeffySyncRun run = get(runId);
+        copyContactCounts(run, counts);
+        run.setEndingCursor(trimToNull(endingCursor));
+        return repository.save(run);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ZeffySyncRun finishContacts(UUID runId, ContactCounts counts, String endingCursor) {
+        ZeffySyncRun run = get(runId);
+        copyContactCounts(run, counts);
+        run.setEndingCursor(trimToNull(endingCursor));
+        run.setStatus(counts.failed() > 0 || counts.needsReview() > 0 ? "PARTIAL" : "COMPLETED");
+        run.setCompletedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        return repository.save(run);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void abortContacts(UUID runId, ContactCounts counts, String endingCursor, String errorSummary) {
+        ZeffySyncRun run = get(runId);
+        copyContactCounts(run, counts);
+        run.setEndingCursor(trimToNull(endingCursor));
+        run.setStatus(counts.fetched() > 0 ? "PARTIAL" : "FAILED");
+        run.setCompletedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        run.setErrorSummary(truncate(errorSummary, 1000));
+        repository.save(run);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -142,6 +175,16 @@ public class ZeffySyncRunService {
         run.setAlreadyAppliedCount(counts.alreadyApplied());
         run.setEligibleCount(counts.eligible());
         run.setNeedsMappingCount(counts.needsMapping());
+        run.setNeedsReviewCount(counts.needsReview());
+        run.setProcessedCount(counts.processed());
+    }
+
+    private void copyContactCounts(ZeffySyncRun run, ContactCounts counts) {
+        run.setFetchedCount(counts.fetched());
+        run.setInsertedCount(counts.inserted());
+        run.setUpdatedCount(counts.updated());
+        run.setIgnoredCount(counts.ignored());
+        run.setFailedCount(counts.failed());
         run.setNeedsReviewCount(counts.needsReview());
         run.setProcessedCount(counts.processed());
     }

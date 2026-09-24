@@ -28,7 +28,8 @@ public interface ZeffyWebhookEventRepository extends JpaRepository<ZeffyWebhookE
 
     @EntityGraph(attributePaths = {"zeffyPayment", "zeffyPayment.mappedFund",
             "zeffyPayment.mappedAccount", "zeffyPayment.person", "zeffyPayment.member",
-            "zeffyPayment.memberPayment", "zeffyPayment.journalEntry"})
+            "zeffyPayment.memberPayment", "zeffyPayment.journalEntry", "zeffyContact",
+            "zeffyContact.person"})
     @Query("select e from ZeffyWebhookEvent e where e.id = :id")
     Optional<ZeffyWebhookEvent> findDetailedById(@Param("id") UUID id);
 }

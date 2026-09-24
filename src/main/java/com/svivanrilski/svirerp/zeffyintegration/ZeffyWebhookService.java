@@ -42,6 +42,7 @@ public class ZeffyWebhookService {
     private final ObjectMapper objectMapper;
     private final ZeffyPaymentProcessingCoordinator processingCoordinator;
     private final ZeffyPaymentLifecycleCoordinator lifecycleCoordinator;
+    private final ZeffyContactCoordinator contactCoordinator;
     private final ZeffyPaymentChangeRepository changeRepository;
     private final ZeffyRefundRepository refundRepository;
     private final ZeffyDisputeRepository disputeRepository;
@@ -79,8 +80,12 @@ public class ZeffyWebhookService {
 
         try {
             ZeffyWebhookEvent inserted = eventStore.insert(event);
-            if ("LIVE".equalsIgnoreCase(mode) && supported && envelope.type().startsWith("payment.")) {
-                processPaymentEvent(inserted.getId(), envelope.type());
+            if ("LIVE".equalsIgnoreCase(mode) && supported) {
+                if (envelope.type().startsWith("payment.")) {
+                    processPaymentEvent(inserted.getId(), envelope.type());
+                } else {
+                    contactCoordinator.process(inserted.getId());
+                }
                 String finalStatus = eventRepository.findById(inserted.getId())
                         .map(ZeffyWebhookEvent::getStatus).orElse(inserted.getStatus());
                 return new ReceiptResponse(inserted.getId(), finalStatus, false);
@@ -133,10 +138,9 @@ public class ZeffyWebhookService {
         }
         ZeffyWebhookEvent stored = eventRepository.findById(eventId)
                 .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
-        if (!stored.getEventType().startsWith("payment.")) {
-            throw new IllegalArgumentException("Contact event processing is introduced in Phase 5C");
-        }
-        processPaymentEvent(eventId, stored.getEventType());
+        if (stored.getEventType().startsWith("payment.")) processPaymentEvent(eventId, stored.getEventType());
+        else if (stored.getEventType().startsWith("contact.")) contactCoordinator.process(eventId);
+        else throw new IllegalArgumentException("Unsupported Zeffy event type: " + stored.getEventType());
         ZeffyWebhookEvent event = eventRepository.findDetailedById(eventId)
                 .orElseThrow(() -> new IllegalArgumentException("Zeffy webhook event not found: " + eventId));
         return toResponse(event);

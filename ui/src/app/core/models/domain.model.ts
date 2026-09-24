@@ -13,6 +13,41 @@ export interface Person {
   createdAt?: string;
 }
 
+export interface ZeffyContactSummary {
+  id: string;
+  zeffyContactId: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  addressLine1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  donorType?: string;
+  totalContribution?: number;
+  currency?: string;
+  donationCount?: number;
+  firstDonationAt?: string;
+  lastDonationAt?: string;
+  processingStatus: 'PROCESSED' | 'NEEDS_REVIEW' | 'DELETED' | 'ERROR';
+  outcomeReason?: string;
+  zeffyCreatedAt?: string;
+  zeffyUpdatedAt?: string;
+  lastSyncedAt?: string;
+  deletedAt?: string;
+}
+
+export interface PersonOverview extends Person {
+  memberId?: string;
+  membershipType?: string;
+  membershipStatus?: string;
+  joinDate?: string;
+  expiryDate?: string;
+  zeffyContacts: ZeffyContactSummary[];
+}
+
 // ─── Organization ───────────────────────────────────────────────────────────
 export interface Organization {
   id: string;

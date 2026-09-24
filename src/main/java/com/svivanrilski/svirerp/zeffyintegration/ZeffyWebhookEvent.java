@@ -81,6 +81,10 @@ public class ZeffyWebhookEvent {
     @JoinColumn(name = "zeffy_payment_record_id")
     private ZeffyPayment zeffyPayment;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zeffy_contact_record_id")
+    private ZeffyContact zeffyContact;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

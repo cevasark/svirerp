@@ -16,10 +16,16 @@ import java.util.UUID;
 public class PersonController {
 
     private final PersonService service;
+    private final PersonOverviewService overviewService;
 
     @GetMapping("/api/persons")
     public Page<Person> list(Pageable pageable) {
         return service.findAll(pageable);
+    }
+
+    @GetMapping("/api/persons/overview")
+    public Page<PersonOverviewService.PersonOverview> overview(Pageable pageable) {
+        return overviewService.findAll(pageable);
     }
 
     /** Autocomplete search — e.g. GET /api/persons/search?field=firstName&q=Jo. */

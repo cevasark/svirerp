@@ -31,6 +31,7 @@ class ZeffyPaymentProcessorTest {
     private ZeffyWebhookEventRepository events;
     private ZeffyPaymentRepository payments;
     private ZeffyCampaignRepository campaigns;
+    private ZeffyContactRepository contacts;
     private PersonService people;
     private MembershipService memberships;
     private FinanceService finance;
@@ -41,10 +42,11 @@ class ZeffyPaymentProcessorTest {
         events = mock(ZeffyWebhookEventRepository.class);
         payments = mock(ZeffyPaymentRepository.class);
         campaigns = mock(ZeffyCampaignRepository.class);
+        contacts = mock(ZeffyContactRepository.class);
         people = mock(PersonService.class);
         memberships = mock(MembershipService.class);
         finance = mock(FinanceService.class);
-        processor = new ZeffyPaymentProcessor(events, payments, campaigns, people,
+        processor = new ZeffyPaymentProcessor(events, payments, campaigns, contacts, people,
                 memberships, finance, new ZeffyPaymentPayload(new ObjectMapper()));
         when(payments.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(payments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -88,7 +90,7 @@ class ZeffyPaymentProcessorTest {
         when(payments.findByZeffyPaymentIdForUpdate("pay-1")).thenReturn(Optional.empty());
         when(campaigns.findWithMappingByZeffyCampaignId("campaign-1")).thenReturn(Optional.of(campaign));
         when(people.findByNormalizedEmail("jane@example.com")).thenReturn(List.of(person));
-        when(people.fillBlankFields(eq(person.getId()), any())).thenReturn(person);
+        when(people.fillBlankContactFields(eq(person.getId()), any())).thenReturn(person);
         when(finance.findOrCreateAccountByNumber("1020", "Undeposited Funds – Zeffy", "asset"))
                 .thenReturn(deposit);
         when(finance.recordIncome(any())).thenReturn(journal);
@@ -104,6 +106,7 @@ class ZeffyPaymentProcessorTest {
         assertThat(event.getStatus()).isEqualTo("PROCESSED");
         assertThat(event.getZeffyPayment().getJournalEntry()).isSameAs(journal);
         assertThat(event.getZeffyPayment().getPerson()).isSameAs(person);
+        verify(memberships).findOrCreateFollowerMember(person.getId(), LocalDate.of(2025, 12, 31));
     }
 
     @Test
@@ -141,7 +144,7 @@ class ZeffyPaymentProcessorTest {
         when(payments.findByZeffyPaymentIdForUpdate("pay-1")).thenReturn(Optional.empty());
         when(campaigns.findWithMappingByZeffyCampaignId("campaign-1")).thenReturn(Optional.of(campaign));
         when(people.findByNormalizedEmail("jane@example.com")).thenReturn(List.of(person));
-        when(people.fillBlankFields(eq(person.getId()), any())).thenReturn(person);
+        when(people.fillBlankContactFields(eq(person.getId()), any())).thenReturn(person);
         when(memberships.findOrCreateFollowerMember(eq(person.getId()), any())).thenReturn(member);
         MemberPayment contribution = MemberPayment.builder().id(UUID.randomUUID()).member(member)
                 .amount(BigDecimal.ZERO).paymentDate(LocalDate.of(2025, 12, 31)).build();
@@ -200,7 +203,7 @@ class ZeffyPaymentProcessorTest {
         assertThat(result.outcome()).isEqualTo("ELIGIBLE");
         assertThat(result.payloadSha256()).hasSize(64);
         verify(people, never()).create(any());
-        verify(people, never()).fillBlankFields(any(), any());
+        verify(people, never()).fillBlankContactFields(any(), any());
         verifyNoInteractions(memberships, finance);
     }
 

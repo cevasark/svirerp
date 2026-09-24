@@ -85,9 +85,12 @@ export interface ZeffyIntegrationStatus {
   webhookPath: string;
   campaignCount: number;
   confirmedMappingCount: number;
+  contactCount: number;
+  contactsNeedingReview: number;
   latestCampaignSync?: ZeffySyncRun;
   latestPaymentPreview?: ZeffySyncRun;
   latestPaymentSync?: ZeffySyncRun;
+  latestContactSync?: ZeffySyncRun;
 }
 
 export interface ZeffyConfigurationRequest {
@@ -111,6 +114,10 @@ export interface ZeffyConnectionTestResult {
 }
 
 export interface ZeffyCampaignSyncResult {
+  run: ZeffySyncRun;
+}
+
+export interface ZeffyContactSyncResult {
   run: ZeffySyncRun;
 }
 

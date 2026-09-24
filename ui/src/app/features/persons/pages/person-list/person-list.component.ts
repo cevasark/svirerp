@@ -4,12 +4,13 @@ import { MatDialog } from '@angular/material/dialog';
 
 import { PersonService } from '../../services/person.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Person } from '../../../../core/models/domain.model';
+import { Person, PersonOverview } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PersonFormComponent } from '../person-form/person-form.component';
+import { PersonDetailsDialogComponent } from '../person-details/person-details-dialog.component';
 
 @Component({
   selector: 'app-person-list',
@@ -41,7 +42,7 @@ export class PersonListComponent implements OnInit {
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
-  page = signal<Page<Person> | null>(null);
+  page = signal<Page<PersonOverview> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
 
@@ -50,10 +51,15 @@ export class PersonListComponent implements OnInit {
     { key: 'lastName',  header: 'Last Name' },
     { key: 'email',     header: 'Email', sortable: true, type: 'email' },
     { key: 'phone',     header: 'Phone' },
-    { key: 'city',      header: 'City' },
+    { key: 'membershipType', header: 'Membership', type: 'status',
+      cell: (p: PersonOverview) => p.membershipType ? `${p.membershipType} (${p.membershipStatus})` : '—' },
+    { key: 'zeffyStatus', header: 'Zeffy', type: 'status', cell: (p: PersonOverview) => this.zeffyStatus(p) },
+    { key: 'zeffyContribution', header: 'Zeffy Total', type: 'number',
+      cell: (p: PersonOverview) => this.zeffyContribution(p) },
   ];
 
   readonly actions: TableAction[] = [
+    { icon: 'visibility', label: 'Details', action: (p: PersonOverview) => this.openDetails(p) },
     { icon: 'edit',   label: 'Edit',   action: (p: Person) => this.openForm(p) },
     { icon: 'delete', label: 'Delete', action: (p: Person) => this.confirmDelete(p) },
   ];
@@ -79,6 +85,24 @@ export class PersonListComponent implements OnInit {
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
+  openDetails(person: PersonOverview): void {
+    this.dialog.open(PersonDetailsDialogComponent, { width: '480px', data: person });
+  }
+
+  zeffyStatus(person: PersonOverview): string {
+    if (!person.zeffyContacts.length) return 'Not linked';
+    if (person.zeffyContacts.some(contact => contact.processingStatus === 'NEEDS_REVIEW')) return 'Needs review';
+    if (person.zeffyContacts.every(contact => contact.processingStatus === 'DELETED')) return 'Deleted in Zeffy';
+    return 'Linked';
+  }
+
+  zeffyContribution(person: PersonOverview): string {
+    if (!person.zeffyContacts.length) return '—';
+    const total = person.zeffyContacts.reduce((sum, contact) => sum + (contact.totalContribution ?? 0), 0);
+    const currency = person.zeffyContacts.find(contact => contact.currency)?.currency ?? 'USD';
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(total);
+  }
+
   confirmDelete(person: Person): void {
     this.dialog
       .open(ConfirmDialogComponent, {
@@ -94,7 +118,7 @@ export class PersonListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.personService.getPage(this.pageParams()).subscribe({
+    this.personService.getOverviewPage(this.pageParams()).subscribe({
       next: data => { this.page.set(data); this.loading.set(false); },
       error: ()   => this.loading.set(false),
     });

@@ -34,6 +34,17 @@ final class ZeffyApiModels {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    record ContactPage(
+            List<JsonNode> data,
+            @JsonProperty("has_more") boolean hasMore,
+            @JsonProperty("next_cursor") JsonNode nextCursor) {
+
+        String cursorText() {
+            return nextCursor != null && nextCursor.isTextual() ? nextCursor.textValue() : null;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     record Campaign(
             String id,
             Double created,

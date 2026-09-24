@@ -13,6 +13,7 @@ import {
   ZeffyCampaignSyncResult,
   ZeffyConfigurationRequest,
   ZeffyConnectionTestResult,
+  ZeffyContactSyncResult,
   ZeffyIntegrationStatus,
   ZeffyPaymentSyncItem,
   ZeffyPaymentSyncRequest,
@@ -45,6 +46,12 @@ export class ZeffyIntegrationService {
   syncCampaigns(): Observable<ZeffyCampaignSyncResult> {
     return this.http.post<ZeffyCampaignSyncResult>(
       `${this.env.apiUrl}/settings/zeffy/sync-campaigns`, {},
+    );
+  }
+
+  syncContacts(): Observable<ZeffyContactSyncResult> {
+    return this.http.post<ZeffyContactSyncResult>(
+      `${this.env.apiUrl}/settings/zeffy/sync-contacts`, {},
     );
   }
 

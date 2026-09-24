@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,6 +44,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     @EntityGraph(attributePaths = {"person", "membershipType"})
     Optional<Member> findByPersonId(UUID personId);
+
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    List<Member> findByPerson_IdIn(Collection<UUID> personIds);
 
     long countByStatusAndMembershipType_NameIgnoreCase(String status, String membershipTypeName);
 

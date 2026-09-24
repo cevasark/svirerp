@@ -38,6 +38,7 @@ public class ZeffyPaymentProcessor {
     private final ZeffyWebhookEventRepository eventRepository;
     private final ZeffyPaymentRepository paymentRepository;
     private final ZeffyCampaignRepository campaignRepository;
+    private final ZeffyContactRepository contactRepository;
     private final PersonService personService;
     private final MembershipService membershipService;
     private final FinanceService financeService;
@@ -143,10 +144,11 @@ public class ZeffyPaymentProcessor {
 
         Person person = resolvePerson(parsed, identity);
         LocalDate paymentDate = parsed.createdAt().atZoneSameInstant(CHURCH_ZONE).toLocalDate();
-        Member member = null;
+        Member member = parsed.contactId() == null ? null
+                : membershipService.findOrCreateFollowerMember(person.getId(), paymentDate);
         MemberPayment memberPayment = null;
         if (Boolean.TRUE.equals(campaign.getGrantsMembershipCredit())) {
-            member = membershipService.findOrCreateFollowerMember(person.getId(), paymentDate);
+            if (member == null) member = membershipService.findOrCreateFollowerMember(person.getId(), paymentDate);
             memberPayment = membershipService.upsertZeffyPayment(
                     member.getId(), parsed.amount(), paymentDate, parsed.createdAt(),
                     parsed.id(), campaign.getTitle()).payment();
@@ -209,6 +211,12 @@ public class ZeffyPaymentProcessor {
 
     private PersonAssessment assessPerson(ZeffyPaymentPayload.PaymentData payment) {
         String email = payload.normalizedEmail(payment.email());
+        if (payment.contactId() != null) {
+            Optional<ZeffyContact> linked = contactRepository.findByZeffyContactId(payment.contactId());
+            if (linked.isPresent() && linked.get().getPerson() != null) {
+                return new PersonAssessment(email, linked.get().getPerson(), null);
+            }
+        }
         if (email == null || !EMAIL.matcher(email).matches()) {
             return new PersonAssessment(null, null, "Buyer email is missing or invalid");
         }
@@ -231,7 +239,7 @@ public class ZeffyPaymentProcessor {
                 .zip(payload.trim(payment.postalCode())).build();
         return assessment.existing() == null
                 ? personService.create(incoming)
-                : personService.fillBlankFields(assessment.existing().getId(), incoming);
+                : personService.fillBlankContactFields(assessment.existing().getId(), incoming);
     }
 
     private void finish(ZeffyWebhookEvent event, ZeffyPayment payment, String status,

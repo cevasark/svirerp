@@ -27,6 +27,7 @@ public class ZeffyMembershipReconciliationService {
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final ZeffyPaymentRepository paymentRepository;
+    private final ZeffyContactRepository contactRepository;
     private final PersonService personService;
     private final MembershipService membershipService;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -131,6 +132,13 @@ public class ZeffyMembershipReconciliationService {
     private PersonResolution resolvePerson(ZeffyPayment payment) {
         if (payment.getPerson() != null) {
             return new PersonResolution(payment.getPerson(), false, null);
+        }
+
+        if (payment.getContactId() != null) {
+            ZeffyContact contact = contactRepository.findByZeffyContactId(payment.getContactId()).orElse(null);
+            if (contact != null && contact.getPerson() != null) {
+                return new PersonResolution(contact.getPerson(), false, null);
+            }
         }
 
         String email = normalizedEmail(payment.getBuyerEmail());

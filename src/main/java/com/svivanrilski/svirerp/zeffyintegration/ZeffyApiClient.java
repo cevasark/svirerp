@@ -33,6 +33,10 @@ public class ZeffyApiClient {
                                    boolean hasMore, String nextCursor) {
     }
 
+    public record ContactPageFetch(List<JsonNode> contacts,
+                                   boolean hasMore, String nextCursor) {
+    }
+
     @Autowired
     public ZeffyApiClient(AppSettingService settingService, ZeffyRequestPacer pacer,
                           RestClient.Builder builder) {
@@ -99,6 +103,21 @@ public class ZeffyApiClient {
     public JsonNode fetchPayment(String paymentId) {
         requireNonBlank(paymentId);
         return getPayment(requireConfiguredApiKey(), paymentId);
+    }
+
+    public ContactPageFetch fetchContactPage(String cursor) {
+        ZeffyApiModels.ContactPage page = getContactPage(requireConfiguredApiKey(), cursor, 100);
+        List<JsonNode> contacts = page.data() == null ? List.of() : List.copyOf(page.data());
+        String nextCursor = page.cursorText();
+        if (page.hasMore() && (nextCursor == null || nextCursor.isBlank())) {
+            throw new ZeffyApiException(502, "Zeffy returned an invalid contact pagination cursor");
+        }
+        return new ContactPageFetch(contacts, page.hasMore(), nextCursor);
+    }
+
+    public JsonNode fetchContact(String contactId) {
+        requireNonBlank(contactId);
+        return getContact(requireConfiguredApiKey(), contactId);
     }
 
     private ZeffyApiModels.CampaignPage getCampaignPage(String apiKey, String cursor, int limit) {
@@ -243,6 +262,91 @@ public class ZeffyApiClient {
             }
         }
         throw new ZeffyApiException(502, "Zeffy API request failed", null, lastFailure);
+    }
+
+    private ZeffyApiModels.ContactPage getContactPage(String apiKey, String cursor, int limit) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            pacer.awaitPermit();
+            try {
+                ZeffyApiModels.ContactPage page = restClient.get()
+                        .uri(uriBuilder -> {
+                            var builder = uriBuilder.path("/api/v1/contacts").queryParam("limit", limit);
+                            if (cursor != null) builder.queryParam("starting_after", cursor);
+                            return builder.build();
+                        })
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                        .retrieve()
+                        .body(ZeffyApiModels.ContactPage.class);
+                if (page == null) throw new ZeffyApiException(502, "Zeffy returned an empty contact response");
+                return page;
+            } catch (HttpStatusCodeException ex) {
+                int status = ex.getStatusCode().value();
+                if (status == 401) throw new ZeffyApiException(401, "Zeffy rejected the API key");
+                if (status == 429) {
+                    Duration delay = retryAfter(ex.getResponseHeaders());
+                    pacer.defer(delay);
+                    if (attempt == MAX_ATTEMPTS) {
+                        throw new ZeffyApiException(429,
+                                "Zeffy rate limit reached; retry after " + delay.toSeconds() + " seconds", delay);
+                    }
+                    lastFailure = ex;
+                    continue;
+                }
+                if (status < 500 || attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Zeffy contact list request failed", null, ex);
+                }
+                lastFailure = ex;
+            } catch (ResourceAccessException ex) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Could not reach the Zeffy API", null, ex);
+                }
+                lastFailure = ex;
+            }
+        }
+        throw new ZeffyApiException(502, "Zeffy contact list request failed", null, lastFailure);
+    }
+
+    private JsonNode getContact(String apiKey, String contactId) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            pacer.awaitPermit();
+            try {
+                JsonNode contact = restClient.get()
+                        .uri("/api/v1/contacts/{id}", contactId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                        .retrieve()
+                        .body(JsonNode.class);
+                if (contact == null || !contact.isObject()) {
+                    throw new ZeffyApiException(502, "Zeffy returned an empty contact response");
+                }
+                return contact;
+            } catch (HttpStatusCodeException ex) {
+                int status = ex.getStatusCode().value();
+                if (status == 401) throw new ZeffyApiException(401, "Zeffy rejected the API key");
+                if (status == 404) throw new ZeffyApiException(404, "Zeffy contact was not found");
+                if (status == 429) {
+                    Duration delay = retryAfter(ex.getResponseHeaders());
+                    pacer.defer(delay);
+                    if (attempt == MAX_ATTEMPTS) {
+                        throw new ZeffyApiException(429,
+                                "Zeffy rate limit reached; retry after " + delay.toSeconds() + " seconds", delay);
+                    }
+                    lastFailure = ex;
+                    continue;
+                }
+                if (status < 500 || attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(status, "Zeffy contact request was rejected", null, ex);
+                }
+                lastFailure = ex;
+            } catch (ResourceAccessException ex) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new ZeffyApiException(502, "Could not reach the Zeffy API", null, ex);
+                }
+                lastFailure = ex;
+            }
+        }
+        throw new ZeffyApiException(502, "Zeffy contact request failed", null, lastFailure);
     }
 
     private String requireConfiguredApiKey() {

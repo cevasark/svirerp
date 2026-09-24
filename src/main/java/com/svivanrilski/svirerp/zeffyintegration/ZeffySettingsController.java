@@ -44,6 +44,11 @@ public class ZeffySettingsController {
         return service.synchronizePayments(request, authentication != null ? authentication.getName() : null);
     }
 
+    @PostMapping("/sync-contacts")
+    public ZeffyIntegrationService.ContactSyncResponse synchronizeContacts(Authentication authentication) {
+        return service.synchronizeContacts(authentication != null ? authentication.getName() : null);
+    }
+
     @GetMapping("/sync-runs/{runId}/payment-results")
     public Page<ZeffyIntegrationService.PaymentSyncResultResponse> paymentSyncResults(
             @PathVariable UUID runId,

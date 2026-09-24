@@ -24,6 +24,7 @@ class ZeffyWebhookServiceTest {
     private ZeffyWebhookEventRepository repository;
     private ZeffyPaymentProcessingCoordinator coordinator;
     private ZeffyPaymentLifecycleCoordinator lifecycleCoordinator;
+    private ZeffyContactCoordinator contactCoordinator;
     private ZeffyWebhookService service;
 
     @BeforeEach
@@ -34,9 +35,10 @@ class ZeffyWebhookServiceTest {
         repository = mock(ZeffyWebhookEventRepository.class);
         coordinator = mock(ZeffyPaymentProcessingCoordinator.class);
         lifecycleCoordinator = mock(ZeffyPaymentLifecycleCoordinator.class);
+        contactCoordinator = mock(ZeffyContactCoordinator.class);
         service = new ZeffyWebhookService(settings, verifier, store,
                 repository, new ObjectMapper(),
-                coordinator, lifecycleCoordinator,
+                coordinator, lifecycleCoordinator, contactCoordinator,
                 mock(ZeffyPaymentChangeRepository.class), mock(ZeffyRefundRepository.class),
                 mock(ZeffyDisputeRepository.class));
         when(settings.getDecryptedValue("zeffy.integration-mode"))
@@ -159,6 +161,26 @@ class ZeffyWebhookServiceTest {
         verify(lifecycleCoordinator).process(id);
         verifyNoInteractions(coordinator);
         assertThat(response.status()).isEqualTo("NEEDS_REVIEW");
+    }
+
+    @Test
+    void liveModeRoutesContactEventsThroughContactProcessing() {
+        UUID id = UUID.randomUUID();
+        when(settings.getDecryptedValue("zeffy.integration-mode")).thenReturn(Optional.of("LIVE"));
+        when(store.insert(any())).thenAnswer(invocation -> {
+            ZeffyWebhookEvent event = invocation.getArgument(0);
+            event.setId(id);
+            return event;
+        });
+        when(repository.findById(id)).thenReturn(Optional.of(
+                ZeffyWebhookEvent.builder().id(id).status("PROCESSED").build()));
+
+        ZeffyWebhookService.ReceiptResponse response =
+                service.receive(payload("contact.created"), "valid");
+
+        verify(contactCoordinator).process(id);
+        verifyNoInteractions(coordinator, lifecycleCoordinator);
+        assertThat(response.status()).isEqualTo("PROCESSED");
     }
 
     @Test

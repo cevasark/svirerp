@@ -102,6 +102,27 @@ import { ZeffyIntegrationService } from '../../../finance/services/zeffy-integra
 
       <mat-card class="setting-card">
         <mat-card-content>
+          <h3>Contact synchronization</h3>
+          <div class="status-grid">
+            <span>Latest run</span><strong>{{ contactRunLabel() }}</strong>
+            <span>Contacts stored</span><strong>{{ status()?.contactCount ?? 0 }}</strong>
+            <span>Need review</span><strong>{{ status()?.contactsNeedingReview ?? 0 }}</strong>
+            <span>Latest result</span><strong>{{ contactCounts() }}</strong>
+          </div>
+          <p class="hint">
+            Synchronizes every Zeffy contact at one API request per second. New contacts receive an
+            active Follower baseline; existing membership levels and staff-maintained person fields are preserved.
+          </p>
+          <button mat-flat-button color="primary"
+            [disabled]="contactSyncing() || !status()?.apiKeyConfigured" (click)="confirmSyncContacts()">
+            @if (contactSyncing()) { <mat-progress-spinner diameter="20" mode="indeterminate" /> }
+            @else { Sync Contacts }
+          </button>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="setting-card">
+        <mat-card-content>
           <h3>Campaign synchronization</h3>
           <div class="status-grid">
             <span>Latest run</span><strong>{{ latestRunLabel() }}</strong>
@@ -237,6 +258,7 @@ export class ZeffySettingsComponent implements OnInit {
   readonly testing = signal(false);
   readonly syncing = signal(false);
   readonly paymentSyncing = signal(false);
+  readonly contactSyncing = signal(false);
   readonly loadingRuns = signal(false);
   readonly loadingPaymentResults = signal(false);
 
@@ -314,6 +336,47 @@ export class ZeffySettingsComponent implements OnInit {
       },
       error: () => {
         this.syncing.set(false);
+        this.loadStatus();
+        this.loadRuns();
+      },
+    });
+  }
+
+  confirmSyncContacts(): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Synchronize Zeffy Contacts',
+        message: 'Retrieve all Zeffy contacts and link or create People with an active Follower baseline? Existing membership levels and nonblank person fields will be preserved.',
+        confirmLabel: 'Sync Contacts',
+      },
+    }).afterClosed().subscribe(confirmed => {
+      if (confirmed) this.syncContacts();
+    });
+  }
+
+  contactRunLabel(): string {
+    const run = this.status()?.latestContactSync;
+    return run ? `${run.status} - ${this.displayDate(run.startedAt)}` : 'Never';
+  }
+
+  contactCounts(): string {
+    const run = this.status()?.latestContactSync;
+    if (!run) return 'No synchronization yet';
+    return `${run.fetchedCount} fetched, ${run.insertedCount} inserted, ${run.updatedCount} updated, `
+      + `${run.ignoredCount} unchanged, ${run.needsReviewCount} need review, ${run.failedCount} failed`;
+  }
+
+  private syncContacts(): void {
+    this.contactSyncing.set(true);
+    this.service.syncContacts().subscribe({
+      next: result => {
+        this.contactSyncing.set(false);
+        this.notifications.success(`Contact sync ${result.run.status.toLowerCase()}.`);
+        this.loadStatus();
+        this.loadRuns();
+      },
+      error: () => {
+        this.contactSyncing.set(false);
         this.loadStatus();
         this.loadRuns();
       },
@@ -408,6 +471,10 @@ export class ZeffySettingsComponent implements OnInit {
 
   runCounts(run: ZeffySyncRun): string {
     if (run.syncType === 'PAYMENTS') return this.paymentCounts(run);
+    if (run.syncType === 'CONTACTS') {
+      return `${run.fetchedCount} fetched, ${run.insertedCount} inserted, ${run.updatedCount} updated, `
+        + `${run.needsReviewCount} need review, ${run.failedCount} failed`;
+    }
     return `${run.fetchedCount} fetched, ${run.insertedCount} inserted, ${run.updatedCount} updated, `
       + `${run.ignoredCount} unchanged/ignored, ${run.failedCount} failed`;
   }

@@ -89,6 +89,20 @@ public class PersonService {
         return repo.save(existing);
     }
 
+    /** Contact synchronization may also populate a missing email address. Existing values remain
+     * staff-controlled and are never overwritten by Zeffy. */
+    @Transactional
+    public Person fillBlankContactFields(UUID id, Person source) {
+        Person existing = findById(id);
+        if (isBlank(existing.getEmail())) existing.setEmail(source.getEmail());
+        if (isBlank(existing.getPhone())) existing.setPhone(source.getPhone());
+        if (isBlank(existing.getAddressLine1())) existing.setAddressLine1(source.getAddressLine1());
+        if (isBlank(existing.getCity())) existing.setCity(source.getCity());
+        if (isBlank(existing.getState())) existing.setState(source.getState());
+        if (isBlank(existing.getZip())) existing.setZip(source.getZip());
+        return repo.save(existing);
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

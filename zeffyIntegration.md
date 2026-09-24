@@ -1,7 +1,7 @@
 # Zeffy API and Webhook Integration Specification
 
-**Status:** Living specification; Phases 1–4, Phases 5A–5B, and Zeffy membership rebuilding implemented
-**Date:** September 23, 2026
+**Status:** Living specification; Phases 1–4 and Phases 5A–5C implemented
+**Date:** September 24, 2026
 **Target application:** SVIR ERP, branch `zeffyAPI`
 **API contract reviewed:** Zeffy OpenAPI 1.0 supplied as `C:\Users\ZM\Downloads\api-1.json`, plus Zeffy's public API documentation
 
@@ -307,9 +307,9 @@ This is the business idempotency boundary. A new event may update the record, bu
 
 `zeffy_refund` and `zeffy_dispute` store stable external IDs, amount/currency/status, Zeffy creation time, the latest webhook that observed the record, and correction state. The nullable correction JournalEntry link is populated only by Phase 5B. Reprocessing the same event or observing the same refund/dispute again updates the existing record rather than creating a duplicate.
 
-### 7.7 Contact link (Phase 5C)
+### 7.7 Contact synchronization record (Phase 5C)
 
-Maps unique `zeffy_contact_id` to Person. Email remains a matching aid but is not the durable external identity because an email can change.
+`zeffy_contact` stores one row per unique Zeffy contact ID and links it to the resolved Person. It retains the latest normalized contact details, contribution aggregate, donation count and dates, payload hash, processing outcome, first-seen source, synchronization timestamps, latest webhook, and deletion tombstone. Email remains a matching aid but is not the durable external identity because an email can change.
 
 ## 8. Cross-cutting business rules
 
@@ -622,7 +622,7 @@ Phase 5 is delivered in three bounded parts:
 
 - **Phase 5A — payment lifecycle audit (implemented):** process payment-created, updated, and deleted events; fetch the authoritative current Payment for ID-only updates; retain normalized changes, refunds, disputes, and deletion tombstones; and place material cases in operator review. This phase makes no accounting or membership corrections.
 - **Phase 5B — payment corrections (implemented):** post idempotent refund, lost-dispute, and payment-amount corrections using the approved rules below.
-- **Phase 5C — contact synchronization (planned):** maintain stable Zeffy contact links and synchronize Persons/Followers using the approved contact rules below.
+- **Phase 5C — contact synchronization (implemented):** maintain stable Zeffy contact records, synchronize Persons/Followers through API and webhook ingestion, and expose Zeffy details on the existing People page.
 
 ### 13.1 Payment updates
 
@@ -687,14 +687,18 @@ already-corrected, needs-review, and failed counts.
 
 - `contact.created` contains the full Contact and can be processed directly.
 - `contact.updated` carries an ID and requires `GET /api/v1/contacts/{id}`.
-- `contact.deleted` tombstones the link and never deletes Person.
-- Stable contact ID is stored in `zeffy_contact_link`.
-- Initial match uses existing link, then unique normalized email.
-- New Zeffy contacts may create Person plus active free Follower, preserving the confirmed free-Follower rule.
-- A newly created contact/Follower defaults `emailOptIn` to true under the organization's confirmed contact policy.
-- Existing Persons should initially be enriched only in blank fields.
+- `contact.deleted` tombstones the `zeffy_contact` row and never deletes its Person or membership.
+- Stable contact ID is stored in `zeffy_contact` and is used before mutable email during later contact, payment, and membership-rebuild processing.
+- Initial resolution uses the existing contact link, then a Person already linked to one of the contact's payments, then a unique normalized email.
+- If no match exists and usable name data is present, the synchronization creates a Person. Missing or ambiguous identity data produces `NEEDS_REVIEW` without guessing or merging Persons.
+- Every resolved Zeffy contact receives an active Follower baseline with `emailOptIn=true`, including contacts with no payments, only zero-dollar payments, or positive non-membership donations.
+- An existing Member or Benefactor tier is preserved. Qualifying membership payments remain responsible for upgrades and membership dates; the aggregate contribution total on the contact is informational and does not grant a tier.
+- Existing Persons are enriched only in blank name, email, phone, and address fields.
 - Email changes that conflict with another Person require review.
 - The supplied Contact schema does not expose an explicit unsubscribe/communication-preference field. The integration must not infer opt-out status from absent fields.
+- **Sync Contacts** in Settings calls `POST /api/settings/zeffy/sync-contacts`, reads up to 100 contacts per page, and uses the integration-wide one-request-per-second API pacer. Every run and its cursor/counts are retained in `zeffy_sync_run`; rerunning is idempotent by Zeffy contact ID.
+- Contact webhooks and full synchronization use the same application logic. An API `404` for an update is treated as a deletion tombstone.
+- The existing **People** page remains the contact operator view. It displays local membership plus linked Zeffy status, aggregate contribution, donation count and contribution dates, with full linked-contact details in the existing person dialog. No separate Finance → Zeffy Contacts page is created.
 - Bidirectional ERP-to-Zeffy contact writes require a separate approved specification.
 
 ### 13.5 Membership rebuild from synchronized payments
@@ -870,8 +874,9 @@ DTO parsing should ignore unknown additive fields while validating required fiel
 8. Enable Phase 3 LIVE mode for completed payments.
 9. Monitor and reconcile against Zeffy daily during an initial observation period.
 10. Run Phase 4 historical preview, approve its range, then execute.
-11. Deploy Phase 5A lifecycle audit and Phase 5B corrections, then implement Phase 5C contacts as a separately reviewed change.
-12. Continue API/webhook reconciliation until two or more accounting periods confirm completeness.
+11. Deploy Phase 5A lifecycle audit and Phase 5B corrections.
+12. Deploy Phase 5C, run **Sync Contacts**, review unresolved contacts on the People page, and enable the contact webhook events in LIVE mode.
+13. Continue API/webhook reconciliation until two or more accounting periods confirm completeness.
 
 Rollback from LIVE means changing to RECORD_ONLY. It must stop new domain application without discarding received events. Re-enabling LIVE may process the backlog through explicit operator action after mappings and configuration are verified.
 

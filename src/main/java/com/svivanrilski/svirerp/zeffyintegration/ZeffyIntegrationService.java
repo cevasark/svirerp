@@ -27,6 +27,7 @@ public class ZeffyIntegrationService {
     private static final String MODE = "zeffy.integration-mode";
     private static final String CAMPAIGNS = "CAMPAIGNS";
     private static final String PAYMENTS = "PAYMENTS";
+    private static final String CONTACTS = "CONTACTS";
     private static final String WEBHOOK_PATH = "/api/webhooks/zeffy";
 
     private final AppSettingService settingService;
@@ -35,6 +36,8 @@ public class ZeffyIntegrationService {
     private final ZeffyCampaignRepository campaignRepository;
     private final ZeffySyncRunService syncRunService;
     private final ZeffyPaymentSyncService paymentSyncService;
+    private final ZeffyContactSyncService contactSyncService;
+    private final ZeffyContactRepository contactRepository;
     private final ZeffySyncPaymentResultService paymentResultService;
     private final FinanceService financeService;
     private final AtomicBoolean campaignSyncRunning = new AtomicBoolean(false);
@@ -53,9 +56,12 @@ public class ZeffyIntegrationService {
             String webhookPath,
             long campaignCount,
             long confirmedMappingCount,
+            long contactCount,
+            long contactsNeedingReview,
             SyncRunResponse latestCampaignSync,
             SyncRunResponse latestPaymentPreview,
-            SyncRunResponse latestPaymentSync) {
+            SyncRunResponse latestPaymentSync,
+            SyncRunResponse latestContactSync) {
     }
 
     public record CampaignSyncResponse(SyncRunResponse run) {
@@ -66,6 +72,9 @@ public class ZeffyIntegrationService {
     }
 
     public record PaymentSyncResponse(SyncRunResponse run) {
+    }
+
+    public record ContactSyncResponse(SyncRunResponse run) {
     }
 
     public record PaymentSyncResultResponse(
@@ -152,9 +161,12 @@ public class ZeffyIntegrationService {
                 WEBHOOK_PATH,
                 campaignRepository.count(),
                 campaignRepository.countByMappingConfirmedTrue(),
+                contactRepository.count(),
+                contactRepository.countByProcessingStatus("NEEDS_REVIEW"),
                 toResponse(syncRunService.latest(CAMPAIGNS)),
                 toResponse(syncRunService.latest(PAYMENTS, "PREVIEW")),
-                toResponse(syncRunService.latest(PAYMENTS)));
+                toResponse(syncRunService.latest(PAYMENTS)),
+                toResponse(syncRunService.latest(CONTACTS)));
     }
 
     public StatusResponse saveConfiguration(ConfigurationRequest request) {
@@ -242,6 +254,10 @@ public class ZeffyIntegrationService {
             default -> throw new IllegalArgumentException("Payment synchronization mode must be PREVIEW or APPLY");
         };
         return new PaymentSyncResponse(toResponse(run));
+    }
+
+    public ContactSyncResponse synchronizeContacts(String initiatedBy) {
+        return new ContactSyncResponse(toResponse(contactSyncService.synchronize(initiatedBy)));
     }
 
     @Transactional(readOnly = true)
