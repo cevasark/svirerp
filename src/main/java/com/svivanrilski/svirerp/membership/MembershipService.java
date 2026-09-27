@@ -2,7 +2,9 @@ package com.svivanrilski.svirerp.membership;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
@@ -80,6 +82,15 @@ public class MembershipService {
     public Page<Member> findAllMembers(String status, UUID membershipTypeId, Pageable pageable) {
         if (status != null && !status.isBlank()) {
             validateMemberStatus(status);
+        }
+        // totalPaid is a database formula: Hibernate orders by it before LIMIT/OFFSET.
+        // Equal amounts need a deterministic tie-breaker for future amount-sorted pages.
+        if (pageable.getSort().getOrderFor("totalPaid") != null
+                && pageable.getSort().getOrderFor("id") == null) {
+            Sort sort = pageable.getSort().and(Sort.by("id"));
+            pageable = pageable.isPaged()
+                    ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort)
+                    : Pageable.unpaged(sort);
         }
         boolean hasStatus = status != null && !status.isBlank();
         if (hasStatus && membershipTypeId != null) {

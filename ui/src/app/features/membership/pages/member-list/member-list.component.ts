@@ -138,6 +138,7 @@ export class MemberListComponent implements OnInit {
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
   private router = inject(Router);
+  private readonly paymentFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
   page = signal<Page<Member> | null>(null);
   loading = signal(false);
@@ -158,6 +159,7 @@ export class MemberListComponent implements OnInit {
     { key: 'status', header: 'Status', type: 'status' },
     { key: 'joinDate', header: 'Join Date', sortable: true, type: 'date' },
     { key: 'expiryDate', header: 'Expiry Date', sortable: true, type: 'date' },
+    { key: 'totalPaid', header: 'Total Paid', type: 'number', cell: (m: Member) => this.paymentFormatter.format(m.totalPaid ?? 0) },
   ];
 
   readonly actions: TableAction[] = [

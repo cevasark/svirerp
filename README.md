@@ -271,6 +271,14 @@ Finance → Zeffy → Webhook Events shows the paginated receipt audit with filt
 
 The older Zeffy Contacts and Transactions spreadsheet imports were removed in V53. The generic Member CSV import remains available.
 
+### Membership payment totals
+
+The Members table shows **Total Paid** after Expiry Date: the person's lifetime successful payments, less recorded refunds and lost disputes, before processing fees. It includes all campaigns and payment purposes, regardless of membership tier, status, or expiry. The application reports amounts in USD.
+
+Migration V63 provides read-only database views combining successful Zeffy payments, posted income/refund journal lines (including Stripe and manual income), successful Stripe events awaiting accounting, and standalone completed membership payments. Integration links and external transaction references prevent their membership/accounting copies from being counted again. Zeffy historical refund snapshots and lifecycle rows are reconciled by external ID. Historical payments can resolve through a linked contact, membership contribution, or an unambiguous normalized email. Unattributable payments are excluded; separately entered manual records with no shared source identity are treated as separate payments.
+
+Totals reflect locally recorded data. Stripe refund webhooks are not currently imported, so Stripe refunds affect this total when recorded in the local ledger. The read-only `Member.totalPaid` field uses the database aggregate, allowing `/api/members?sort=totalPaid,desc` to sort before pagination with member ID as a stable tie-breaker. The table's amount-sort control is reserved for a later UI enhancement.
+
 ---
 
 ## Building
@@ -290,6 +298,13 @@ On first run the wrapper downloads Maven 3.9.6 automatically into your local Mav
 ```
 
 The fat JAR produced by `spring-boot-maven-plugin` embeds Tomcat and all dependencies. It is fully self-contained — no application server required.
+
+The payment-total repository tests require a disposable MariaDB 11.8 database, matching production and the existing migrations' column CHECK behavior. They exercise the actual Flyway views, JSON refund parsing, and Hibernate pagination. Set `TOTAL_PAID_TEST_URL` to its MySQL-driver JDBC URL (root user, empty password) before running the tests; without it, only those database tests are skipped. For example, in PowerShell after starting an isolated MariaDB container:
+
+```powershell
+$env:TOTAL_PAID_TEST_URL = 'jdbc:mysql://127.0.0.1:3307/svirerp_total_paid_test'
+.\mvnw.cmd test
+```
 
 ### Release build (UI + API in one jar)
 

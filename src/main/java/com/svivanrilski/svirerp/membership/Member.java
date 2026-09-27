@@ -1,10 +1,13 @@
 package com.svivanrilski.svirerp.membership;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import org.hibernate.annotations.Formula;
 import com.svivanrilski.svirerp.person.Person;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -47,6 +50,13 @@ public class Member {
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
+
+    /** Lifetime net payments for the person, independent of membership tier or campaign.
+     *  A database expression keeps display and future server-side sorting on the same total. */
+    @Formula("coalesce((select paid.total_paid from person_payment_total paid where paid.person_id = person_id), 0)")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Setter(AccessLevel.NONE)
+    private BigDecimal totalPaid;
 
     /**
      * Allowed values (enforced by DB CHECK): active, inactive, suspended, expired, pending.

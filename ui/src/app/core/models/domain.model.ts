@@ -94,6 +94,8 @@ export interface Member {
   memberNumber?: string;
   joinDate: string;
   expiryDate?: string;
+  /** Lifetime successful payments across all sources, less refunds; computed by the backend. */
+  readonly totalPaid?: number;
   status: 'active' | 'inactive' | 'suspended' | 'expired' | 'pending';
   emailOptIn: boolean;
   createdAt?: string;
