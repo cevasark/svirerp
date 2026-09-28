@@ -279,6 +279,14 @@ Migration V63 provides read-only database views combining successful Zeffy payme
 
 Totals reflect locally recorded data. Stripe refund webhooks are not currently imported, so Stripe refunds affect this total when recorded in the local ledger. The read-only `Member.totalPaid` field uses the database aggregate, allowing `/api/members?sort=totalPaid,desc` to sort before pagination with member ID as a stable tie-breaker. The table's amount-sort control is reserved for a later UI enhancement.
 
+If V63 failed with MariaDB error 1267 (mixed `utf8mb4_general_ci` and `utf8mb4_uca1400_ai_ci` collations), rebuild and deploy the corrected migration, remove only its failed history entry from the affected database, and restart:
+
+```sql
+DELETE FROM flyway_schema_history WHERE version = '63' AND success = 0;
+```
+
+V63 explicitly aligns text comparisons and replaces its views on retry, so existing table collations and payment records remain unchanged. This recovery is for a **failed** V63; do not delete a successful migration entry. If V63 already succeeded in another environment, changing its checksum alone does not install the corrected views there.
+
 ---
 
 ## Building
@@ -299,7 +307,7 @@ On first run the wrapper downloads Maven 3.9.6 automatically into your local Mav
 
 The fat JAR produced by `spring-boot-maven-plugin` embeds Tomcat and all dependencies. It is fully self-contained — no application server required.
 
-The payment-total repository tests require a disposable MariaDB 11.8 database, matching production and the existing migrations' column CHECK behavior. They exercise the actual Flyway views, JSON refund parsing, and Hibernate pagination. Set `TOTAL_PAID_TEST_URL` to its MySQL-driver JDBC URL (root user, empty password) before running the tests; without it, only those database tests are skipped. For example, in PowerShell after starting an isolated MariaDB container:
+The payment-total database tests require a disposable MariaDB 11.8 database, matching production and the existing migrations' column CHECK behavior. They exercise the actual Flyway views, JSON refund parsing, Hibernate pagination, and migration/retry with legacy and current collations. The collation test creates and removes its own temporary schema. Set `TOTAL_PAID_TEST_URL` to its MySQL-driver JDBC URL (root user, empty password) before running the tests; without it, only those database tests are skipped. For example, in PowerShell after starting an isolated MariaDB container:
 
 ```powershell
 $env:TOTAL_PAID_TEST_URL = 'jdbc:mysql://127.0.0.1:3307/svirerp_total_paid_test'
