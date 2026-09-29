@@ -84,7 +84,7 @@ public class MembershipService {
             validateMemberStatus(status);
         }
         // totalPaid is a database formula: Hibernate orders by it before LIMIT/OFFSET.
-        // Equal amounts need a deterministic tie-breaker for future amount-sorted pages.
+        // Equal amounts need a deterministic tie-breaker for amount-sorted pages.
         if (pageable.getSort().getOrderFor("totalPaid") != null
                 && pageable.getSort().getOrderFor("id") == null) {
             Sort sort = pageable.getSort().and(Sort.by("id"));

@@ -159,7 +159,7 @@ export class MemberListComponent implements OnInit {
     { key: 'status', header: 'Status', type: 'status' },
     { key: 'joinDate', header: 'Join Date', sortable: true, type: 'date' },
     { key: 'expiryDate', header: 'Expiry Date', sortable: true, type: 'date' },
-    { key: 'totalPaid', header: 'Total Paid', type: 'number', cell: (m: Member) => this.paymentFormatter.format(m.totalPaid ?? 0) },
+    { key: 'totalPaid', header: 'Total Paid', sortable: true, type: 'number', cell: (m: Member) => this.paymentFormatter.format(m.totalPaid ?? 0) },
   ];
 
   readonly actions: TableAction[] = [

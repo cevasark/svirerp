@@ -52,7 +52,7 @@ public class Member {
     private LocalDate expiryDate;
 
     /** Lifetime net payments for the person, independent of membership tier or campaign.
-     *  A database expression keeps display and future server-side sorting on the same total. */
+     *  A database expression keeps display and server-side sorting on the same total. */
     @Formula("coalesce((select paid.total_paid from person_payment_total paid where paid.person_id = person_id), 0)")
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Setter(AccessLevel.NONE)
