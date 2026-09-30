@@ -15,7 +15,7 @@ SVIR (Saint Ivan Rilski) is a parish community and non-profit organization whose
    - Review incoming Zeffy and Stripe transactions, map campaigns, and resolve unmapped items.
 2. **Treasurer & Finance Officers:**
    - Manage chart of accounts, restricted funds, bank accounts, and journal entries.
-   - Reconcile online clearing accounts (Zeffy Account 1020, Stripe Account 1030) into the primary Checking account upon bank deposit.
+   - Reconcile online clearing accounts (Zeffy Account 1020, Stripe Account 1021) into the primary Checking account upon bank deposit.
    - Run Statement of Financial Position (Balance Sheet), Statement of Activities (Income Statement), and Fund Summaries.
    - Audit corrections, refunds, disputes, and vendor payables.
 3. **Board of Trustees & Committee Chairs:**
@@ -32,7 +32,7 @@ SVIR (Saint Ivan Rilski) is a parish community and non-profit organization whose
    - **Member ($150 - $999 single qualifying payment):** Grants 1 full year of active voting membership.
    - **Benefactor ($1,000+ single qualifying payment):** Grants 1 full year of premier active benefactor membership.
    - **Renewal Chaining:** A qualifying payment received before current expiry extends the expiration date by 1 year. A payment received after lapse establishes a new 1-year window from the payment date.
-   - **Historical Rebuild:** Recomputing membership tiers replays all recorded payments chronologically using their original source transaction timestamps (`source_timestamp`).
+   - **Historical Rebuild:** Recomputing membership tiers replays all recorded payments chronologically using their original source transaction timestamps (`source_created_at`).
 2. **Segregation of Manual vs. Automated Operations:**
    - Manual contributions and manual journal entries entered by staff are strictly preserved. Automated sync will never overwrite, reverse, or delete manual accounting entries.
    - Staff deliberately maintain manual ledger entries separately from automated processor sync.
@@ -46,3 +46,10 @@ SVIR (Saint Ivan Rilski) is a parish community and non-profit organization whose
    - Every financial transaction belongs to a `Fund` (e.g., General Fund, Building Fund, Memorial Fund).
    - Revenue and expense accounts are segregated by fund, allowing exact balance calculation per restricted project.
    - Transfer transactions allow moving money from processor clearing accounts (e.g. Undeposited Funds 1020) to operating Checking without impacting revenue accounts.
+5. **Lifetime Total Paid:**
+   - The Members table displays **Total Paid** after Expiry Date for members and followers: the person's lifetime successful payments across all campaigns and payment purposes, less recorded refunds and lost disputes, before processing fees. This includes manual cash, check, and Zelle payments, Stripe, and Zeffy; the supported reporting currency is USD.
+   - Totals follow the Person across membership records and are independent of membership type, status, and expiry. A person with no qualifying payments displays `$0.00`. This reporting amount does not determine membership tier eligibility.
+   - Successful attributable Zeffy payments can count before a campaign is mapped or applied. Reporting does not override campaign APPLY/IGNORE policy or create accounting/membership records.
+   - Integration links and external transaction references identify duplicate representations of the same payment. Payments with unresolved identity are excluded; independently entered manual finance and membership records without a shared source identity remain separate payments.
+   - Stripe refund webhooks are not currently imported; those refunds affect the total when recorded in the local ledger. Zeffy deletion tombstones alone do not represent a refund.
+   - Staff can sort Total Paid ascending or descending from the desktop header or mobile Sort by control. Sorting applies to the full filtered result in the backend before pagination, resets to the first page, and preserves the selected filters.

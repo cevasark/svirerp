@@ -15,12 +15,13 @@ Prior to this system, the church/non-profit operated with fragmented, manual pro
 1. **Single Unified Source of Truth:** Unify Person profiles, active membership tiers, double-entry financial accounting, and church governance in one installation.
 2. **Direct Zeffy API & Webhook Integration:** Replace legacy CSV/Excel imports with automated, durable, signed webhook processing and historical API synchronization.
 3. **Automated Membership Tier Calculation:** Provide deterministic tier tracking (`Follower`, `Member`, `Benefactor`) driven by actual qualifying payments and renewal chaining.
-4. **GAAP/Non-Profit Fund Accounting:** Strict double-entry ledger with restricted funds ("Projects" in financial context), clearing accounts for online processors (Zeffy 1020, Stripe 1030), and balanced journal entries.
+4. **GAAP/Non-Profit Fund Accounting:** Strict double-entry ledger with restricted funds ("Projects" in financial context), clearing accounts for online processors (Zeffy 1020, Stripe 1021), and balanced journal entries.
 5. **Governance & Board Operations:** Manage Trustees (2-year re-election cycles), Committees, Meeting Minutes, Action Items, and Parish Projects with structured task checklists.
 6. **Event & Volunteer Operations:** Manage liturgical and parish calendar events (with Google Calendar one-way sync), attendee registrations, volunteer areas, and logged volunteer service hours.
 7. **Secure, Single-Origin Architecture:** Deploy as a single self-contained JAR (Spring Boot serving the Angular SPA from `/` and REST endpoints from `/api/**`) using session-cookie authentication and domain-restricted Google Workspace OIDC login.
+8. **Lifetime Payment Visibility:** Show each member/follower's Total Paid across manual, Stripe, and Zeffy payments, net of recorded refunds and lost disputes, with backend sorting before pagination.
 
 ## Target Deployment Model
 - **Single-Tenant Architecture:** Exactly one Organization record per database instance (enforced at the DB constraint level by Flyway migration V52).
-- **Runtime Environment:** Linux/WSL2 host running MariaDB 11.8 / MySQL 8.0, with Caddy reverse proxy handling HTTPS and port routing.
+- **Runtime Environment:** Linux/WSL2 host running MariaDB 11.8, with Caddy reverse proxy handling HTTPS and port routing. MariaDB is the validated migration target; see [techContext.md](techContext.md) for MySQL compatibility limits.
 - **Development Environment:** Windows host with JDK 25/26, Node 24+, Angular 21, and Maven 3.9+.

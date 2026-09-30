@@ -17,10 +17,10 @@ Spring Boot 3.5.16 Application
  ├── REST Controllers (@RestController, thin DTO / Entity contracts)
  ├── Application Services (@Service, @Transactional boundaries)
  ├── Spring Data JPA Repositories (@EntityGraph / Fetch Joins)
- └── Database Migration Engine (Flyway 10)
+ └── Database Migration Engine (Flyway 11.7.2 runtime)
        │
        ▼
- MariaDB 11.8 / MySQL 8.0 Database (Flyway DDL-managed schema)
+ MariaDB 11.8 Database (validated migration target; MySQL JDBC driver)
 ```
 
 ## Backend Architectural Patterns
@@ -42,7 +42,7 @@ Located under `com.svivanrilski.svirerp`:
 - `zeffyintegration`: Comprehensive 5-phase Zeffy API client, webhook inbox, payment processor, sync coordinator, lifecycle/correction coordinator, and contact synchronizer.
 
 ### 2. Database & Persistence Rules
-- **Flyway Sole DDL Ownership:** `spring.jpa.hibernate.ddl-auto=validate`. Hibernate never mutates the schema. Every change is an immutable migration (`V1` to `V62`).
+- **Flyway Sole DDL Ownership:** `spring.jpa.hibernate.ddl-auto=validate`. Hibernate never mutates the schema. Schema changes use versioned migrations (`V1` through `V63`); do not rewrite successfully applied migration history. V63 was corrected for a failed mixed-collation migration, with recovery details in [README](../README.md#membership-payment-totals).
 - **Open-in-View Disabled:** `spring.jpa.open-in-view=false`. Hibernate sessions terminate when service transactions end. To avoid `LazyInitializationException` during JSON serialization:
   - Repositories declare `@EntityGraph(attributePaths = {...})` for standard queries.
   - Complex nested relationships use explicit JPQL `JOIN FETCH` queries.
@@ -65,6 +65,15 @@ Located under `com.svivanrilski.svirerp`:
 - **Atomic Processing:** When an inbound payment is applied, Person lookup/creation, Member record creation/extension, `MemberPayment` contribution record, and balanced double-entry `JournalEntry` are committed within a single database transaction.
 - **Reversal & Correction Chain:** Refunds, disputes, or amount changes produce linked correction journal entries (`corrects_journal_entry_id`) rather than altering historical journal records.
 
+### 5. Derived Lifetime Payment Totals
+
+- **One Person-Level Aggregate:** `Member.totalPaid` is a read-only `BigDecimal` API field backed by Hibernate `@Formula`, reading `person_payment_total` by `person_id` with a zero fallback. No separate balance is maintained. Every membership for the same person shows the same lifetime total, independent of tier, status, or campaign.
+- **V63 View Pipeline:** `zeffy_payment_loss` reconciles successful refund and lost-dispute snapshots with lifecycle rows by external ID, preferring the latest snapshot when an ID is present. `person_payment_amount` combines net successful Zeffy payments, posted revenue journal lines, successful Stripe events without a journal, and standalone completed membership payments. `person_payment_total` groups attributable amounts by person into `DECIMAL(19,2)`.
+- **Source Identity Prevents Double Counting:** Integration links and external transaction references exclude copied membership payments and Zeffy accounting/correction entries. Person resolution uses existing person/member/contribution/contact/journal links, then unique external references and unambiguous normalized email. Unattributable payments are excluded. Independent manual records without shared source identity remain distinct.
+- **Financial Meaning:** Totals cover all payment purposes in the application's supported USD currency, less recorded refunds/lost disputes and before processing fees. Zeffy campaign APPLY/IGNORE policy does not restrict this report or cause new accounting writes; external deletion is not a refund. Stripe refunds affect totals when recorded in the local ledger because Stripe refund webhooks are not currently ingested.
+- **Explicit Collations:** Natural-key, currency, and email comparisons and matching grouping expressions use `utf8mb4_general_ci`, avoiding MariaDB 1267 when legacy columns and `JSON_TABLE` session defaults differ. All three views use `CREATE OR REPLACE VIEW` so a partially applied V63 can be replayed without altering table collations or stored payment data.
+- **Sort Before Pagination:** `MembershipService.findAllMembers` passes the `totalPaid` sort to JPA so SQL orders numerically before `LIMIT/OFFSET`. It appends ascending member `id` only when no explicit ID tie-breaker was requested, preserving filters and other requested ordering.
+
 ## Frontend Architectural Patterns
 
 ### 1. Angular 21 Standalone Components
@@ -81,3 +90,9 @@ Located under `com.svivanrilski.svirerp`:
 ### 3. Deep Link Preservation
 - Unauthenticated access to deep links (e.g. `/governance/projects/:id`) is captured in `sessionStorage` by `authGuard`.
 - Upon successful Google OAuth redirect or break-glass login, the user is navigated directly back to their target URL.
+
+### 4. Membership Total Paid Display and Sorting
+
+- The Members table places **Total Paid** immediately after **Expiry Date**, formats it as USD currency, and displays missing totals as zero.
+- The column is sortable through the shared table's desktop header and mobile **Sort by** control. `totalPaid,asc` / `totalPaid,desc` travels through the existing member service to the pageable API; the UI does not sort only the loaded page.
+- Changing sort resets to page zero and retains the membership status/type filters. Enabling the control reused the existing backend aggregate and required no additional migration.
