@@ -4,7 +4,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.SortDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +21,7 @@ import java.util.UUID;
 public class FinanceController {
 
     private final FinanceService service;
+    private final FinanceTransactionCsvService transactionCsvService;
 
     // ── Fund ─────────────────────────────────────────────────────────────────
 
@@ -101,6 +105,21 @@ public class FinanceController {
             @RequestParam(required = false) LocalDate entryDateTo,
             Pageable pageable) {
         return service.findEntries(fundId, paymentMethod, entryDateFrom, entryDateTo, pageable);
+    }
+
+    @GetMapping(value = "/api/journal-entries/export.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> exportEntries(
+            @RequestParam(required = false) UUID fundId,
+            @RequestParam(required = false) String paymentMethod,
+            @RequestParam(required = false) LocalDate entryDateFrom,
+            @RequestParam(required = false) LocalDate entryDateTo,
+            @SortDefault(sort = "entryDate", direction = Sort.Direction.DESC) Sort sort) {
+        String filename = "finance-transactions-" + LocalDate.now() + ".csv";
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(transactionCsvService.export(
+                        fundId, paymentMethod, entryDateFrom, entryDateTo, sort));
     }
 
     @GetMapping("/api/journal-entries/{id}")

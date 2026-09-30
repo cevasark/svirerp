@@ -51,6 +51,10 @@ const PAYMENT_METHOD_OPTIONS: { value: string; label: string }[] = [
         actionIcon="add_circle"
         (action)="openIncomeForm()">
         <ng-container extraActions>
+          <button mat-stroked-button (click)="exportCsv()" [disabled]="exporting()">
+            <mat-icon>download</mat-icon>
+            {{ exporting() ? 'Exporting...' : 'Export CSV' }}
+          </button>
           <button mat-stroked-button (click)="openExpenseForm()">
             <mat-icon>remove_circle</mat-icon>
             Record Expense
@@ -108,6 +112,7 @@ export class TransactionListComponent implements OnInit {
 
   page = signal<Page<JournalEntry> | null>(null);
   loading = signal(false);
+  exporting = signal(false);
   // Latest transactions first by default — treasurers care most about what just happened.
   pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, sort: 'entryDate,desc' });
   funds = signal<Fund[]>([]);
@@ -177,6 +182,32 @@ export class TransactionListComponent implements OnInit {
       .open(ExpenseFormComponent, { width: '560px' })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
+  }
+
+  exportCsv(): void {
+    this.exporting.set(true);
+    this.transactionService.exportCsv(this.pageParams(), {
+      fundId: this.fundFilter ?? undefined,
+      paymentMethod: this.paymentMethodFilter ?? undefined,
+    }).subscribe({
+      next: response => {
+        const disposition = response.headers.get('Content-Disposition') ?? '';
+        const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+          ?? `finance-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+        const url = URL.createObjectURL(response.body ?? new Blob([], { type: 'text/csv' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+        this.notifications.success('Transaction CSV exported.');
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.notifications.error('Could not export transactions.');
+      },
+    });
   }
 
   private loadPage(): void {

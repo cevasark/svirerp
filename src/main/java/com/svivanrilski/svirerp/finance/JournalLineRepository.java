@@ -2,6 +2,7 @@ package com.svivanrilski.svirerp.finance;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -30,6 +31,19 @@ public interface JournalLineRepository extends JpaRepository<JournalLine, UUID> 
             "journalEntry.serviceRequest", "journalEntry.categoryAccount", "journalEntry.fund",
             "account", "account.parentAccount", "fund"})
     List<JournalLine> findByJournalEntryId(UUID journalEntryId);
+
+    /** Complete ledger-detail export for the Transactions tab. Filters apply to the entry header;
+     *  returning lines preserves fee splits and both sides of transfers. */
+    @EntityGraph(attributePaths = {"journalEntry", "journalEntry.createdBy",
+            "journalEntry.approvedBy", "journalEntry.payer", "journalEntry.vendor",
+            "journalEntry.serviceRequest", "journalEntry.categoryAccount", "journalEntry.fund",
+            "journalEntry.correctsJournalEntry", "account", "account.parentAccount", "fund"})
+    @Query("SELECT l FROM JournalLine l WHERE (:fundId IS NULL OR l.journalEntry.fund.id = :fundId) "
+            + "AND (:paymentMethod IS NULL OR l.journalEntry.paymentMethod = :paymentMethod) "
+            + "AND (:entryDateFrom IS NULL OR l.journalEntry.entryDate >= :entryDateFrom) "
+            + "AND (:entryDateTo IS NULL OR l.journalEntry.entryDate <= :entryDateTo)")
+    List<JournalLine> findForTransactionExport(UUID fundId, String paymentMethod,
+            LocalDate entryDateFrom, LocalDate entryDateTo, Sort sort);
 
     @EntityGraph(attributePaths = {"journalEntry", "journalEntry.createdBy",
             "journalEntry.approvedBy", "journalEntry.payer", "journalEntry.vendor",

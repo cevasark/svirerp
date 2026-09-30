@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
 import { JournalEntry, JournalLine, RecordExpenseRequest, RecordIncomeRequest, RecordTransferRequest } from '../../../core/models/domain.model';
@@ -46,6 +46,23 @@ export class FinanceTransactionService {
       `${this.env.apiUrl}/journal-entries`,
       { params: p },
     );
+  }
+
+  exportCsv(
+    params: PageParams = DEFAULT_PAGE_PARAMS,
+    filter: TransactionFilter = {},
+  ): Observable<HttpResponse<Blob>> {
+    let p = new HttpParams();
+    if (params.sort) p = p.set('sort', params.sort);
+    if (filter.fundId) p = p.set('fundId', filter.fundId);
+    if (filter.paymentMethod) p = p.set('paymentMethod', filter.paymentMethod);
+    if (filter.entryDateFrom) p = p.set('entryDateFrom', filter.entryDateFrom);
+    if (filter.entryDateTo) p = p.set('entryDateTo', filter.entryDateTo);
+    return this.http.get(`${this.env.apiUrl}/journal-entries/export.csv`, {
+      params: p,
+      observe: 'response',
+      responseType: 'blob',
+    });
   }
 
   recordIncome(request: RecordIncomeRequest): Observable<JournalEntry> {
