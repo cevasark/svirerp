@@ -4,7 +4,7 @@
 
 | Domain | Status | Key Implemented Features | Known Notes / Follow-ups |
 |---|---|---|---|
-| **Organization & Core Identity** | Complete | Singleton profile (`V52`), Person entity, phone/email/address, overview service (`PersonOverviewService`) | Single-tenant model strictly enforced |
+| **Organization & Core Identity** | Complete | Singleton profile (`V52`), Person entity, phone/email/address, overview service (`PersonOverviewService`), People view backend filtering (`PersonSpecifications`: name, email, membership type) | Single-tenant model strictly enforced |
 | **Membership & Dues** | Complete | Membership types, member list/detail, contribution logging, `TierCalculator` renewal chaining, manual tier rebuild (`POST /api/members/recompute-tiers`), lifetime Total Paid with desktop/mobile backend sorting | Preserves active status for free Followers; totals are per person, independent of tier |
 | **Finance & Fund Accounting** | Complete | Chart of accounts (auto-seeded), restricted funds, balanced double-entry journal entries, statement of activities, balance sheet, clearing accounts (Zeffy 1020, Stripe 1021), transaction CSV export (`FinanceTransactionCsvService`) | Open-in-view disabled; fetch graphs required |
 | **Governance & Board** | Complete | Trustees with 2-year renewal terms, committees, meeting minutes, action items, projects, project tasks, multi-checklist tracking (`new`/`done`/`skipped`/`reopen`) | Project deletion cascades to tasks and checklists |
@@ -16,8 +16,8 @@
 
 ## Test Suite & Build Verification
 
-- **2026-10-09 — Full backend test run:** `mvn test` executed **128 tests (118 passed, 0 failures, 0 errors, 10 skipped database tests)** in 17.0s. Includes new `FinanceTransactionCsvServiceTest`. The 10 skipped tests are the MariaDB database integration tests guarded by `TOTAL_PAID_TEST_URL`.
-- **2026-10-09 — Frontend build:** `npm.cmd --prefix ui run build` passed cleanly in 17.9s with known bundle budget warnings (initial bundle 777.12 kB vs 500 kB budget, project-detail styles 2.78 kB vs 2.0 kB budget).
+- **2026-10-09 — Full backend test run:** `mvn test` executed **138 tests (128 passed, 0 failures, 0 errors, 10 skipped database tests)** in 18.7s. Includes new `PersonSpecificationsTest` and `PersonControllerTest` suites.
+- **2026-10-09 — Frontend build:** `npm.cmd --prefix ui run build` passed cleanly with known bundle budget warnings.
 - **2026-09-27 — Full backend package after the collation fix:** `mvn package` passed **126 tests, 0 failures, 0 errors, 0 skipped** and rebuilt the executable JAR against disposable MariaDB 11.8.
 - **2026-09-29 — Sorting change:** `mvn.cmd -B -ntp '-Dtest=MembershipServiceTotalPaidTest' test` passed **3 tests, 0 failures, 0 errors, 0 skipped**.
 - **Total Paid regression coverage:**

@@ -19,13 +19,41 @@ public class PersonController {
     private final PersonOverviewService overviewService;
 
     @GetMapping("/api/persons")
-    public Page<Person> list(Pageable pageable) {
-        return service.findAll(pageable);
+    public Page<Person> list(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) UUID membershipTypeId,
+            @RequestParam(required = false) String membershipType,
+            Pageable pageable) {
+        UUID effectiveTypeId = membershipTypeId;
+        String effectiveTypeName = null;
+        if (effectiveTypeId == null && membershipType != null && !membershipType.isBlank()) {
+            try {
+                effectiveTypeId = UUID.fromString(membershipType.trim());
+            } catch (IllegalArgumentException e) {
+                effectiveTypeName = membershipType.trim();
+            }
+        }
+        return service.findAll(name, email, effectiveTypeId, effectiveTypeName, pageable);
     }
 
     @GetMapping("/api/persons/overview")
-    public Page<PersonOverviewService.PersonOverview> overview(Pageable pageable) {
-        return overviewService.findAll(pageable);
+    public Page<PersonOverviewService.PersonOverview> overview(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) UUID membershipTypeId,
+            @RequestParam(required = false) String membershipType,
+            Pageable pageable) {
+        UUID effectiveTypeId = membershipTypeId;
+        String effectiveTypeName = null;
+        if (effectiveTypeId == null && membershipType != null && !membershipType.isBlank()) {
+            try {
+                effectiveTypeId = UUID.fromString(membershipType.trim());
+            } catch (IllegalArgumentException e) {
+                effectiveTypeName = membershipType.trim();
+            }
+        }
+        return overviewService.findAll(name, email, effectiveTypeId, effectiveTypeName, pageable);
     }
 
     /** Autocomplete search — e.g. GET /api/persons/search?field=firstName&q=Jo. */

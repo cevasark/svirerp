@@ -3,10 +3,17 @@
 ## Current Branch & State
 - **Last Updated:** 2026-10-09.
 - **Active Git Branch:** `antigravity-free-version-from-zeffyAPI` (branched from `zeffyAPI`)
-- **Head Commit at Update:** `ca53c96` (*"implemet export transactions to csv feature"*).
-- **Working Tree:** Clean.
-- **Latest Full Backend Verification:** `mvn test` executed 128 tests (118 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
-- **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`, with existing bundle/style budget warnings.
+- **Head Commit at Update:** `8b4b81d` (*"chore(memory-bank): update context and branch state for antigravity-free-version-from-zeffyAPI"*).
+- **Working Tree:** Features implemented for People view backend filter.
+- **Latest Full Backend Verification:** `mvn test` executed 138 tests (128 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
+- **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`.
+
+## Latest Changes: People View Backend Filter
+- Added backend filtering to the People view (`PersonController`, `PersonOverviewService`, `PersonService`, and `PersonSpecifications`).
+- **Name Filter:** One text input comparing against first name, last name, and concatenated full name. Uses wildcard matching (`%` appended to user input if not present; user-entered `%` preserved; case-insensitive).
+- **Email Filter:** One text input comparing against email with wildcard matching.
+- **Membership Type Filter:** Dropdown with single selection of available membership types. Applied via `EXISTS` subquery on `Member`.
+- **Combination & Execution:** Combined via strict `AND` condition. Query executes only after the user clicks the "Filter" button (or hits Enter on an input). Reset button clears filters and resets page to 0. Pagination and sorting preserve active filters.
 
 
 ## Latest Changes: Membership Total Paid

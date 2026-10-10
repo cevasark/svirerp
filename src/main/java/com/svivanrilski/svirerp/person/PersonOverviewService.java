@@ -47,12 +47,23 @@ public class PersonOverviewService {
     }
 
     public Page<PersonOverview> findAll(Pageable pageable) {
-        Page<Person> people = personRepository.findAll(pageable);
+        return findAll(null, null, null, null, pageable);
+    }
+
+    public Page<PersonOverview> findAll(
+            String name,
+            String email,
+            UUID membershipTypeId,
+            String membershipTypeName,
+            Pageable pageable) {
+        Page<Person> people = personRepository.findAll(
+                PersonSpecifications.filter(name, email, membershipTypeId, membershipTypeName),
+                pageable);
         List<UUID> ids = people.stream().map(Person::getId).toList();
         if (ids.isEmpty()) return people.map(person -> toOverview(person, null, List.of()));
 
         Map<UUID, Member> members = memberRepository.findByPerson_IdIn(ids).stream()
-                .collect(Collectors.toMap(member -> member.getPerson().getId(), Function.identity()));
+                .collect(Collectors.toMap(member -> member.getPerson().getId(), Function.identity(), (m1, m2) -> m1));
         Map<UUID, List<ZeffyContact>> contacts = contactRepository
                 .findByPerson_IdInOrderByZeffyContactId(ids).stream()
                 .collect(Collectors.groupingBy(contact -> contact.getPerson().getId()));
