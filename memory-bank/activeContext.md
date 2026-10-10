@@ -1,12 +1,13 @@
 # Active Context: SVIR ERP
 
 ## Current Branch & State
-- **Last Updated:** 2026-09-29.
-- **Active Git Branch:** `zeffyAPI`
-- **Head Commit at Update:** `4497bad` (*"enable sorting on total column"*).
-- **Working Tree:** Clean before this memory bank update.
-- **Latest Full Backend Verification (2026-09-27):** `mvn package` passed 126 tests with 0 failures, errors, or skips, including the real MariaDB 11.8 tests; executable JAR rebuilt.
-- **Latest Sorting Verification (2026-09-29):** All 3 `MembershipServiceTotalPaidTest` tests passed. Angular production build passed via `npm.cmd run build`, with existing bundle/style budget warnings. The full suite and JAR packaging were not rerun for this UI sorting change.
+- **Last Updated:** 2026-10-09.
+- **Active Git Branch:** `antigravity-free-version-from-zeffyAPI` (branched from `zeffyAPI`)
+- **Head Commit at Update:** `ca53c96` (*"implemet export transactions to csv feature"*).
+- **Working Tree:** Clean.
+- **Latest Full Backend Verification:** `mvn test` executed 128 tests (118 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
+- **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`, with existing bundle/style budget warnings.
+
 
 ## Latest Changes: Membership Total Paid
 - The Members table now shows **Total Paid** immediately after Expiry Date, formatted as USD with `$0.00` for no payments. The amount belongs to the Person, so it includes lifetime payments across membership records, tiers, statuses, campaigns, and payment purposes.

@@ -6,7 +6,7 @@
 |---|---|---|---|
 | **Organization & Core Identity** | Complete | Singleton profile (`V52`), Person entity, phone/email/address, overview service (`PersonOverviewService`) | Single-tenant model strictly enforced |
 | **Membership & Dues** | Complete | Membership types, member list/detail, contribution logging, `TierCalculator` renewal chaining, manual tier rebuild (`POST /api/members/recompute-tiers`), lifetime Total Paid with desktop/mobile backend sorting | Preserves active status for free Followers; totals are per person, independent of tier |
-| **Finance & Fund Accounting** | Complete | Chart of accounts (auto-seeded), restricted funds, balanced double-entry journal entries, statement of activities, balance sheet, clearing accounts (Zeffy 1020, Stripe 1021) | Open-in-view disabled; fetch graphs required |
+| **Finance & Fund Accounting** | Complete | Chart of accounts (auto-seeded), restricted funds, balanced double-entry journal entries, statement of activities, balance sheet, clearing accounts (Zeffy 1020, Stripe 1021), transaction CSV export (`FinanceTransactionCsvService`) | Open-in-view disabled; fetch graphs required |
 | **Governance & Board** | Complete | Trustees with 2-year renewal terms, committees, meeting minutes, action items, projects, project tasks, multi-checklist tracking (`new`/`done`/`skipped`/`reopen`) | Project deletion cascades to tasks and checklists |
 | **Events & Church Services** | Complete | Liturgical & community calendar events, sacramental church service details, attendee registrations, event resources, Google Calendar 1-way sync | One-way sync from ERP to Google |
 | **Volunteers** | Complete | Volunteer roster, volunteer areas (7 default areas), area assignments, service hour logging & totals | Contact person linking supported |
@@ -16,14 +16,15 @@
 
 ## Test Suite & Build Verification
 
-- **2026-09-27 — Full backend package after the collation fix:** `mvn package` passed **126 tests, 0 failures, 0 errors, 0 skipped** and rebuilt the executable JAR. Real database coverage used disposable MariaDB 11.8, matching the production engine. Evidence: `target/total-paid-collation-fixed.log` (local build output).
-- **2026-09-29 — Sorting change:** `mvn.cmd -B -ntp '-Dtest=MembershipServiceTotalPaidTest' test` passed **3 tests, 0 failures, 0 errors, 0 skipped**. Evidence: `target/total-paid-sort-test.log`. This was a focused rerun, not a new full-suite/package run.
-- **2026-09-29 — Frontend:** `npm.cmd run build` passed. Existing warnings remain: initial bundle **777.12 kB** versus the **500 kB** budget, and project-detail component styles **2.78 kB** versus **2 kB**. Repackage after this UI build to include the enabled sorting in the executable JAR.
+- **2026-10-09 — Full backend test run:** `mvn test` executed **128 tests (118 passed, 0 failures, 0 errors, 10 skipped database tests)** in 17.0s. Includes new `FinanceTransactionCsvServiceTest`. The 10 skipped tests are the MariaDB database integration tests guarded by `TOTAL_PAID_TEST_URL`.
+- **2026-10-09 — Frontend build:** `npm.cmd --prefix ui run build` passed cleanly in 17.9s with known bundle budget warnings (initial bundle 777.12 kB vs 500 kB budget, project-detail styles 2.78 kB vs 2.0 kB budget).
+- **2026-09-27 — Full backend package after the collation fix:** `mvn package` passed **126 tests, 0 failures, 0 errors, 0 skipped** and rebuilt the executable JAR against disposable MariaDB 11.8.
+- **2026-09-29 — Sorting change:** `mvn.cmd -B -ntp '-Dtest=MembershipServiceTotalPaidTest' test` passed **3 tests, 0 failures, 0 errors, 0 skipped**.
 - **Total Paid regression coverage:**
   - `MembershipServiceTotalPaidTest`: 3 tests for stable sort/tie-break handling across filters and read-only JSON serialization.
   - `MemberTotalPaidRepositoryTest`: 9 real MariaDB tests covering sources, fees, refunds/disputes, duplicate prevention, identity resolution/ambiguity, historical memberships, zero totals, and numeric sorting before pagination with filters.
-  - `MemberTotalPaidCollationMigrationTest`: 1 real MariaDB test migrating legacy `utf8mb4_general_ci` tables under `utf8mb4_uca1400_ai_ci` defaults, checking refund deduplication and replay of V63. The original migration reproduced error 1267; the corrected migration passes.
-- The 10 database tests require `TOTAL_PAID_TEST_URL` pointing to a disposable local test schema and are skipped without it. See [techContext.md](techContext.md) for setup. MySQL 8.4 was not validated successfully: earlier V40/V42/V44 check-constraint migrations behave differently from MariaDB.
+  - `MemberTotalPaidCollationMigrationTest`: 1 real MariaDB test migrating legacy `utf8mb4_general_ci` tables under `utf8mb4_uca1400_ai_ci` defaults, checking refund deduplication and replay of V63.
+- The 10 database tests require `TOTAL_PAID_TEST_URL` pointing to a disposable local test schema and are skipped without it. See [techContext.md](techContext.md) for setup.
 - No production deployment or recovery on the user's database was verified during this work.
 
 ## Total Paid Implementation Status
