@@ -1,12 +1,18 @@
 # Active Context: SVIR ERP
 
 ## Current Branch & State
-- **Last Updated:** 2026-10-09.
+- **Last Updated:** 2026-10-12.
 - **Active Git Branch:** `antigravity-free-version-from-zeffyAPI` (branched from `zeffyAPI`)
-- **Head Commit at Update:** `8b4b81d` (*"chore(memory-bank): update context and branch state for antigravity-free-version-from-zeffyAPI"*).
-- **Working Tree:** Features implemented for People view backend filter.
-- **Latest Full Backend Verification:** `mvn test` executed 138 tests (128 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
+- **Head Commit at Update:** `1fa5437` (*"Add filter on the Person screen"*).
+- **Working Tree:** Members screen email filter + Filter/Reset buttons (uncommitted).
+- **Latest Full Backend Verification:** `mvn test` executed 142 tests (0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
 - **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`.
+
+## Latest Changes: Members Screen Email Filter
+- `GET /api/members` accepts optional `email`. When present, `MembershipService.findAllMembers(status, typeId, email, pageable)` uses `MemberSpecifications.filter` (AND of status, membership type, `LOWER(person.email) LIKE` with the same wildcard rules as People via `PersonSpecifications.toWildcardPattern`). Without email, the existing derived queries are used unchanged.
+- `MemberRepository` now extends `JpaSpecificationExecutor` and overrides `findAll(Specification, Pageable)` with the `person`/`membershipType` entity graph (required because open-in-view is off). The `totalPaid` ID tie-breaker applies to all paths.
+- `MemberListComponent`: Email input, Status and Membership Type dropdowns no longer auto-query; results load on **Filter** click or Enter. **Reset** clears everything. The applied filter is kept in an `appliedFilter` signal so paging/sorting reuse it. Stats-bar links set the dropdowns, clear email, and apply.
+- Tests: `MemberSpecificationsTest` (4 tests).
 
 ## Latest Changes: People View Backend Filter
 - Added backend filtering to the People view (`PersonController`, `PersonOverviewService`, `PersonService`, and `PersonSpecifications`).

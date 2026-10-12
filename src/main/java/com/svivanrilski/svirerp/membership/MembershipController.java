@@ -60,8 +60,9 @@ public class MembershipController {
     public Page<Member> listMembers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID membershipTypeId,
+            @RequestParam(required = false) String email,
             Pageable pageable) {
-        return service.findAllMembers(status, membershipTypeId, pageable);
+        return service.findAllMembers(status, membershipTypeId, email, pageable);
     }
 
     @GetMapping("/api/members/summary")

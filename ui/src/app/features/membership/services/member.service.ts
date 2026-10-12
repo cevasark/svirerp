@@ -19,6 +19,7 @@ export class MemberService extends ResourceService<Member> {
     params: PageParams = DEFAULT_PAGE_PARAMS,
     status?: string | null,
     membershipTypeId?: string | null,
+    email?: string | null,
   ): Observable<Page<Member>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
@@ -29,6 +30,9 @@ export class MemberService extends ResourceService<Member> {
     }
     if (membershipTypeId) {
       p = p.set('membershipTypeId', membershipTypeId);
+    }
+    if (email && email.trim()) {
+      p = p.set('email', email.trim());
     }
     return this.http.get<Page<Member>>(
       `${this.apiEnv.apiUrl}/members`,

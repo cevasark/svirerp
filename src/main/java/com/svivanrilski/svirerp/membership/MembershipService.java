@@ -80,6 +80,15 @@ public class MembershipService {
     // ── Member ───────────────────────────────────────────────────────────────
 
     public Page<Member> findAllMembers(String status, UUID membershipTypeId, Pageable pageable) {
+        return findAllMembers(status, membershipTypeId, null, pageable);
+    }
+
+    /**
+     * Lists members filtered (AND) by status, membership type and person email.
+     * Email uses the same wildcard rules as the People filter: '%' is appended
+     * to the input and any user-typed '%' acts as an additional wildcard.
+     */
+    public Page<Member> findAllMembers(String status, UUID membershipTypeId, String email, Pageable pageable) {
         if (status != null && !status.isBlank()) {
             validateMemberStatus(status);
         }
@@ -93,6 +102,10 @@ public class MembershipService {
                     : Pageable.unpaged(sort);
         }
         boolean hasStatus = status != null && !status.isBlank();
+        if (email != null && !email.isBlank()) {
+            return memberRepo.findAll(
+                    MemberSpecifications.filter(status, membershipTypeId, email), pageable);
+        }
         if (hasStatus && membershipTypeId != null) {
             return memberRepo.findByStatusAndMembershipTypeId(status, membershipTypeId, pageable);
         }

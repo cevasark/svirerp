@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 
 import { MemberService } from '../../services/member.service';
@@ -23,7 +24,7 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
   selector: 'app-member-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataTableComponent, PageHeaderComponent, MatButtonModule, MatIconModule, MatFormFieldModule, MatSelectModule, FormsModule],
+  imports: [DataTableComponent, PageHeaderComponent, MatButtonModule, MatIconModule, MatFormFieldModule, MatSelectModule, MatInputModule, FormsModule],
   template: `
     <div class="page-container">
       <app-page-header
@@ -83,8 +84,19 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
 
       <div class="filter-bar">
         <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Email</mat-label>
+          <input matInput id="member-email-filter" [(ngModel)]="emailFilter"
+                 placeholder="e.g. john or %gmail" (keydown.enter)="applyFilter()" />
+          @if (emailFilter) {
+            <button matSuffix mat-icon-button aria-label="Clear email" (click)="emailFilter = ''">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Status</mat-label>
-          <mat-select [(ngModel)]="statusFilter" (selectionChange)="onFilterChange()">
+          <mat-select id="member-status-filter" [(ngModel)]="statusFilter">
             <mat-option [value]="null">All</mat-option>
             @for (s of statuses; track s) {
               <mat-option [value]="s">{{ s }}</mat-option>
@@ -94,13 +106,24 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
 
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Membership Type</mat-label>
-          <mat-select [(ngModel)]="membershipTypeFilter" (selectionChange)="onFilterChange()">
+          <mat-select id="member-type-filter" [(ngModel)]="membershipTypeFilter">
             <mat-option [value]="null">All</mat-option>
             @for (t of membershipTypes(); track t.id) {
               <mat-option [value]="t.id">{{ t.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
+
+        <div class="filter-actions">
+          <button mat-flat-button color="primary" id="member-filter-btn" (click)="applyFilter()">
+            <mat-icon>filter_list</mat-icon>
+            Filter
+          </button>
+          <button mat-stroked-button id="member-reset-btn" [disabled]="!hasActiveFilters()" (click)="resetFilter()">
+            <mat-icon>clear_all</mat-icon>
+            Reset
+          </button>
+        </div>
       </div>
 
       <app-data-table
@@ -128,8 +151,9 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
     .stat-value { font-size: 1.5em; font-weight: 500; line-height: 1.2; }
     .stat-label { font-size: .8em; color: #3f51b5; cursor: pointer; text-decoration: none; }
     .stat-label:hover { text-decoration: underline; }
-    .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; }
+    .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; align-items: flex-start; }
     .filter-field { width: 220px; }
+    .filter-actions { display: flex; gap: 8px; padding-top: 10px; }
   `],
 })
 export class MemberListComponent implements OnInit {
@@ -151,6 +175,16 @@ export class MemberListComponent implements OnInit {
   readonly statuses = ['active', 'inactive', 'suspended', 'expired', 'pending'];
   statusFilter: string | null = null;
   membershipTypeFilter: string | null = null;
+  emailFilter = '';
+
+  /** Filter actually used for queries — only changes when the user clicks Filter / presses Enter,
+   *  so paging and sorting keep the last applied criteria even if inputs were edited since. */
+  appliedFilter = signal<{ status: string | null; membershipTypeId: string | null; email: string }>(
+    { status: null, membershipTypeId: null, email: '' });
+  hasActiveFilters = computed(() => {
+    const f = this.appliedFilter();
+    return !!(f.status || f.membershipTypeId || f.email);
+  });
 
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: m => `${m.person.firstName} ${m.person.lastName}` },
@@ -181,22 +215,36 @@ export class MemberListComponent implements OnInit {
     this.loadPage();
   }
 
-  onFilterChange(): void {
+  applyFilter(): void {
+    this.appliedFilter.set({
+      status: this.statusFilter,
+      membershipTypeId: this.membershipTypeFilter,
+      email: this.emailFilter.trim(),
+    });
     this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
+  }
+
+  resetFilter(): void {
+    this.statusFilter = null;
+    this.membershipTypeFilter = null;
+    this.emailFilter = '';
+    this.applyFilter();
   }
 
   /** Drives the Status/Membership Type filters from a stats-bar link click, so the number shown
    *  can be clicked through to the actual member records behind it. typeName is matched against
    *  the org's configured membership types by name (e.g. "Member", "Benefactor", "Follower" — see
    *  TierCalculator); null resets that filter (used by "Total Members" for both, and by
-   *  "Followers" for status, since followers have no active/inactive distinction). */
+   *  "Followers" for status, since followers have no active/inactive distinction).
+   *  The email filter is cleared so the result matches the count that was clicked. */
   applyStatFilter(status: string | null, typeName: string | null): void {
     this.statusFilter = status;
     this.membershipTypeFilter = typeName
       ? (this.membershipTypes().find(t => t.name === typeName)?.id ?? null)
       : null;
-    this.onFilterChange();
+    this.emailFilter = '';
+    this.applyFilter();
   }
 
   onSortChange(sort: string | null): void {
@@ -303,7 +351,8 @@ export class MemberListComponent implements OnInit {
 
   private loadPage(): void {
     this.loading.set(true);
-    this.memberService.getPage(this.pageParams(), this.statusFilter, this.membershipTypeFilter).subscribe({
+    const f = this.appliedFilter();
+    this.memberService.getPage(this.pageParams(), f.status, f.membershipTypeId, f.email).subscribe({
       next: data => { this.page.set(data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });

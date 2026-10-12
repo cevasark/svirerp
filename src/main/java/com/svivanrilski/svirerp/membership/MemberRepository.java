@@ -2,8 +2,10 @@ package com.svivanrilski.svirerp.membership;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -13,7 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface MemberRepository extends JpaRepository<Member, UUID> {
+public interface MemberRepository extends JpaRepository<Member, UUID>, JpaSpecificationExecutor<Member> {
 
     // spring.jpa.open-in-view=false closes the Hibernate session before the
     // controller layer serializes the response, so these LAZY associations
@@ -24,6 +26,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     @EntityGraph(attributePaths = {"person", "membershipType"})
     Page<Member> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"person", "membershipType"})
+    @Override
+    Page<Member> findAll(Specification<Member> spec, Pageable pageable);
 
     @EntityGraph(attributePaths = {"person", "membershipType"})
     Page<Member> findByStatus(String status, Pageable pageable);

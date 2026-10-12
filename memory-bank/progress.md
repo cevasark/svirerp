@@ -22,6 +22,7 @@
 - **2026-09-29 — Sorting change:** `mvn.cmd -B -ntp '-Dtest=MembershipServiceTotalPaidTest' test` passed **3 tests, 0 failures, 0 errors, 0 skipped**.
 - **Total Paid regression coverage:**
   - `MembershipServiceTotalPaidTest`: 3 tests for stable sort/tie-break handling across filters and read-only JSON serialization.
+  - `MemberSpecificationsTest`: 4 tests for the Members screen AND filter (status, type, wildcard person email) and service routing with the totalPaid tie-breaker.
   - `MemberTotalPaidRepositoryTest`: 9 real MariaDB tests covering sources, fees, refunds/disputes, duplicate prevention, identity resolution/ambiguity, historical memberships, zero totals, and numeric sorting before pagination with filters.
   - `MemberTotalPaidCollationMigrationTest`: 1 real MariaDB test migrating legacy `utf8mb4_general_ci` tables under `utf8mb4_uca1400_ai_ci` defaults, checking refund deduplication and replay of V63.
 - The 10 database tests require `TOTAL_PAID_TEST_URL` pointing to a disposable local test schema and are skipped without it. See [techContext.md](techContext.md) for setup.
