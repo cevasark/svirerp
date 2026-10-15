@@ -8,14 +8,7 @@ export const governanceRoutes: Routes = [
         m => m.GovernanceShellComponent,
       ),
     children: [
-      { path: '', redirectTo: 'projects', pathMatch: 'full' },
-      {
-        path: 'trustees',
-        loadComponent: () =>
-          import('./pages/trustee-list/trustee-list.component').then(
-            m => m.TrusteeListComponent,
-          ),
-      },
+      { path: '', redirectTo: 'meeting-minutes', pathMatch: 'full' },
       {
         path: 'meeting-minutes',
         loadComponent: () =>
@@ -42,6 +35,13 @@ export const governanceRoutes: Routes = [
         loadComponent: () =>
           import('./pages/project-detail/project-detail.component').then(
             m => m.ProjectDetailComponent,
+          ),
+      },
+      {
+        path: 'trustees',
+        loadComponent: () =>
+          import('./pages/trustee-list/trustee-list.component').then(
+            m => m.TrusteeListComponent,
           ),
       },
     ],

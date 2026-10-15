@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatCardModule } from '@angular/material/card';
@@ -65,6 +65,7 @@ function formatDateTime(iso?: string): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     PageHeaderComponent,
     MatCardModule,
     MatButtonModule,
@@ -79,6 +80,13 @@ function formatDateTime(iso?: string): string {
   template: `
     @if (project(); as p) {
       <div class="page-container">
+        <div class="top-nav">
+          <a mat-button routerLink="/governance/projects" class="back-link">
+            <mat-icon>arrow_back</mat-icon>
+            All Projects
+          </a>
+        </div>
+
         <app-page-header [title]="p.name" [subtitle]="statusLabels[p.status]">
           <ng-container extraActions>
             <button mat-stroked-button (click)="editProject()">
@@ -289,6 +297,8 @@ function formatDateTime(iso?: string): string {
     }
   `,
   styles: [`
+    .top-nav { margin-bottom: 8px; }
+    .back-link { color: rgba(0,0,0,.7); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
     .summary-card, .task-card, .checklist-card, .comment-thread-card { margin-bottom: 16px; }
     .description { white-space: pre-wrap; margin: 0 0 12px; }
     .meta-row { display: flex; flex-wrap: wrap; gap: 16px; color: rgba(0,0,0,.6); font-size: .9em; }
