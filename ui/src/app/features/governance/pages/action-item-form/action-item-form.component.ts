@@ -40,7 +40,7 @@ const STATUSES = ['new', 'planned', 'done'] as const;
       <form [formGroup]="form" class="item-form">
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Action Item *</mat-label>
+          <mat-label>Action Item</mat-label>
           <input matInput formControlName="note" placeholder="e.g., Prepare annual parish financial audit" />
           @if (form.controls.note.invalid && form.controls.note.touched) {
             <mat-error>Action item is required</mat-error>

@@ -121,7 +121,7 @@ function defaultDueDate(): string {
               <form [formGroup]="addForm" (ngSubmit)="addItem()" class="add-form">
                 <div class="form-grid">
                   <mat-form-field appearance="outline" class="col-full">
-                    <mat-label>Action Item *</mat-label>
+                    <mat-label>Action Item</mat-label>
                     <input matInput [formControl]="addForm.controls.note"
                            placeholder="e.g., Prepare annual parish financial audit" />
                     @if (addForm.controls.note.invalid && addForm.controls.note.touched) {
