@@ -121,11 +121,11 @@ function defaultDueDate(): string {
               <form [formGroup]="addForm" (ngSubmit)="addItem()" class="add-form">
                 <div class="form-grid">
                   <mat-form-field appearance="outline" class="col-full">
-                    <mat-label>Action Item / Note *</mat-label>
-                    <textarea matInput [formControl]="addForm.controls.note"
-                              placeholder="What needs to be done?" rows="2"></textarea>
+                    <mat-label>Action Item *</mat-label>
+                    <input matInput [formControl]="addForm.controls.note"
+                           placeholder="e.g., Prepare annual parish financial audit" />
                     @if (addForm.controls.note.invalid && addForm.controls.note.touched) {
-                      <mat-error>Note is required</mat-error>
+                      <mat-error>Action item is required</mat-error>
                     }
                   </mat-form-field>
 
@@ -164,8 +164,8 @@ function defaultDueDate(): string {
 
                   <mat-form-field appearance="outline" class="col-full">
                     <mat-label>Additional Notes (optional)</mat-label>
-                    <input matInput [formControl]="addForm.controls.notes"
-                           placeholder="Context, progress, or follow-up details" />
+                    <textarea matInput [formControl]="addForm.controls.notes"
+                              placeholder="Context, background details, links, or follow-up notes..." rows="3"></textarea>
                   </mat-form-field>
                 </div>
 
@@ -221,7 +221,8 @@ function defaultDueDate(): string {
 
                   @if (item.notes) {
                     <div class="card-notes">
-                      <strong>Notes:</strong> {{ item.notes }}
+                      <div class="notes-caption">Additional Notes:</div>
+                      <div>{{ item.notes }}</div>
                     </div>
                   }
                 </mat-card-content>
@@ -351,7 +352,7 @@ function defaultDueDate(): string {
     .assignee-cell { white-space: nowrap; }
     .assignee-wrap, .meta-tag, .due-date-text { display: flex; align-items: center; gap: 4px; }
     .cell-icon, .meta-icon { font-size: 18px; width: 18px; height: 18px; color: rgba(0,0,0,.54); }
-    .notes-cell { word-break: break-word; max-width: 200px; color: rgba(0,0,0,.7); }
+    .notes-cell { word-break: break-word; max-width: 240px; color: rgba(0,0,0,.7); white-space: pre-wrap; }
     .actions-cell { white-space: nowrap; text-align: right; width: 88px; }
     .overdue { color: #d32f2f; font-weight: 600; }
     .muted { color: rgba(0,0,0,.38); }
@@ -373,7 +374,8 @@ function defaultDueDate(): string {
     .card-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
     .card-item-note { font-weight: 600; font-size: .95rem; word-break: break-word; flex: 1; }
     .card-meta-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 6px; font-size: .85rem; color: rgba(0,0,0,.65); }
-    .card-notes { margin-top: 6px; padding: 6px 8px; background: rgba(0,0,0,.03); border-radius: 4px; font-size: .85rem; word-break: break-word; }
+    .card-notes { margin-top: 6px; padding: 6px 8px; background: rgba(0,0,0,.03); border-radius: 4px; font-size: .85rem; word-break: break-word; white-space: pre-wrap; }
+    .notes-caption { font-weight: 600; color: rgba(0,0,0,.6); font-size: .8rem; margin-bottom: 2px; }
     .card-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 2px 8px 8px; }
 
     .empty-state { text-align: center; padding: 28px 16px; background: white; border-radius: 8px; border: 1px dashed rgba(0,0,0,.15); color: rgba(0,0,0,.54); }

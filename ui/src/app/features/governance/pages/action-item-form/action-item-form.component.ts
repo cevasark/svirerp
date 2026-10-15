@@ -40,10 +40,10 @@ const STATUSES = ['new', 'planned', 'done'] as const;
       <form [formGroup]="form" class="item-form">
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Note</mat-label>
-          <textarea matInput formControlName="note" rows="3"></textarea>
+          <mat-label>Action Item *</mat-label>
+          <input matInput formControlName="note" placeholder="e.g., Prepare annual parish financial audit" />
           @if (form.controls.note.invalid && form.controls.note.touched) {
-            <mat-error>Note is required</mat-error>
+            <mat-error>Action item is required</mat-error>
           }
         </mat-form-field>
 
@@ -84,7 +84,7 @@ const STATUSES = ['new', 'planned', 'done'] as const;
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Additional Notes</mat-label>
-          <textarea matInput formControlName="notes" rows="2"></textarea>
+          <textarea matInput formControlName="notes" rows="4" placeholder="Context, background details, links, or follow-up notes..."></textarea>
         </mat-form-field>
 
       </form>
