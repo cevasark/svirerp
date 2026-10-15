@@ -102,10 +102,10 @@ const STATUSES = ['new', 'planned', 'done'] as const;
     </mat-dialog-actions>
   `,
   styles: [`
-    .item-form { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; min-width: 440px; }
+    .item-form { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; width: 100%; max-width: 100%; box-sizing: border-box; }
     .full-width { width: 100%; }
-    .form-row { display: flex; gap: 12px; width: 100%; }
-    .flex-1 { flex: 1; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; }
+    .flex-1 { flex: 1 1 120px; min-width: 100px; }
   `],
 })
 export class ActionItemFormComponent implements OnInit {

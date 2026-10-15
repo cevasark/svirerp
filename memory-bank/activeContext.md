@@ -10,6 +10,16 @@
   - Java 25 explicit constructor safety in `PersonOverviewService` and `PersonController` to avoid Lombok JDK 25 `VerifyError`.
 - **Latest Full Backend Verification:** `mvn test` executed 147 tests (137 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
 - **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`.
+- **Security Assessment:** Full codebase vulnerability assessment performed and documented in [securityReport.md](securityReport.md) (covers 6 findings: OAuth CSRF state, journal posting balance integrity, webhook payload limits, brute-force rate-limiting, cookie directives, and CORS preflight).
+- **Meeting Minutes Detail View Responsive Redesign:** Overhauled `MeetingMinutesDetailComponent` to prevent horizontal viewport spilling. Replaced inline 7-column table add-row with a dedicated, responsive quick-add card (`.add-card`), introduced dual desktop table (inside an overflow-safe `.table-container`) and mobile card (`.mobile-card-list`) modes via `BreakpointObserver(Breakpoints.Handset)`, added 1-click status change menus, overdue date highlighting, and made `ActionItemFormComponent` and `MeetingMinutesFormComponent` dialogs mobile-responsive (`maxWidth: '95vw'`).
+
+## Latest Changes: Meeting Minutes Detail View Responsive Redesign
+- **Root Cause of Horizontal Spilling:** Previously, `meeting-minutes-detail.component.ts` rendered an inline `<tr class="add-row">` containing 6 side-by-side Angular Material form fields in one horizontal table row, enforcing a ~1100px minimum width that spilled over screens and broke mobile/tablet layouts.
+- **Dedicated Responsive Add Item Card:** Extracted action item creation into a dedicated card above the list with a responsive flex grid (`.col-full`, `.col-field`) that flexes from 4 columns on wide monitors to stacked single-column inputs on phones. Preserves consecutive batch-logging UX by retaining priority, assignee, and status selections across submits.
+- **Adaptive Display (Desktop Table vs Mobile Cards):**
+  - **Desktop (`!isMobile()`):** Rendered in a clean semantic table enclosed in an `overflow-x: auto` container with explicit cell widths, wrapping text, status chips, and priority badges.
+  - **Mobile (`isMobile()`):** Rendered as touch-friendly cards displaying note titles, status chips with 1-tap MatMenu status toggling, metadata badges (assignee, priority, due date with overdue warning), and touch targets >= 44px.
+- **Dialog Responsiveness:** Updated `ActionItemFormComponent` and `MeetingMinutesFormComponent` to replace rigid `min-width: 440px/400px` with `width: 100%; box-sizing: border-box; flex-wrap: wrap;` and configured `maxWidth: '95vw'` on dialog launches.
 
 ## Latest Changes: Members Screen Email Filter
 - `GET /api/members` accepts optional `email`. When present, `MembershipService.findAllMembers(status, typeId, email, pageable)` uses `MemberSpecifications.filter` (AND of status, membership type, `LOWER(person.email) LIKE` with the same wildcard rules as People via `PersonSpecifications.toWildcardPattern`). Without email, the existing derived queries are used unchanged.

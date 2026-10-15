@@ -72,7 +72,7 @@ function toIsoDate(date: Date): string {
     </mat-dialog-actions>
   `,
   styles: [`
-    .minutes-form { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; min-width: 400px; }
+    .minutes-form { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; width: 100%; max-width: 100%; box-sizing: border-box; }
     .full-width { width: 100%; }
   `],
 })
