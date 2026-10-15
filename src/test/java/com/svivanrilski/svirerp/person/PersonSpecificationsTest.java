@@ -127,4 +127,46 @@ class PersonSpecificationsTest {
         assertThat(result).isSameAs(andPredicate);
         verify(cb).exists(subquery);
     }
+
+    @Test
+    @DisplayName("filter with noMembership creates NOT EXISTS subquery on Member")
+    @SuppressWarnings("unchecked")
+    void filter_withNoMembership_createsNotExistsSubquery() {
+        when(query.subquery(Integer.class)).thenReturn(subquery);
+        when(subquery.from(Member.class)).thenReturn(memberRoot);
+        when(cb.literal(1)).thenReturn(mock(Expression.class));
+        when(memberRoot.<Person>get("person")).thenReturn(memberPersonPath);
+        when(cb.equal(memberPersonPath, root)).thenReturn(predicate1);
+        when(cb.exists(subquery)).thenReturn(orPredicate);
+        when(cb.not(orPredicate)).thenReturn(predicate2);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+        Specification<Person> spec = PersonSpecifications.filter(null, null, null, null, true);
+        Predicate result = spec.toPredicate(root, query, cb);
+
+        assertThat(result).isSameAs(andPredicate);
+        verify(cb).exists(subquery);
+        verify(cb).not(orPredicate);
+    }
+
+    @Test
+    @DisplayName("filter with membershipTypeName 'none' creates NOT EXISTS subquery on Member")
+    @SuppressWarnings("unchecked")
+    void filter_withNoneMembershipTypeName_createsNotExistsSubquery() {
+        when(query.subquery(Integer.class)).thenReturn(subquery);
+        when(subquery.from(Member.class)).thenReturn(memberRoot);
+        when(cb.literal(1)).thenReturn(mock(Expression.class));
+        when(memberRoot.<Person>get("person")).thenReturn(memberPersonPath);
+        when(cb.equal(memberPersonPath, root)).thenReturn(predicate1);
+        when(cb.exists(subquery)).thenReturn(orPredicate);
+        when(cb.not(orPredicate)).thenReturn(predicate2);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+        Specification<Person> spec = PersonSpecifications.filter(null, null, null, "none");
+        Predicate result = spec.toPredicate(root, query, cb);
+
+        assertThat(result).isSameAs(andPredicate);
+        verify(cb).exists(subquery);
+        verify(cb).not(orPredicate);
+    }
 }

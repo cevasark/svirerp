@@ -4,7 +4,6 @@ import com.svivanrilski.svirerp.membership.Member;
 import com.svivanrilski.svirerp.membership.MemberRepository;
 import com.svivanrilski.svirerp.zeffyintegration.ZeffyContact;
 import com.svivanrilski.svirerp.zeffyintegration.ZeffyContactRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,13 +19,21 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PersonOverviewService {
 
     private final PersonRepository personRepository;
     private final MemberRepository memberRepository;
     private final ZeffyContactRepository contactRepository;
+
+    public PersonOverviewService(
+            PersonRepository personRepository,
+            MemberRepository memberRepository,
+            ZeffyContactRepository contactRepository) {
+        this.personRepository = personRepository;
+        this.memberRepository = memberRepository;
+        this.contactRepository = contactRepository;
+    }
 
     public record ZeffyContactSummary(
             UUID id, String zeffyContactId, String email, String firstName, String lastName,
@@ -56,14 +63,26 @@ public class PersonOverviewService {
             UUID membershipTypeId,
             String membershipTypeName,
             Pageable pageable) {
+        return findAll(name, email, membershipTypeId, membershipTypeName, false, pageable);
+    }
+
+    public Page<PersonOverview> findAll(
+            String name,
+            String email,
+            UUID membershipTypeId,
+            String membershipTypeName,
+            boolean noMembership,
+            Pageable pageable) {
         Page<Person> people = personRepository.findAll(
-                PersonSpecifications.filter(name, email, membershipTypeId, membershipTypeName),
+                PersonSpecifications.filter(name, email, membershipTypeId, membershipTypeName, noMembership),
                 pageable);
         List<UUID> ids = people.stream().map(Person::getId).toList();
         if (ids.isEmpty()) return people.map(person -> toOverview(person, null, List.of()));
 
-        Map<UUID, Member> members = memberRepository.findByPerson_IdIn(ids).stream()
-                .collect(Collectors.toMap(member -> member.getPerson().getId(), Function.identity(), (m1, m2) -> m1));
+        Map<UUID, Member> members = noMembership
+                ? Map.of()
+                : memberRepository.findByPerson_IdIn(ids).stream()
+                        .collect(Collectors.toMap(member -> member.getPerson().getId(), Function.identity(), (m1, m2) -> m1));
         Map<UUID, List<ZeffyContact>> contacts = contactRepository
                 .findByPerson_IdInOrderByZeffyContactId(ids).stream()
                 .collect(Collectors.groupingBy(contact -> contact.getPerson().getId()));

@@ -16,6 +16,8 @@
 
 ## Test Suite & Build Verification
 
+- **2026-10-14 — Full backend test run:** `mvn test` executed **147 tests (137 passed, 0 failures, 0 errors, 10 skipped database tests)** in 21.7s. Includes PersonSpecificationsTest, PersonControllerTest, and PersonOverviewServiceTest optimizations.
+- **2026-10-14 — Frontend build:** `npm.cmd --prefix ui run build` passed cleanly with known bundle budget warnings.
 - **2026-10-09 — Full backend test run:** `mvn test` executed **138 tests (128 passed, 0 failures, 0 errors, 10 skipped database tests)** in 18.7s. Includes new `PersonSpecificationsTest` and `PersonControllerTest` suites.
 - **2026-10-09 — Frontend build:** `npm.cmd --prefix ui run build` passed cleanly with known bundle budget warnings.
 - **2026-09-27 — Full backend package after the collation fix:** `mvn package` passed **126 tests, 0 failures, 0 errors, 0 skipped** and rebuilt the executable JAR against disposable MariaDB 11.8.

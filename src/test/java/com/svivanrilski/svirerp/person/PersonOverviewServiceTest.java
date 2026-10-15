@@ -100,4 +100,38 @@ class PersonOverviewServiceTest {
         verify(personRepository).findAll(specCaptor.capture(), eq(pageable));
         assertThat(specCaptor.getValue()).isNotNull();
     }
+
+    @Test
+    @DisplayName("findAll with noMembership queries specification and maps overview without member")
+    @SuppressWarnings("unchecked")
+    void findAll_withNoMembership_queriesSpecificationAndMapsOverviewWithoutMember() {
+        UUID personId = UUID.randomUUID();
+        Person person = Person.builder()
+                .id(personId)
+                .firstName("Alice")
+                .lastName("Smith")
+                .email("alice@example.com")
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Person> personPage = new PageImpl<>(List.of(person), pageable, 1);
+
+        when(personRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(personPage);
+        when(contactRepository.findByPerson_IdInOrderByZeffyContactId(List.of(personId))).thenReturn(List.of());
+
+        Page<PersonOverviewService.PersonOverview> result = overviewService.findAll(
+                null, null, null, null, true, pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        PersonOverviewService.PersonOverview overview = result.getContent().get(0);
+        assertThat(overview.id()).isEqualTo(personId);
+        assertThat(overview.firstName()).isEqualTo("Alice");
+        assertThat(overview.membershipType()).isNull();
+        assertThat(overview.membershipStatus()).isNull();
+
+        ArgumentCaptor<Specification<Person>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+        verify(personRepository).findAll(specCaptor.capture(), eq(pageable));
+        assertThat(specCaptor.getValue()).isNotNull();
+        org.mockito.Mockito.verifyNoInteractions(memberRepository);
+    }
 }

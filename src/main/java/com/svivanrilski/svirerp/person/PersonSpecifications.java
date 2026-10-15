@@ -35,6 +35,25 @@ public final class PersonSpecifications {
             String email,
             UUID membershipTypeId,
             String membershipTypeName) {
+        return filter(name, email, membershipTypeId, membershipTypeName, false);
+    }
+
+    /**
+     * Builds an AND filter specification for {@link Person}.
+     *
+     * @param name               partial name compared against first name, last name, and full name
+     * @param email              partial email compared against email address
+     * @param membershipTypeId   optional membership type ID to match via linked {@link Member}
+     * @param membershipTypeName optional membership type name to match via linked {@link Member}
+     * @param noMembership       if {@code true}, restricts to people without any linked {@link Member} record
+     * @return JPA Specification combining all non-empty filter criteria
+     */
+    public static Specification<Person> filter(
+            String name,
+            String email,
+            UUID membershipTypeId,
+            String membershipTypeName,
+            boolean noMembership) {
 
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -53,7 +72,13 @@ public final class PersonSpecifications {
                 predicates.add(cb.like(cb.lower(root.get("email")), pattern));
             }
 
-            if (membershipTypeId != null || (membershipTypeName != null && !membershipTypeName.isBlank())) {
+            if (noMembership || "none".equalsIgnoreCase(membershipTypeName)) {
+                Subquery<Integer> subquery = query.subquery(Integer.class);
+                Root<Member> memberRoot = subquery.from(Member.class);
+                subquery.select(cb.literal(1));
+                subquery.where(cb.equal(memberRoot.get("person"), root));
+                predicates.add(cb.not(cb.exists(subquery)));
+            } else if (membershipTypeId != null || (membershipTypeName != null && !membershipTypeName.isBlank())) {
                 Subquery<Integer> subquery = query.subquery(Integer.class);
                 Root<Member> memberRoot = subquery.from(Member.class);
                 subquery.select(cb.literal(1));

@@ -35,7 +35,17 @@ public class PersonService {
             UUID membershipTypeId,
             String membershipTypeName,
             Pageable pageable) {
-        return repo.findAll(PersonSpecifications.filter(name, email, membershipTypeId, membershipTypeName), pageable);
+        return findAll(name, email, membershipTypeId, membershipTypeName, false, pageable);
+    }
+
+    public Page<Person> findAll(
+            String name,
+            String email,
+            UUID membershipTypeId,
+            String membershipTypeName,
+            boolean noMembership,
+            Pageable pageable) {
+        return repo.findAll(PersonSpecifications.filter(name, email, membershipTypeId, membershipTypeName, noMembership), pageable);
     }
 
     /** Autocomplete search — case-insensitive "contains" match against one allow-listed field,

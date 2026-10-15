@@ -75,6 +75,7 @@ import { PersonDetailsDialogComponent } from '../person-details/person-details-d
           <mat-label>Membership Type</mat-label>
           <mat-select [(ngModel)]="membershipTypeFilter">
             <mat-option [value]="null">All Types</mat-option>
+            <mat-option value="none">None (No Membership)</mat-option>
             @for (t of membershipTypes(); track t.id) {
               <mat-option [value]="t.id">{{ t.name }}</mat-option>
             }

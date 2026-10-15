@@ -34,14 +34,14 @@ class PersonControllerTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<PersonOverviewService.PersonOverview> emptyPage = new PageImpl<>(List.of(), pageable, 0);
 
-        when(overviewService.findAll("John", "john%", typeId, null, pageable))
+        when(overviewService.findAll("John", "john%", typeId, null, false, pageable))
                 .thenReturn(emptyPage);
 
         Page<PersonOverviewService.PersonOverview> result = controller.overview(
-                "John", "john%", typeId, null, pageable);
+                "John", "john%", typeId.toString(), null, null, pageable);
 
         assertThat(result).isSameAs(emptyPage);
-        verify(overviewService).findAll("John", "john%", typeId, null, pageable);
+        verify(overviewService).findAll("John", "john%", typeId, null, false, pageable);
     }
 
     @Test
@@ -51,14 +51,14 @@ class PersonControllerTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<PersonOverviewService.PersonOverview> emptyPage = new PageImpl<>(List.of(), pageable, 0);
 
-        when(overviewService.findAll(null, null, typeId, null, pageable))
+        when(overviewService.findAll(null, null, typeId, null, false, pageable))
                 .thenReturn(emptyPage);
 
         Page<PersonOverviewService.PersonOverview> result = controller.overview(
-                null, null, null, typeId.toString(), pageable);
+                null, null, null, typeId.toString(), null, pageable);
 
         assertThat(result).isSameAs(emptyPage);
-        verify(overviewService).findAll(null, null, typeId, null, pageable);
+        verify(overviewService).findAll(null, null, typeId, null, false, pageable);
     }
 
     @Test
@@ -67,14 +67,30 @@ class PersonControllerTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<PersonOverviewService.PersonOverview> emptyPage = new PageImpl<>(List.of(), pageable, 0);
 
-        when(overviewService.findAll(null, null, null, "Benefactor", pageable))
+        when(overviewService.findAll(null, null, null, "Benefactor", false, pageable))
                 .thenReturn(emptyPage);
 
         Page<PersonOverviewService.PersonOverview> result = controller.overview(
-                null, null, null, "Benefactor", pageable);
+                null, null, null, "Benefactor", null, pageable);
 
         assertThat(result).isSameAs(emptyPage);
-        verify(overviewService).findAll(null, null, null, "Benefactor", pageable);
+        verify(overviewService).findAll(null, null, null, "Benefactor", false, pageable);
+    }
+
+    @Test
+    @DisplayName("overview delegates with noMembership=true when membershipTypeId is 'none'")
+    void overview_withNoneMembershipType_delegatesWithNoMembershipTrue() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<PersonOverviewService.PersonOverview> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        when(overviewService.findAll(null, null, null, null, true, pageable))
+                .thenReturn(emptyPage);
+
+        Page<PersonOverviewService.PersonOverview> result = controller.overview(
+                null, null, "none", null, null, pageable);
+
+        assertThat(result).isSameAs(emptyPage);
+        verify(overviewService).findAll(null, null, null, null, true, pageable);
     }
 
     @Test
@@ -83,12 +99,27 @@ class PersonControllerTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Person> emptyPage = new PageImpl<>(List.of(), pageable, 0);
 
-        when(service.findAll("Smith", null, null, null, pageable))
+        when(service.findAll("Smith", null, null, null, false, pageable))
                 .thenReturn(emptyPage);
 
-        Page<Person> result = controller.list("Smith", null, null, null, pageable);
+        Page<Person> result = controller.list("Smith", null, null, null, null, pageable);
 
         assertThat(result).isSameAs(emptyPage);
-        verify(service).findAll("Smith", null, null, null, pageable);
+        verify(service).findAll("Smith", null, null, null, false, pageable);
+    }
+
+    @Test
+    @DisplayName("list delegates with noMembership=true when membershipType is 'none'")
+    void list_withNoneMembershipType_delegatesWithNoMembershipTrue() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Person> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        when(service.findAll(null, null, null, null, true, pageable))
+                .thenReturn(emptyPage);
+
+        Page<Person> result = controller.list(null, null, null, "none", null, pageable);
+
+        assertThat(result).isSameAs(emptyPage);
+        verify(service).findAll(null, null, null, null, true, pageable);
     }
 }

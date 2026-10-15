@@ -1,11 +1,14 @@
 # Active Context: SVIR ERP
 
 ## Current Branch & State
-- **Last Updated:** 2026-10-12.
+- **Last Updated:** 2026-10-14.
 - **Active Git Branch:** `antigravity-free-version-from-zeffyAPI` (branched from `zeffyAPI`)
-- **Head Commit at Update:** `1fa5437` (*"Add filter on the Person screen"*).
-- **Working Tree:** Members screen email filter + Filter/Reset buttons (uncommitted).
-- **Latest Full Backend Verification:** `mvn test` executed 142 tests (0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
+- **Head Commit at Update:** `0820826` (*"Add email filter on membership page"*).
+- **Working Tree:**
+  - Person screen "None (No Membership)" filter support across UI, controller, service, and JPA specifications.
+  - Performance optimization in `PersonOverviewService` bypassing `memberRepository.findByPerson_IdIn` when `noMembership` is true.
+  - Java 25 explicit constructor safety in `PersonOverviewService` and `PersonController` to avoid Lombok JDK 25 `VerifyError`.
+- **Latest Full Backend Verification:** `mvn test` executed 147 tests (137 passed, 0 failures, 0 errors, 10 integration tests skipped requiring MariaDB `TOTAL_PAID_TEST_URL`).
 - **Latest Frontend Verification:** Angular production build passed via `npm.cmd --prefix ui run build`.
 
 ## Latest Changes: Members Screen Email Filter

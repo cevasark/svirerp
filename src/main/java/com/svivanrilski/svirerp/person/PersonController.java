@@ -1,7 +1,6 @@
 package com.svivanrilski.svirerp.person;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -12,48 +11,60 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequiredArgsConstructor
 public class PersonController {
 
     private final PersonService service;
     private final PersonOverviewService overviewService;
 
+    public PersonController(PersonService service, PersonOverviewService overviewService) {
+        this.service = service;
+        this.overviewService = overviewService;
+    }
+
     @GetMapping("/api/persons")
     public Page<Person> list(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String email,
-            @RequestParam(required = false) UUID membershipTypeId,
+            @RequestParam(required = false) String membershipTypeId,
             @RequestParam(required = false) String membershipType,
+            @RequestParam(required = false) Boolean noMembership,
             Pageable pageable) {
-        UUID effectiveTypeId = membershipTypeId;
-        String effectiveTypeName = null;
-        if (effectiveTypeId == null && membershipType != null && !membershipType.isBlank()) {
-            try {
-                effectiveTypeId = UUID.fromString(membershipType.trim());
-            } catch (IllegalArgumentException e) {
-                effectiveTypeName = membershipType.trim();
-            }
-        }
-        return service.findAll(name, email, effectiveTypeId, effectiveTypeName, pageable);
+        TypeFilter filter = resolveTypeFilter(membershipTypeId, membershipType, noMembership);
+        return service.findAll(name, email, filter.id(), filter.name(), filter.noMembership(), pageable);
     }
 
     @GetMapping("/api/persons/overview")
     public Page<PersonOverviewService.PersonOverview> overview(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String email,
-            @RequestParam(required = false) UUID membershipTypeId,
+            @RequestParam(required = false) String membershipTypeId,
             @RequestParam(required = false) String membershipType,
+            @RequestParam(required = false) Boolean noMembership,
             Pageable pageable) {
-        UUID effectiveTypeId = membershipTypeId;
-        String effectiveTypeName = null;
-        if (effectiveTypeId == null && membershipType != null && !membershipType.isBlank()) {
-            try {
-                effectiveTypeId = UUID.fromString(membershipType.trim());
-            } catch (IllegalArgumentException e) {
-                effectiveTypeName = membershipType.trim();
-            }
+        TypeFilter filter = resolveTypeFilter(membershipTypeId, membershipType, noMembership);
+        return overviewService.findAll(name, email, filter.id(), filter.name(), filter.noMembership(), pageable);
+    }
+
+    private record TypeFilter(UUID id, String name, boolean noMembership) {
+    }
+
+    private TypeFilter resolveTypeFilter(String membershipTypeId, String membershipType, Boolean noMembership) {
+        if (Boolean.TRUE.equals(noMembership)
+                || "none".equalsIgnoreCase(membershipTypeId)
+                || "none".equalsIgnoreCase(membershipType)) {
+            return new TypeFilter(null, null, true);
         }
-        return overviewService.findAll(name, email, effectiveTypeId, effectiveTypeName, pageable);
+        String candidate = (membershipTypeId != null && !membershipTypeId.isBlank())
+                ? membershipTypeId.trim()
+                : (membershipType != null && !membershipType.isBlank() ? membershipType.trim() : null);
+        if (candidate == null) {
+            return new TypeFilter(null, null, false);
+        }
+        try {
+            return new TypeFilter(UUID.fromString(candidate), null, false);
+        } catch (IllegalArgumentException e) {
+            return new TypeFilter(null, candidate, false);
+        }
     }
 
     /** Autocomplete search — e.g. GET /api/persons/search?field=firstName&q=Jo. */
