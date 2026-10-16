@@ -53,6 +53,7 @@ export class NavComponent {
     { label: 'Governance',     icon: 'gavel',               route: '/governance' },
     { label: 'Volunteers',     icon: 'volunteer_activism',  route: '/volunteers' },
     { label: 'Events',         icon: 'event',               route: '/events' },
+    { label: 'Services',       icon: 'room_service',        route: '/services' },
     { label: 'Finance',        icon: 'account_balance',     route: '/finance' },
   ];
 

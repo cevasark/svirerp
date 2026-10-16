@@ -751,3 +751,30 @@ export interface StripeWebhookEvent {
   serviceRequest?: ServiceRequest;
   journalEntry?: JournalEntry;
 }
+
+// ─── Room Rentals ─────────────────────────────────────────────────────────────
+export type RoomRentalStatus = 'requested' | 'slot_confirmed' | 'deposit_paid' | 'confirmed' | 'cancelled' | 'completed';
+export type RentalPaymentMethod = 'cash' | 'check' | 'zelle' | 'card' | 'other';
+
+export interface RoomRental {
+  id: string;
+  roomName: string;
+  renterPerson: Person;
+  contactTrustee?: Trustee;
+  eventTitle: string;
+  eventType?: string;
+  startTime: string;
+  endTime: string;
+  estimatedAttendees?: number;
+  status: RoomRentalStatus;
+  totalFee: number;
+  depositAmount: number;
+  depositPaidDate?: string;
+  depositPaymentMethod?: RentalPaymentMethod;
+  finalAmountPaid: number;
+  finalPaymentDate?: string;
+  finalPaymentMethod?: RentalPaymentMethod;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

@@ -17,11 +17,11 @@
 @REM Locate Java
 @REM ---------------------------------------------------------------------------
 @IF NOT "%JAVA_HOME%"=="" (
-    @SET "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
-    @IF NOT EXIST "%JAVA_EXE%" (
+    @IF NOT EXIST "%JAVA_HOME%\bin\java.exe" (
         @ECHO Error: JAVA_HOME points to an invalid directory: %JAVA_HOME% >&2
         @EXIT /B 1
     )
+    @SET "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
 ) ELSE (
     @SET "JAVA_EXE=java"
     @WHERE java >NUL 2>&1

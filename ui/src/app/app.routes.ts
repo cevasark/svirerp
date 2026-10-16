@@ -55,6 +55,11 @@ export const appRoutes: Routes = [
           import('./features/finance/finance.routes').then(m => m.financeRoutes),
       },
       {
+        path: 'services',
+        loadChildren: () =>
+          import('./features/services/services.routes').then(m => m.servicesRoutes),
+      },
+      {
         path: 'settings',
         canActivate: [adminGuard],
         loadChildren: () =>

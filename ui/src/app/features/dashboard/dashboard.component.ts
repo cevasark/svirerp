@@ -72,6 +72,7 @@ export class DashboardComponent {
     { label: 'Governance',    icon: 'gavel',              route: '/governance',    description: 'Trustees, committees and resolutions',  color: '#f57c00' },
     { label: 'Volunteers',    icon: 'volunteer_activism', route: '/volunteers',    description: 'Volunteer hours and assignments',       color: '#7b1fa2' },
     { label: 'Events',        icon: 'event',              route: '/events',        description: 'Calendar and registrations',            color: '#c2185b' },
+    { label: 'Services',      icon: 'room_service',       route: '/services',      description: 'Room rentals and church ceremonies',    color: '#00796b' },
     { label: 'Finance',       icon: 'account_balance',    route: '/finance',       description: 'Accounts, journal entries, bank recon', color: '#5d4037' },
   ];
 }
