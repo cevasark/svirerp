@@ -5,12 +5,10 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { RoomRentalService } from '../../services/room-rental.service';
@@ -52,12 +50,10 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
     MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatButtonToggleModule,
     MatFormFieldModule,
     MatSelectModule,
     MatMenuModule,
     MatTooltipModule,
-    MatChipsModule,
     MatProgressSpinnerModule,
   ],
   template: `
@@ -130,19 +126,6 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
             </button>
             <span class="week-title">{{ weekRangeLabel() }}</span>
           </div>
-
-          <div class="view-toggle">
-            <mat-button-toggle-group [(ngModel)]="viewMode" aria-label="View Mode">
-              <mat-button-toggle value="pipeline">
-                <mat-icon>view_kanban</mat-icon>
-                <span>Pipeline</span>
-              </mat-button-toggle>
-              <mat-button-toggle value="list">
-                <mat-icon>view_list</mat-icon>
-                <span>List View</span>
-              </mat-button-toggle>
-            </mat-button-toggle-group>
-          </div>
         </div>
       </mat-card>
 
@@ -191,89 +174,12 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
         </div>
       </div>
 
-      <!-- LOWER VIEW: PIPELINE BOARD vs LIST VIEW -->
-      @if (viewMode() === 'pipeline') {
-        <div class="pipeline-container">
-          <div class="pipeline-header">
-            <h3 class="section-title">
-              <mat-icon inline>account_tree</mat-icon>
-              4-Step Trustee Rental Pipeline
-            </h3>
-            <span class="pipeline-desc">Manage rental agreements across the 4 stages without unnecessary overhead</span>
-          </div>
-
-          <div class="pipeline-columns">
-            <!-- STEP 1: REQUESTED -->
-            <div class="pipeline-col">
-              <div class="col-banner step-1">
-                <span class="step-num">1</span>
-                <span class="step-title">Inquiries & Requests</span>
-                <span class="step-count">{{ requestsList().length }}</span>
-              </div>
-              <div class="cards-list">
-                @for (item of requestsList(); track item.id) {
-                  <ng-container *ngTemplateOutlet="rentalCard; context: { $implicit: item, step: 1 }"></ng-container>
-                } @empty {
-                  <p class="empty-col">No incoming requests</p>
-                }
-              </div>
-            </div>
-
-            <!-- STEP 2: SLOT CONFIRMED -->
-            <div class="pipeline-col">
-              <div class="col-banner step-2">
-                <span class="step-num">2</span>
-                <span class="step-title">Slot Confirmed</span>
-                <span class="step-count">{{ slotConfirmedList().length }}</span>
-              </div>
-              <div class="cards-list">
-                @for (item of slotConfirmedList(); track item.id) {
-                  <ng-container *ngTemplateOutlet="rentalCard; context: { $implicit: item, step: 2 }"></ng-container>
-                } @empty {
-                  <p class="empty-col">No slots waiting for deposit</p>
-                }
-              </div>
-            </div>
-
-            <!-- STEP 3: SPOT RESERVED (DEPOSIT PAID) -->
-            <div class="pipeline-col">
-              <div class="col-banner step-3">
-                <span class="step-num">3</span>
-                <span class="step-title">Spot Reserved (Deposit)</span>
-                <span class="step-count">{{ depositPaidList().length }}</span>
-              </div>
-              <div class="cards-list">
-                @for (item of depositPaidList(); track item.id) {
-                  <ng-container *ngTemplateOutlet="rentalCard; context: { $implicit: item, step: 3 }"></ng-container>
-                } @empty {
-                  <p class="empty-col">No active deposits</p>
-                }
-              </div>
-            </div>
-
-            <!-- STEP 4: CONFIRMED -->
-            <div class="pipeline-col">
-              <div class="col-banner step-4">
-                <span class="step-num">4</span>
-                <span class="step-title">Fully Confirmed & Paid</span>
-                <span class="step-count">{{ confirmedList().length }}</span>
-              </div>
-              <div class="cards-list">
-                @for (item of confirmedList(); track item.id) {
-                  <ng-container *ngTemplateOutlet="rentalCard; context: { $implicit: item, step: 4 }"></ng-container>
-                } @empty {
-                  <p class="empty-col">No confirmed bookings</p>
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-      } @else {
-        <!-- LIST VIEW -->
-        <mat-card class="list-card">
-          <div class="list-filter-bar">
+      <!-- ALL RENTALS TABLE VIEW -->
+      <mat-card class="list-card">
+        <div class="table-controls-bar">
+          <div class="filter-group">
             <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-filter">
-              <mat-label>Status Filter</mat-label>
+              <mat-label>Filter by Status</mat-label>
               <mat-select [(ngModel)]="statusFilter" (selectionChange)="loadAllRentals()">
                 <mat-option value="all">All Statuses</mat-option>
                 <mat-option value="requested">1. Request Received</mat-option>
@@ -286,190 +192,151 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
             </mat-form-field>
           </div>
 
-          <div class="table-container">
-            <table class="rentals-table">
-              <thead>
+          <div class="sort-group">
+            <button mat-stroked-button (click)="toggleDateSort()" class="date-sort-btn"
+                    matTooltip="Toggle event date sorting (currently {{ dateSortDirection() === 'desc' ? 'Newest first' : 'Oldest first' }})">
+              <mat-icon>{{ dateSortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+              <span>Date: <strong>{{ dateSortDirection() === 'desc' ? 'Newest first (Desc)' : 'Oldest first (Asc)' }}</strong></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="rentals-table">
+            <thead>
+              <tr>
+                <th class="sortable-th clickable" (click)="toggleDateSort()"
+                    matTooltip="Click to sort by event date (currently {{ dateSortDirection() === 'desc' ? 'Newest first' : 'Oldest first' }})">
+                  <div class="th-sort-wrap">
+                    <span>Event Date & Time</span>
+                    <mat-icon class="sort-icon">{{ dateSortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+                    <span class="sort-order-pill">{{ dateSortDirection() === 'desc' ? 'Desc' : 'Asc' }}</span>
+                  </div>
+                </th>
+                <th>Event & Room</th>
+                <th>Renter (Contact)</th>
+                <th>Trustee POC</th>
+                <th>Fee / Deposit / Balance</th>
+                <th>Status & Next Step</th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of allRentals(); track r.id) {
                 <tr>
-                  <th>Event & Room</th>
-                  <th>Date & Time</th>
-                  <th>Renter (Contact)</th>
-                  <th>Trustee POC</th>
-                  <th>Financials (Fee / Dep / Paid)</th>
-                  <th>Status</th>
-                  <th class="actions-col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (r of allRentals(); track r.id) {
-                  <tr>
-                    <td>
-                      <div class="event-title-wrap">
-                        <strong class="clickable" (click)="openEditDialog(r)">{{ r.eventTitle }}</strong>
-                        <span class="room-chip">{{ r.roomName }}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="datetime-cell">
-                        <span>{{ r.startTime | date:'EEE, MMM d, y' }}</span>
-                        <span class="time-sub">{{ r.startTime | date:'shortTime' }} – {{ r.endTime | date:'shortTime' }}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="renter-cell">
-                        <strong>{{ r.renterPerson.firstName }} {{ r.renterPerson.lastName }}</strong>
-                        @if (r.renterPerson.phone) {
-                          <span class="phone-sub">{{ r.renterPerson.phone }}</span>
-                        }
-                      </div>
-                    </td>
-                    <td>
-                      @if (r.contactTrustee) {
-                        <span class="trustee-badge">
-                          <mat-icon inline>person_outline</mat-icon>
-                          {{ r.contactTrustee.person.firstName }} {{ r.contactTrustee.person.lastName }}
-                        </span>
-                      } @else {
-                        <span class="muted">—</span>
+                  <td>
+                    <div class="datetime-cell">
+                      <span class="date-main">{{ r.startTime | date:'EEE, MMM d, y' }}</span>
+                      <span class="time-sub">{{ r.startTime | date:'shortTime' }} – {{ r.endTime | date:'shortTime' }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="event-title-wrap">
+                      <strong class="clickable" (click)="openEditDialog(r)">{{ r.eventTitle }}</strong>
+                      <span class="room-chip">{{ r.roomName }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="renter-cell">
+                      <strong>{{ r.renterPerson.firstName }} {{ r.renterPerson.lastName }}</strong>
+                      @if (r.renterPerson.phone) {
+                        <span class="phone-sub">{{ r.renterPerson.phone }}</span>
                       }
-                    </td>
-                    <td>
-                      <div class="fin-cell">
-                        <span>Fee: {{ r.totalFee | currency }}</span>
-                        <span class="fin-sub">Dep: {{ r.depositAmount | currency }} | Paid: {{ (r.depositAmount + r.finalAmountPaid) | currency }}</span>
-                      </div>
-                    </td>
-                    <td>
+                    </div>
+                  </td>
+                  <td>
+                    @if (r.contactTrustee) {
+                      <span class="trustee-badge" matTooltip="{{ r.contactTrustee.role }}">
+                        <mat-icon inline>person_outline</mat-icon>
+                        {{ r.contactTrustee.person.firstName }} {{ r.contactTrustee.person.lastName }}
+                      </span>
+                    } @else {
+                      <span class="muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="fin-cell">
+                      <span>Fee: <strong>{{ r.totalFee | currency }}</strong></span>
+                      <span class="fin-sub">
+                        Dep: {{ r.depositAmount | currency }} |
+                        Bal: <span [class.balance-alert]="(r.totalFee - r.depositAmount - r.finalAmountPaid) > 0">
+                          {{ (r.totalFee - r.depositAmount - r.finalAmountPaid) | currency }}
+                        </span>
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="status-action-cell">
                       <span class="status-pill" [attr.data-status]="r.status">
                         {{ statusLabels[r.status] }}
                       </span>
-                    </td>
-                    <td class="actions-col">
-                      <button mat-icon-button [matMenuTriggerFor]="tableMenu">
-                        <mat-icon>more_vert</mat-icon>
+
+                      @if (r.status === 'requested') {
+                        <button mat-stroked-button color="primary" class="row-step-btn" (click)="confirmSlot(r)">
+                          <mat-icon>check</mat-icon> Confirm Slot
+                        </button>
+                      } @else if (r.status === 'slot_confirmed') {
+                        <button mat-stroked-button class="row-step-btn deposit-btn" (click)="recordPayment(r, 'deposit')">
+                          <mat-icon>payments</mat-icon> Record Deposit
+                        </button>
+                      } @else if (r.status === 'deposit_paid') {
+                        <button mat-stroked-button class="row-step-btn balance-btn" (click)="recordPayment(r, 'final')">
+                          <mat-icon>paid</mat-icon> Record Balance
+                        </button>
+                      }
+                    </div>
+                  </td>
+                  <td class="actions-col">
+                    <button mat-icon-button [matMenuTriggerFor]="tableMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #tableMenu="matMenu">
+                      <button mat-menu-item (click)="openEditDialog(r)">
+                        <mat-icon>edit</mat-icon> Edit Details
                       </button>
-                      <mat-menu #tableMenu="matMenu">
-                        <button mat-menu-item (click)="openEditDialog(r)">
-                          <mat-icon>edit</mat-icon> Edit Details
+                      @if (r.status === 'requested') {
+                        <button mat-menu-item (click)="confirmSlot(r)">
+                          <mat-icon>check_circle</mat-icon> Confirm Slot Available
                         </button>
-                        @if (r.status === 'requested') {
-                          <button mat-menu-item (click)="confirmSlot(r)">
-                            <mat-icon>check_circle</mat-icon> Confirm Slot Available
-                          </button>
-                        }
-                        @if (r.status === 'slot_confirmed') {
-                          <button mat-menu-item (click)="recordPayment(r, 'deposit')">
-                            <mat-icon>payments</mat-icon> Record Deposit ($)
-                          </button>
-                        }
-                        @if (r.status === 'deposit_paid') {
-                          <button mat-menu-item (click)="recordPayment(r, 'final')">
-                            <mat-icon>paid</mat-icon> Record Final Payment ($)
-                          </button>
-                        }
-                        @if (r.status !== 'cancelled' && r.status !== 'completed') {
-                          <button mat-menu-item (click)="cancelRental(r)">
-                            <mat-icon>cancel</mat-icon> Cancel Booking
-                          </button>
-                        }
-                        <button mat-menu-item (click)="deleteRental(r)">
-                          <mat-icon color="warn">delete</mat-icon> Delete
+                      }
+                      @if (r.status === 'slot_confirmed') {
+                        <button mat-menu-item (click)="recordPayment(r, 'deposit')">
+                          <mat-icon>payments</mat-icon> Record Deposit ($)
                         </button>
-                      </mat-menu>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="7" class="empty-cell">No room rentals found.</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </mat-card>
-      }
+                      }
+                      @if (r.status === 'deposit_paid') {
+                        <button mat-menu-item (click)="recordPayment(r, 'final')">
+                          <mat-icon>paid</mat-icon> Record Final Payment ($)
+                        </button>
+                      }
+                      @if (r.status !== 'cancelled' && r.status !== 'completed') {
+                        <button mat-menu-item (click)="cancelRental(r)">
+                          <mat-icon>cancel</mat-icon> Cancel Booking
+                        </button>
+                      }
+                      <button mat-menu-item (click)="deleteRental(r)">
+                        <mat-icon color="warn">delete</mat-icon> Delete
+                      </button>
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7" class="empty-cell">
+                    @if (loading()) {
+                      <mat-progress-spinner diameter="24" mode="indeterminate" class="inline-spinner" />
+                      <span>Loading room rentals...</span>
+                    } @else {
+                      <span>No room rentals found matching current filters.</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </mat-card>
     </div>
-
-    <!-- KANBAN CARD REUSABLE TEMPLATE -->
-    <ng-template #rentalCard let-item let-step="step">
-      <div class="kanban-card" [attr.data-status]="item.status">
-        <div class="card-header-row">
-          <span class="card-date">{{ item.startTime | date:'EEE, MMM d' }}</span>
-          <button mat-icon-button class="card-menu-btn" [matMenuTriggerFor]="cardMenu">
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          <mat-menu #cardMenu="matMenu">
-            <button mat-menu-item (click)="openEditDialog(item)">
-              <mat-icon>edit</mat-icon> Edit Details
-            </button>
-            @if (item.status !== 'cancelled') {
-              <button mat-menu-item (click)="cancelRental(item)">
-                <mat-icon>cancel</mat-icon> Cancel Booking
-              </button>
-            }
-            <button mat-menu-item (click)="deleteRental(item)">
-              <mat-icon color="warn">delete</mat-icon> Delete
-            </button>
-          </mat-menu>
-        </div>
-
-        <div class="card-title clickable" (click)="openEditDialog(item)">
-          {{ item.eventTitle }}
-        </div>
-
-        <div class="card-time">
-          <mat-icon inline>schedule</mat-icon>
-          {{ item.startTime | date:'shortTime' }} – {{ item.endTime | date:'shortTime' }}
-        </div>
-
-        <div class="card-renter">
-          <mat-icon inline>person</mat-icon>
-          <strong>{{ item.renterPerson.firstName }} {{ item.renterPerson.lastName }}</strong>
-        </div>
-
-        @if (item.contactTrustee) {
-          <div class="card-trustee" matTooltip="Trustee Point of Contact">
-            <mat-icon inline>verified_user</mat-icon>
-            <span>POC: {{ item.contactTrustee.person.firstName }} {{ item.contactTrustee.person.lastName }}</span>
-          </div>
-        }
-
-        <div class="card-financials">
-          <div class="fin-item">
-            <span class="lbl">Fee</span>
-            <span class="val">{{ item.totalFee | currency }}</span>
-          </div>
-          <div class="fin-item">
-            <span class="lbl">Deposit</span>
-            <span class="val">{{ item.depositAmount | currency }}</span>
-          </div>
-          <div class="fin-item highlight">
-            <span class="lbl">Balance</span>
-            <span class="val">{{ (item.totalFee - item.depositAmount - item.finalAmountPaid) | currency }}</span>
-          </div>
-        </div>
-
-        <!-- STAGE ADVANCEMENT BUTTON -->
-        <div class="card-actions">
-          @if (step === 1) {
-            <button mat-flat-button color="primary" class="stage-btn" (click)="confirmSlot(item)">
-              <mat-icon>check</mat-icon> Confirm Slot
-            </button>
-          } @else if (step === 2) {
-            <button mat-flat-button color="accent" class="stage-btn deposit-btn" (click)="recordPayment(item, 'deposit')">
-              <mat-icon>payments</mat-icon> Record Deposit
-            </button>
-          } @else if (step === 3) {
-            <button mat-flat-button class="stage-btn confirm-btn" (click)="recordPayment(item, 'final')">
-              <mat-icon>paid</mat-icon> Record Balance
-            </button>
-          } @else if (step === 4) {
-            <button mat-stroked-button class="stage-btn view-btn" (click)="openEditDialog(item)">
-              <mat-icon>visibility</mat-icon> Details
-            </button>
-          }
-        </div>
-      </div>
-    </ng-template>
   `,
   styles: [`
     .kpi-grid {
@@ -562,7 +429,7 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
       border-radius: 8px;
       display: flex;
       flex-direction: column;
-      min-height: 200px;
+      min-height: 190px;
     }
     .day-col.today-col {
       border-color: #3b82f6;
@@ -652,130 +519,22 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
       border-color: #2563eb;
     }
 
-    /* PIPELINE KANBAN */
-    .pipeline-container { margin-bottom: 24px; }
-    .pipeline-header { margin-bottom: 12px; }
-    .pipeline-desc { font-size: .85rem; color: rgba(0,0,0,.6); }
-    .pipeline-columns {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-      min-width: 900px;
-      overflow-x: auto;
-    }
-    .pipeline-col {
-      background: #f1f5f9;
-      border-radius: 8px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .col-banner {
-      display: flex;
-      align-items: center;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: .9rem;
-      gap: 8px;
-    }
-    .step-num {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: rgba(0,0,0,.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: .75rem;
-    }
-    .step-title { flex: 1; }
-    .step-count {
-      background: white;
-      padding: 1px 7px;
-      border-radius: 12px;
-      font-size: .8rem;
-    }
-    .step-1 { background: #fef3c7; color: #92400e; }
-    .step-2 { background: #e0f2fe; color: #075985; }
-    .step-3 { background: #ede9fe; color: #5b21b6; }
-    .step-4 { background: #dcfce7; color: #166534; }
-
-    .cards-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .kanban-card {
-      background: white;
-      border-radius: 8px;
-      padding: 12px;
-      border: 1px solid rgba(0,0,0,.08);
-      box-shadow: 0 1px 3px rgba(0,0,0,.04);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .card-header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .card-date {
-      font-size: .8rem;
-      font-weight: 700;
-      color: #2563eb;
-    }
-    .card-menu-btn { width: 24px; height: 24px; line-height: 24px; }
-    .card-title {
-      font-weight: 600;
-      font-size: .95rem;
-      color: #1e293b;
-      line-height: 1.3;
-    }
-    .card-time, .card-renter, .card-trustee {
-      font-size: .82rem;
-      color: rgba(0,0,0,.65);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .card-trustee { color: #4338ca; font-weight: 500; }
-    .card-financials {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 4px;
-      margin-top: 4px;
-      padding: 6px;
-      background: #f8fafc;
-      border-radius: 4px;
-      text-align: center;
-    }
-    .fin-item { display: flex; flex-direction: column; }
-    .fin-item .lbl { font-size: .7rem; color: rgba(0,0,0,.5); text-transform: uppercase; }
-    .fin-item .val { font-size: .85rem; font-weight: 600; }
-    .fin-item.highlight .val { color: #d97706; font-weight: 700; }
-
-    .card-actions { margin-top: 6px; }
-    .stage-btn { width: 100%; font-size: .85rem; }
-    .deposit-btn { background: #7c3aed !important; color: white !important; }
-    .confirm-btn { background: #16a34a !important; color: white !important; }
-    .view-btn { border-color: rgba(0,0,0,.2); }
-
-    .empty-col {
-      text-align: center;
-      font-size: .85rem;
-      color: rgba(0,0,0,.4);
-      padding: 20px 8px;
-    }
-
-    /* LIST VIEW TABLE */
+    /* TABLE VIEW */
     .list-card { padding: 16px; border-radius: 8px; }
-    .list-filter-bar { margin-bottom: 12px; }
+    .table-controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
     .status-filter { width: 220px; }
+    .date-sort-btn { font-weight: 500; }
+    .date-sort-btn strong { color: #2563eb; }
+
     .table-container { overflow-x: auto; }
-    .rentals-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    .rentals-table { width: 100%; border-collapse: collapse; min-width: 860px; }
     .rentals-table th {
       text-align: left;
       font-weight: 600;
@@ -784,16 +543,31 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
       border-bottom: 2px solid rgba(0,0,0,.08);
       background: #fafafa;
     }
+    .sortable-th { cursor: pointer; user-select: none; }
+    .sortable-th:hover { background: #f1f5f9; }
+    .th-sort-wrap { display: flex; align-items: center; gap: 6px; }
+    .sort-icon { font-size: 18px; width: 18px; height: 18px; color: #2563eb; }
+    .sort-order-pill {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
     .rentals-table td {
       padding: 10px 12px;
       border-bottom: 1px solid rgba(0,0,0,.06);
       font-size: .9rem;
       vertical-align: middle;
     }
+    .datetime-cell { display: flex; flex-direction: column; }
+    .date-main { font-weight: 600; }
+    .time-sub, .phone-sub, .fin-sub { font-size: .8rem; color: rgba(0,0,0,.55); }
     .event-title-wrap { display: flex; flex-direction: column; gap: 2px; }
     .room-chip { font-size: .75rem; color: rgba(0,0,0,.5); }
-    .datetime-cell { display: flex; flex-direction: column; }
-    .time-sub, .phone-sub, .fin-sub { font-size: .8rem; color: rgba(0,0,0,.55); }
+    .renter-cell { display: flex; flex-direction: column; }
     .trustee-badge {
       display: inline-flex;
       align-items: center;
@@ -805,6 +579,23 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
       font-size: .8rem;
       font-weight: 500;
     }
+    .fin-cell { display: flex; flex-direction: column; }
+    .balance-alert { color: #d97706; font-weight: 600; }
+
+    .status-action-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .row-step-btn {
+      font-size: .75rem;
+      line-height: 24px;
+      padding: 0 8px;
+    }
+    .deposit-btn { color: #7c3aed !important; border-color: #7c3aed !important; }
+    .balance-btn { color: #16a34a !important; border-color: #16a34a !important; }
+
     .status-pill {
       display: inline-block;
       padding: 2px 8px;
@@ -824,6 +615,7 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
     .actions-col { text-align: right; width: 60px; }
     .muted { color: rgba(0,0,0,.35); }
     .empty-cell { text-align: center; padding: 24px; color: rgba(0,0,0,.5); }
+    .inline-spinner { display: inline-block; vertical-align: middle; margin-right: 8px; }
   `],
 })
 export class RoomRentalsComponent implements OnInit {
@@ -836,18 +628,12 @@ export class RoomRentalsComponent implements OnInit {
   // Selected week baseline (Monday of that week)
   currentWeekMonday = signal<Date>(this.getMonday(new Date()));
   selectedRoom = signal<string>('Parish Hall');
-  viewMode = signal<'pipeline' | 'list'>('pipeline');
   statusFilter = signal<string>('all');
+  dateSortDirection = signal<'desc' | 'asc'>('desc');
 
   weeklyRentals = signal<RoomRental[]>([]);
   allRentals = signal<RoomRental[]>([]);
   loading = signal(false);
-
-  // Filtered lists for Kanban
-  requestsList = computed(() => this.allRentals().filter(r => r.status === 'requested'));
-  slotConfirmedList = computed(() => this.allRentals().filter(r => r.status === 'slot_confirmed'));
-  depositPaidList = computed(() => this.allRentals().filter(r => r.status === 'deposit_paid'));
-  confirmedList = computed(() => this.allRentals().filter(r => r.status === 'confirmed'));
 
   countByStatus(status: RoomRentalStatus): number {
     return this.allRentals().filter(r => r.status === status).length;
@@ -909,13 +695,19 @@ export class RoomRentalsComponent implements OnInit {
   loadAllRentals(): void {
     this.loading.set(true);
     const filter = this.statusFilter() === 'all' ? undefined : this.statusFilter();
-    this.rentalService.getFilteredPage(filter, { page: 0, size: 200, sort: 'startTime,asc' }).subscribe({
+    const sort = `startTime,${this.dateSortDirection()}`;
+    this.rentalService.getFilteredPage(filter, { page: 0, size: 200, sort }).subscribe({
       next: page => {
         this.allRentals.set(page.content);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  toggleDateSort(): void {
+    this.dateSortDirection.update(dir => (dir === 'desc' ? 'asc' : 'desc'));
+    this.loadAllRentals();
   }
 
   previousWeek(): void {
@@ -1054,7 +846,7 @@ export class RoomRentalsComponent implements OnInit {
   private getMonday(d: Date): Date {
     const date = new Date(d);
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(date.setDate(diff));
   }
 

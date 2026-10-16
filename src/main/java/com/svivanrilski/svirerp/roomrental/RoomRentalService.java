@@ -18,7 +18,6 @@ import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 public class RoomRentalService {
 
     public static final Set<String> ALLOWED_STATUSES = Set.of(
@@ -32,6 +31,12 @@ public class RoomRentalService {
     private final RoomRentalRepository rentalRepo;
     private final PersonService personService;
     private final TrusteeRepository trusteeRepo;
+
+    public RoomRentalService(RoomRentalRepository rentalRepo, PersonService personService, TrusteeRepository trusteeRepo) {
+        this.rentalRepo = rentalRepo;
+        this.personService = personService;
+        this.trusteeRepo = trusteeRepo;
+    }
 
     public Page<RoomRental> findAll(Pageable pageable) {
         return rentalRepo.findAll(pageable);
@@ -90,7 +95,6 @@ public class RoomRentalService {
 
         existing.setRoomName(patch.getRoomName() != null ? patch.getRoomName() : "Parish Hall");
         existing.setEventTitle(patch.getEventTitle());
-        existing.setEventType(patch.getEventType());
         existing.setStartTime(patch.getStartTime());
         existing.setEndTime(patch.getEndTime());
         existing.setEstimatedAttendees(patch.getEstimatedAttendees());

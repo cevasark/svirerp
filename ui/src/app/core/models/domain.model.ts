@@ -762,7 +762,6 @@ export interface RoomRental {
   renterPerson: Person;
   contactTrustee?: Trustee;
   eventTitle: string;
-  eventType?: string;
   startTime: string;
   endTime: string;
   estimatedAttendees?: number;

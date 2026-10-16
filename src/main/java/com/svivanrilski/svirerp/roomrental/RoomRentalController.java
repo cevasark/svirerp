@@ -15,10 +15,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/room-rentals")
-@RequiredArgsConstructor
 public class RoomRentalController {
 
     private final RoomRentalService service;
+
+    public RoomRentalController(RoomRentalService service) {
+        this.service = service;
+    }
 
     @GetMapping
     public Page<RoomRental> listRentals(

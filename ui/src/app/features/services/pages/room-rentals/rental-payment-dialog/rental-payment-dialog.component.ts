@@ -239,7 +239,6 @@ export class RentalPaymentDialogComponent implements OnInit {
       id: r.id,
       roomName: r.roomName,
       eventTitle: r.eventTitle,
-      eventType: r.eventType,
       startTime: r.startTime,
       endTime: r.endTime,
       estimatedAttendees: r.estimatedAttendees,

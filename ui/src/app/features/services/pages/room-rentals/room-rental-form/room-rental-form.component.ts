@@ -31,14 +31,6 @@ const STATUS_OPTIONS: { value: RoomRentalStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-const EVENT_TYPES = [
-  { value: 'reception', label: 'Reception / Party' },
-  { value: 'meeting', label: 'Meeting / Assembly' },
-  { value: 'celebration', label: 'Celebration / Banquet' },
-  { value: 'educational', label: 'Workshop / Class' },
-  { value: 'other', label: 'Other' },
-];
-
 function personLabel(p: Person): string {
   const parts = [`${p.firstName} ${p.lastName}`];
   if (p.phone) parts.push(`(${p.phone})`);
@@ -102,24 +94,13 @@ function toIsoDate(d: Date = new Date()): string {
           </button>
         </div>
 
-        <div class="form-row">
-          <mat-form-field appearance="outline" class="flex-2">
-            <mat-label>Event Title</mat-label>
-            <input matInput formControlName="eventTitle" placeholder="e.g. Birthday Celebration, Choir Practice" />
-            @if (form.controls.eventTitle.invalid && form.controls.eventTitle.touched) {
-              <mat-error>Event title is required</mat-error>
-            }
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Event Type</mat-label>
-            <mat-select formControlName="eventType">
-              @for (t of eventTypes; track t.value) {
-                <mat-option [value]="t.value">{{ t.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        </div>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Event Title</mat-label>
+          <input matInput formControlName="eventTitle" placeholder="e.g. Birthday Celebration, Choir Practice" />
+          @if (form.controls.eventTitle.invalid && form.controls.eventTitle.touched) {
+            <mat-error>Event title is required</mat-error>
+          }
+        </mat-form-field>
 
         <div class="form-row">
           <mat-form-field appearance="outline" class="flex-1">
@@ -276,7 +257,6 @@ export class RoomRentalFormComponent implements OnInit {
   conflictWarning = signal<string | null>(null);
 
   readonly statusOptions = STATUS_OPTIONS;
-  readonly eventTypes = EVENT_TYPES;
   renterLabel = signal('');
   personLabel = personLabel;
   searchByFirstName = (q: string) => this.personService.search('firstName', q);
@@ -286,7 +266,6 @@ export class RoomRentalFormComponent implements OnInit {
     contactTrusteeId: this.fb.control<string | null>(null),
     roomName: ['Parish Hall', Validators.required],
     eventTitle: ['', Validators.required],
-    eventType: ['reception'],
     eventDate: [this.data?.defaultDate || toIsoDate(), Validators.required],
     startTime: ['14:00', Validators.required],
     endTime: ['18:00', Validators.required],
@@ -320,7 +299,6 @@ export class RoomRentalFormComponent implements OnInit {
         contactTrusteeId: this.rental.contactTrustee?.id ?? null,
         roomName: this.rental.roomName,
         eventTitle: this.rental.eventTitle,
-        eventType: this.rental.eventType || 'reception',
         eventDate: dateStr,
         startTime: `${startH}:${startM}`,
         endTime: `${endH}:${endM}`,
@@ -392,7 +370,6 @@ export class RoomRentalFormComponent implements OnInit {
     const payload: Partial<RoomRental> = {
       roomName: val.roomName.trim() || 'Parish Hall',
       eventTitle: val.eventTitle.trim(),
-      eventType: val.eventType,
       startTime: startIso,
       endTime: endIso,
       estimatedAttendees: val.estimatedAttendees || undefined,

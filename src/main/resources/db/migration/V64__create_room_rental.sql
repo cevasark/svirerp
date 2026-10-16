@@ -8,7 +8,6 @@ CREATE TABLE room_rental (
     renter_person_id       CHAR(36)       NOT NULL,
     contact_trustee_id     CHAR(36),
     event_title            VARCHAR(150)   NOT NULL,
-    event_type             VARCHAR(50),
     start_time             DATETIME       NOT NULL,
     end_time               DATETIME       NOT NULL,
     estimated_attendees    INT,

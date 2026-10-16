@@ -49,9 +49,6 @@ public class RoomRental {
     @Column(name = "event_title", nullable = false, length = 150)
     private String eventTitle;
 
-    @Column(name = "event_type", length = 50)
-    private String eventType;
-
     @NotNull
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
