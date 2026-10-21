@@ -176,6 +176,18 @@ function toIsoDate(d: Date = new Date()): string {
         </div>
 
         <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Rental Contract Link (URL)</mat-label>
+          <input matInput formControlName="contractUrl" placeholder="https://..." type="url" />
+          <mat-icon matPrefix>description</mat-icon>
+          @if (form.controls.contractUrl.value) {
+            <a mat-icon-button matSuffix [href]="form.controls.contractUrl.value" target="_blank" rel="noopener noreferrer"
+               matTooltip="Open contract link in new tab" (click)="$event.stopPropagation()">
+              <mat-icon>open_in_new</mat-icon>
+            </a>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
           <mat-label>Notes & Setup Requirements</mat-label>
           <textarea matInput formControlName="notes" rows="2" placeholder="Kitchen access requested, tables arrangement, key pickup notes..."></textarea>
         </mat-form-field>
@@ -273,6 +285,7 @@ export class RoomRentalFormComponent implements OnInit {
     totalFee: [0, [Validators.required, Validators.min(0)]],
     depositAmount: [0, [Validators.required, Validators.min(0)]],
     status: ['requested' as RoomRentalStatus, Validators.required],
+    contractUrl: [''],
     notes: [''],
   });
 
@@ -306,6 +319,7 @@ export class RoomRentalFormComponent implements OnInit {
         totalFee: this.rental.totalFee,
         depositAmount: this.rental.depositAmount,
         status: this.rental.status,
+        contractUrl: this.rental.contractUrl || '',
         notes: this.rental.notes || '',
       });
 
@@ -376,6 +390,7 @@ export class RoomRentalFormComponent implements OnInit {
       totalFee: val.totalFee,
       depositAmount: val.depositAmount,
       status: val.status,
+      contractUrl: val.contractUrl.trim() || undefined,
       notes: val.notes.trim() || undefined,
       renterPerson: { id: val.renterPersonId } as any,
       contactTrustee: val.contactTrusteeId ? ({ id: val.contactTrusteeId } as any) : undefined,

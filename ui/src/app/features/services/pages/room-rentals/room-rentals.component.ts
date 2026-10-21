@@ -158,6 +158,13 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
                       <mat-icon inline>person</mat-icon>
                       <span>{{ rental.renterPerson.firstName }} {{ rental.renterPerson.lastName }}</span>
                     </div>
+                    @if (rental.contractUrl) {
+                      <div class="slot-contract" (click)="$event.stopPropagation()">
+                        <a [href]="rental.contractUrl" target="_blank" rel="noopener noreferrer" class="contract-chip" matTooltip="Open rental contract in new tab">
+                          <mat-icon inline>description</mat-icon> Contract
+                        </a>
+                      </div>
+                    }
                     <div class="slot-badge" [attr.data-status]="rental.status">
                       {{ statusLabels[rental.status] }}
                     </div>
@@ -233,7 +240,15 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
                   <td>
                     <div class="event-title-wrap">
                       <strong class="clickable" (click)="openEditDialog(r)">{{ r.eventTitle }}</strong>
-                      <span class="room-chip">{{ r.roomName }}</span>
+                      <div class="room-tags">
+                        <span class="room-chip">{{ r.roomName }}</span>
+                        @if (r.contractUrl) {
+                          <a class="contract-chip" [href]="r.contractUrl" target="_blank" rel="noopener noreferrer"
+                             matTooltip="Open rental contract in new tab" (click)="$event.stopPropagation()">
+                            <mat-icon inline>description</mat-icon> Contract
+                          </a>
+                        }
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -294,6 +309,11 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
                       <button mat-menu-item (click)="openEditDialog(r)">
                         <mat-icon>edit</mat-icon> Edit Details
                       </button>
+                      @if (r.contractUrl) {
+                        <a mat-menu-item [href]="r.contractUrl" target="_blank" rel="noopener noreferrer">
+                          <mat-icon>description</mat-icon> View Rental Contract
+                        </a>
+                      }
                       @if (r.status === 'requested') {
                         <button mat-menu-item (click)="confirmSlot(r)">
                           <mat-icon>check_circle</mat-icon> Confirm Slot Available
@@ -566,6 +586,26 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
     .date-main { font-weight: 600; }
     .time-sub, .phone-sub, .fin-sub { font-size: .8rem; color: rgba(0,0,0,.55); }
     .event-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .room-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+    .contract-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: .72rem;
+      font-weight: 500;
+      text-decoration: none;
+    }
+    .contract-chip:hover {
+      background: #dbeafe;
+      color: #1e40af;
+      text-decoration: none;
+    }
+    .slot-contract { margin-top: 3px; }
     .room-chip { font-size: .75rem; color: rgba(0,0,0,.5); }
     .renter-cell { display: flex; flex-direction: column; }
     .trustee-badge {

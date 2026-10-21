@@ -92,6 +92,9 @@ public class RoomRental {
     @Column(name = "final_payment_method", length = 30)
     private String finalPaymentMethod;
 
+    @Column(name = "contract_url", length = 1000)
+    private String contractUrl;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

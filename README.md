@@ -427,15 +427,31 @@ The API starts at `http://localhost:8080` (or `--server.port` value). All REST e
 
 `https://svirerp.svivanrilski.com` is the public URL for the running app. TLS termination and reverse proxying are handled by a **Caddy** instance (not part of this repo) running as a Windows service on the host machine, config at `H:\caddy-w\Caddyfile`:
 
-```
+```caddy
 svirerp.svivanrilski.com {
-	reverse_proxy 172.21.43.55:8080
+	reverse_proxy 127.0.0.1:8080
 }
 ```
 
 Caddy obtains and renews the Let's Encrypt certificate automatically — no cert files or manual renewal needed. This is the same Caddy instance already fronting `app.svivanrilski.com` (a separate ERPNext installation, unrelated to this app), just with an additional site block.
 
-The app itself currently runs inside a WSL2 VM rather than natively on Windows, so the reverse-proxy target above is the VM's internal IP rather than `127.0.0.1` (WSL2's `localhostForwarding` only relays WSL ports to Windows' IPv6 loopback, not the IPv4 loopback Caddy would otherwise use). Because that internal IP changes on every WSL restart, a scheduled task (**"Update WSL IP for Caddy"**, running `H:\caddy-w\update-wsl-ip.ps1`) periodically rewrites any `172.x.x.x` address found anywhere in the Caddyfile to the VM's current IP and reloads Caddy — this keeps the `svirerp.svivanrilski.com` block in sync automatically alongside the pre-existing `app.svivanrilski.com` one, with no per-domain wiring needed.
+### WSL2 Networking Configuration
+
+The app runs inside a WSL2 VM rather than natively on Windows. To allow Caddy running on the Windows host to forward traffic directly to `127.0.0.1:8080` without dynamic IP complications, WSL2 is configured with **mirrored networking mode**.
+
+On the Windows host, the user configuration file `%USERPROFILE%\.wslconfig` (e.g. `C:\Users\<user>\.wslconfig`) contains:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+With `networkingMode=mirrored`:
+- WSL2 shares the host network interfaces and loopback adapter (`127.0.0.1` / `localhost`).
+- Applications listening on `8080` inside WSL2 are accessible directly on Windows via `127.0.0.1:8080`.
+- Caddy's reverse-proxy upstream in `H:\caddy-w\Caddyfile` is static (`127.0.0.1:8080`).
+
+*(Note: Prior to mirrored networking, WSL2 used a virtual NAT subnet where the VM's internal IP changed on every restart from `172.x.x.x`, which required a scheduled task `H:\caddy-w\update-wsl-ip.ps1` to rewrite the Caddyfile. With `networkingMode=mirrored`, that script and scheduled task are no longer needed for SVIR ERP).*
 
 Reloading after a manual Caddyfile edit: `caddy reload --config H:\caddy-w\Caddyfile` (or restart the `caddy` Windows service).
 

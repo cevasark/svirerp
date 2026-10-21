@@ -773,6 +773,7 @@ export interface RoomRental {
   finalAmountPaid: number;
   finalPaymentDate?: string;
   finalPaymentMethod?: RentalPaymentMethod;
+  contractUrl?: string;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;

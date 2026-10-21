@@ -106,6 +106,7 @@ public class RoomRentalService {
         existing.setFinalAmountPaid(patch.getFinalAmountPaid());
         existing.setFinalPaymentDate(patch.getFinalPaymentDate());
         existing.setFinalPaymentMethod(patch.getFinalPaymentMethod());
+        existing.setContractUrl(patch.getContractUrl());
         existing.setNotes(patch.getNotes());
 
         if (patch.getRenterPerson() != null && patch.getRenterPerson().getId() != null) {

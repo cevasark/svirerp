@@ -54,6 +54,7 @@ class RoomRentalServiceTest {
                 .totalFee(new BigDecimal("250.00"))
                 .depositAmount(new BigDecimal("100.00"))
                 .depositPaymentMethod("cash")
+                .contractUrl("https://example.com/contracts/rental-123.pdf")
                 .build();
 
         when(personService.findById(renterId)).thenReturn(renter);
@@ -65,7 +66,43 @@ class RoomRentalServiceTest {
         assertThat(saved).isNotNull();
         assertThat(saved.getRenterPerson()).isEqualTo(renter);
         assertThat(saved.getContactTrustee()).isEqualTo(trustee);
+        assertThat(saved.getContractUrl()).isEqualTo("https://example.com/contracts/rental-123.pdf");
         verify(rentalRepo).save(rental);
+    }
+
+    @Test
+    void update_validPatch_updatesContractUrlAndFields() {
+        UUID rentalId = UUID.randomUUID();
+        OffsetDateTime start = OffsetDateTime.of(2026, 10, 20, 14, 0, 0, 0, ZoneOffset.UTC);
+        OffsetDateTime end = OffsetDateTime.of(2026, 10, 20, 18, 0, 0, 0, ZoneOffset.UTC);
+
+        RoomRental existing = RoomRental.builder()
+                .id(rentalId)
+                .roomName("Parish Hall")
+                .eventTitle("Old Title")
+                .startTime(start)
+                .endTime(end)
+                .status("requested")
+                .build();
+
+        RoomRental patch = RoomRental.builder()
+                .roomName("Fellowship Room")
+                .eventTitle("New Title")
+                .startTime(start)
+                .endTime(end)
+                .status("slot_confirmed")
+                .contractUrl("https://example.com/contract-signed.pdf")
+                .build();
+
+        when(rentalRepo.findById(rentalId)).thenReturn(Optional.of(existing));
+        when(rentalRepo.save(any(RoomRental.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RoomRental updated = service.update(rentalId, patch);
+
+        assertThat(updated.getEventTitle()).isEqualTo("New Title");
+        assertThat(updated.getContractUrl()).isEqualTo("https://example.com/contract-signed.pdf");
+        assertThat(updated.getStatus()).isEqualTo("slot_confirmed");
+        verify(rentalRepo).save(existing);
     }
 
     @Test

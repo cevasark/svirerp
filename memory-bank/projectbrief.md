@@ -23,5 +23,5 @@ Prior to this system, the church/non-profit operated with fragmented, manual pro
 
 ## Target Deployment Model
 - **Single-Tenant Architecture:** Exactly one Organization record per database instance (enforced at the DB constraint level by Flyway migration V52).
-- **Runtime Environment:** Linux/WSL2 host running MariaDB 11.8, with Caddy reverse proxy handling HTTPS and port routing. MariaDB is the validated migration target; see [techContext.md](techContext.md) for MySQL compatibility limits.
+- **Runtime Environment:** Linux/WSL2 host running MariaDB 11.8 with mirrored networking (`networkingMode=mirrored`), with host Caddy reverse proxy handling HTTPS and routing to `127.0.0.1:8080`. MariaDB is the validated migration target; see [techContext.md](techContext.md) for MySQL compatibility limits.
 - **Development Environment:** Windows host with JDK 25/26, Node 24+, Angular 21, and Maven 3.9+.
