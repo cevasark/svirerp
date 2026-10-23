@@ -288,15 +288,31 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
 
                       @if (r.status === 'requested') {
                         <button mat-stroked-button color="primary" class="row-step-btn" (click)="confirmSlot(r)">
-                          <mat-icon>check</mat-icon> Confirm Slot
+                          <mat-icon>check</mat-icon> {{ r.totalFee === 0 ? 'Confirm (No Fee)' : 'Confirm Slot' }}
                         </button>
                       } @else if (r.status === 'slot_confirmed') {
-                        <button mat-stroked-button class="row-step-btn deposit-btn" (click)="recordPayment(r, 'deposit')">
-                          <mat-icon>payments</mat-icon> Record Deposit
-                        </button>
+                        @if (r.totalFee === 0) {
+                          <button mat-stroked-button color="primary" class="row-step-btn" (click)="markConfirmed(r)">
+                            <mat-icon>verified</mat-icon> Confirm (No Fee)
+                          </button>
+                        } @else {
+                          <button mat-stroked-button class="row-step-btn deposit-btn" (click)="recordPayment(r, 'deposit')">
+                            <mat-icon>payments</mat-icon> Record Deposit
+                          </button>
+                        }
                       } @else if (r.status === 'deposit_paid') {
-                        <button mat-stroked-button class="row-step-btn balance-btn" (click)="recordPayment(r, 'final')">
-                          <mat-icon>paid</mat-icon> Record Balance
+                        @if ((r.totalFee - r.depositAmount - r.finalAmountPaid) <= 0) {
+                          <button mat-stroked-button color="primary" class="row-step-btn" (click)="markConfirmed(r)">
+                            <mat-icon>verified</mat-icon> Confirm (Paid)
+                          </button>
+                        } @else {
+                          <button mat-stroked-button class="row-step-btn balance-btn" (click)="recordPayment(r, 'final')">
+                            <mat-icon>paid</mat-icon> Record Balance
+                          </button>
+                        }
+                      } @else if (r.status === 'confirmed') {
+                        <button mat-stroked-button class="row-step-btn complete-btn" (click)="markCompleted(r)">
+                          <mat-icon>task_alt</mat-icon> Complete
                         </button>
                       }
                     </div>
@@ -327,6 +343,16 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
                       @if (r.status === 'deposit_paid') {
                         <button mat-menu-item (click)="recordPayment(r, 'final')">
                           <mat-icon>paid</mat-icon> Record Final Payment ($)
+                        </button>
+                      }
+                      @if (r.status === 'slot_confirmed' && r.totalFee === 0) {
+                        <button mat-menu-item (click)="markConfirmed(r)">
+                          <mat-icon>verified</mat-icon> Confirm Booking (No Fee)
+                        </button>
+                      }
+                      @if (r.status !== 'completed' && r.status !== 'cancelled') {
+                        <button mat-menu-item (click)="markCompleted(r)">
+                          <mat-icon>task_alt</mat-icon> Mark Completed
                         </button>
                       }
                       @if (r.status !== 'cancelled' && r.status !== 'completed') {
@@ -635,6 +661,7 @@ const STATUS_LABELS: Record<RoomRentalStatus, string> = {
     }
     .deposit-btn { color: #7c3aed !important; border-color: #7c3aed !important; }
     .balance-btn { color: #16a34a !important; border-color: #16a34a !important; }
+    .complete-btn { color: #0284c7 !important; border-color: #0284c7 !important; }
 
     .status-pill {
       display: inline-block;
@@ -800,20 +827,70 @@ export class RoomRentalsComponent implements OnInit {
   }
 
   confirmSlot(rental: RoomRental): void {
+    const isZeroFee = rental.totalFee === 0;
     this.dialog
       .open(ConfirmDialogComponent, {
         data: {
-          title: 'Confirm Slot Availability',
-          message: `Confirm that "${rental.roomName}" is available for "${rental.eventTitle}" on ${new Date(rental.startTime).toLocaleDateString()}? This advances the agreement to Step 2 (Awaiting Deposit).`,
-          confirmLabel: 'Confirm Slot',
+          title: isZeroFee ? 'Confirm Reservation (No Fee)' : 'Confirm Slot Availability',
+          message: isZeroFee
+            ? `Confirm booking for "${rental.roomName}" for "${rental.eventTitle}" on ${new Date(rental.startTime).toLocaleDateString()}? No fee is required, so the reservation will advance directly to Fully Confirmed.`
+            : `Confirm that "${rental.roomName}" is available for "${rental.eventTitle}" on ${new Date(rental.startTime).toLocaleDateString()}? This advances the agreement to Step 2 (Awaiting Deposit).`,
+          confirmLabel: isZeroFee ? 'Confirm Reservation' : 'Confirm Slot',
         },
       })
       .afterClosed()
       .subscribe(confirmed => {
         if (confirmed) {
-          this.rentalService.update(rental.id, { ...rental, status: 'slot_confirmed' }).subscribe({
+          const nextStatus = isZeroFee ? 'confirmed' : 'slot_confirmed';
+          this.rentalService.update(rental.id, { ...rental, status: nextStatus }).subscribe({
             next: () => {
-              this.notifications.success('Slot confirmed! Awaiting deposit.');
+              this.notifications.success(isZeroFee ? 'Reservation fully confirmed (no fee).' : 'Slot confirmed! Awaiting deposit.');
+              this.loadWeekSchedule();
+              this.loadAllRentals();
+            },
+          });
+        }
+      });
+  }
+
+  markConfirmed(rental: RoomRental): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Confirm Rental',
+          message: `Confirm reservation for "${rental.eventTitle}"? Status will update to Fully Confirmed & Paid.`,
+          confirmLabel: 'Confirm Reservation',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.rentalService.update(rental.id, { ...rental, status: 'confirmed' }).subscribe({
+            next: () => {
+              this.notifications.success('Reservation fully confirmed!');
+              this.loadWeekSchedule();
+              this.loadAllRentals();
+            },
+          });
+        }
+      });
+  }
+
+  markCompleted(rental: RoomRental): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Mark Rental as Completed',
+          message: `Mark "${rental.eventTitle}" as completed?`,
+          confirmLabel: 'Mark Completed',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.rentalService.update(rental.id, { ...rental, status: 'completed' }).subscribe({
+            next: () => {
+              this.notifications.success('Rental marked as completed.');
               this.loadWeekSchedule();
               this.loadAllRentals();
             },

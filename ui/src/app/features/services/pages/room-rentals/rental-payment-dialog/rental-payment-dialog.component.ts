@@ -243,6 +243,7 @@ export class RentalPaymentDialogComponent implements OnInit {
       endTime: r.endTime,
       estimatedAttendees: r.estimatedAttendees,
       totalFee: r.totalFee,
+      contractUrl: r.contractUrl,
       renterPerson: { id: r.renterPerson.id } as any,
       contactTrustee: r.contactTrustee ? ({ id: r.contactTrustee.id } as any) : undefined,
     };
