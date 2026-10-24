@@ -34,13 +34,30 @@ import java.io.IOException;
  */
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final GoogleHostedDomainOidcUserService googleHostedDomainOidcUserService;
     private final JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint;
     private final LocalAdminSecurityConfig localAdminSecurityConfig;
     private final AppSettingService settingService;
+    private final org.springframework.beans.factory.ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandlerProvider;
+    private final org.springframework.beans.factory.ObjectProvider<com.svivanrilski.svirerp.user.UserLoginService> userLoginServiceProvider;
+
+    public SecurityConfig(
+            GoogleHostedDomainOidcUserService googleHostedDomainOidcUserService,
+            JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint,
+            LocalAdminSecurityConfig localAdminSecurityConfig,
+            AppSettingService settingService,
+            org.springframework.beans.factory.ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandlerProvider,
+            org.springframework.beans.factory.ObjectProvider<com.svivanrilski.svirerp.user.UserLoginService> userLoginServiceProvider
+    ) {
+        this.googleHostedDomainOidcUserService = googleHostedDomainOidcUserService;
+        this.jsonAuthenticationEntryPoint = jsonAuthenticationEntryPoint;
+        this.localAdminSecurityConfig = localAdminSecurityConfig;
+        this.settingService = settingService;
+        this.oauth2LoginSuccessHandlerProvider = oauth2LoginSuccessHandlerProvider;
+        this.userLoginServiceProvider = userLoginServiceProvider;
+    }
 
     /**
      * Resolved fresh on every OAuth2 login attempt rather than built once at
@@ -95,15 +112,26 @@ public class SecurityConfig {
                         .requestMatchers("/api/webhooks/stripe", "/api/webhooks/zeffy").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
-                .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo.oidcUserService(googleHostedDomainOidcUserService)))
+                .oauth2Login(oauth2 -> {
+                    oauth2.userInfoEndpoint(userInfo -> userInfo.oidcUserService(googleHostedDomainOidcUserService));
+                    OAuth2LoginSuccessHandler handler = oauth2LoginSuccessHandlerProvider.getIfAvailable();
+                    if (handler != null) {
+                        oauth2.successHandler(handler);
+                    }
+                })
                 // Spring's default formLogin success/failure handlers issue redirects, which
                 // XHR follows transparently and reports back as a confusing 200-with-HTML-body
                 // rather than a clean success/failure signal — override both so the Angular
                 // client gets a plain status code instead.
                 .formLogin(form -> form
                         .loginProcessingUrl("/login/local")
-                        .successHandler((request, response, authentication) -> response.setStatus(204))
+                        .successHandler((request, response, authentication) -> {
+                            com.svivanrilski.svirerp.user.UserLoginService uls = userLoginServiceProvider.getIfAvailable();
+                            if (uls != null) {
+                                uls.recordLogin(authentication.getName(), "Local Admin", "local-admin");
+                            }
+                            response.setStatus(204);
+                        })
                         .failureHandler((request, response, exception) -> response.sendError(
                                 exception instanceof LockedException ? 429 : 401, exception.getMessage()))
                         .permitAll())

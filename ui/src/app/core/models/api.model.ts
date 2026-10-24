@@ -211,3 +211,15 @@ export interface StripePriceInfo {
   currency?: string;
   alreadyMapped: boolean;
 }
+
+/** Response shape of GET /api/settings/users */
+export interface AppUserSummary {
+  id: string;
+  email: string;
+  name?: string | null;
+  provider: string;
+  lastLoginAt: string | null;
+  loginCount: number;
+  createdAt: string;
+}
+

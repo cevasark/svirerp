@@ -13,6 +13,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="generalActive.isActive">
         General
       </a>
+      <a mat-tab-link routerLink="users" routerLinkActive #usersActive="routerLinkActive"
+         [active]="usersActive.isActive">
+        Users
+      </a>
       <a mat-tab-link routerLink="organization" routerLinkActive #orgActive="routerLinkActive"
          [active]="orgActive.isActive">
         Organization

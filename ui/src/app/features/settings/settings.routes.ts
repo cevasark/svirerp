@@ -17,6 +17,13 @@ export const settingsRoutes: Routes = [
           ),
       },
       {
+        path: 'users',
+        loadComponent: () =>
+          import('./pages/user-settings/user-settings.component').then(
+            m => m.UserSettingsComponent,
+          ),
+      },
+      {
         path: 'organization',
         loadComponent: () =>
           import('./pages/organization-settings/organization-settings.component').then(

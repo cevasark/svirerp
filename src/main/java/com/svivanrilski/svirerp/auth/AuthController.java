@@ -14,13 +14,18 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/auth")
+@lombok.RequiredArgsConstructor
 public class AuthController {
+
+    private final com.svivanrilski.svirerp.user.UserLoginService userLoginService;
 
     @GetMapping("/me")
     public AuthenticatedUserResponse me(Authentication authentication) {
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+            userLoginService.recordInitialIfAbsent(oidcUser.getEmail(), oidcUser.getFullName(), "google");
             return new AuthenticatedUserResponse(oidcUser.getEmail(), oidcUser.getFullName(), "google");
         }
+        userLoginService.recordInitialIfAbsent(authentication.getName(), "Local Admin", "local-admin");
         return new AuthenticatedUserResponse(null, authentication.getName(), "local-admin");
     }
 
