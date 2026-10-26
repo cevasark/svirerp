@@ -1,0 +1,29 @@
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+site:
+  title: SVIR ERP
+  structure:
+    - type: section
+      key: section-svirerp
+      title: SVIR ERP
+      path: svirerp
+      default: true
+      children:
+        - type: space
+          key: space-svirerp
+          title: SVIR ERP
+          path: docs
+          default: true
+          content:
+            directory: ./
+    - type: section
+      key: section-memory-bank
+      title: Memory Bank
+      path: memory-bank
+      children:
+        - type: space
+          key: space-memory-bank
+          title: Memory Bank
+          path: docs
+          default: true
+          content:
+            directory: ./memory-bank
